@@ -25,6 +25,8 @@ MODULE MOD_DA_SM
    USE MOD_Pixelset
    USE MOD_Pixel
    USE MOD_Mesh
+   USE MOD_SPMD_Task
+
    IMPLICIT NONE
    SAVE
 
@@ -275,15 +277,15 @@ MODULE MOD_DA_SM
    real(r8), allocatable :: synop_lon(:)                     ! longitude of all obs
    integer,  allocatable :: synop_id(:)                      ! global id of all obs
    real(r8), allocatable :: synop_tref(:)                    ! 2m temperature of all obs ([K])
-   integer,  allocatable :: synop_qref(:)                    ! 2m humidity of all obs ([K])
+   real(r8), allocatable :: synop_qref(:)                    ! 2m humidity of all obs ([K])
 
    ! observations around patch (dimensions changes with patch)
    integer :: num_synop_p
    logical, allocatable :: index_synop_p(:)                  ! index of obs around each patch
    real(r8), allocatable :: synop_lat_p(:)                   ! latitude of obs around each patch
    real(r8), allocatable :: synop_lon_p(:)                   ! longitude of obs around each patch
-   real(r8), allocatable :: synop_qref_p(:)                  ! 2m temperature of obs around each patch ([K])
-   real(r8), allocatable :: synop_tref_p(:)                  ! 2m humidity of obs around each patch ([K])
+   real(r8), allocatable :: synop_tref_p(:)                  ! 2m temperature of obs around each patch ([K])
+   real(r8), allocatable :: synop_qref_p(:)                  ! 2m humidity of obs around each patch ([K])
    real(r8), allocatable :: synop_p(:)                       ! concatenate 2m temperature and humidity of obs around each patch
    real(r8), allocatable :: qref_ens_p(:,:)                  ! predicted 2m temperature around patch
    real(r8), allocatable :: tref_ens_p(:,:)                  ! predicted 2m humidity around patch
@@ -1273,7 +1275,7 @@ CONTAINS
                         synop_lat(:) < lat_p_n .and. synop_lat(:) > lat_p_s .and. &
                         synop_lon(:) > lon_p_w .and. synop_lon(:) < lon_p_e .and. &
                         synop_time(:) - idate_b >= 0 .and. synop_time(:) - idate_e <= 0 .and. &
-                        tref_ens_o(:,1) > 0)
+                        tref_ens_o(:,1) > 0) 
                   ENDIF
                ENDIF
                num_obs_p = num_smap_p + num_fy3d_p + 2*num_synop_p

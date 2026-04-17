@@ -29,8 +29,7 @@ MODULE MOD_DA_Const
    ! Constant variables
    real(r8), parameter :: C = 2.998e8           ! speed of light (m/s)
    real(r8), parameter :: mu0 = 4.*pi*1e-7      ! vacuum permeability (H/m)
-   real(r8), parameter :: eps0 = 8.854e-12      ! vacuum permittivity (Klein and Swift 1977) [Farads/meter]
-   real(r8), parameter :: z0 = sqrt(mu0/eps0)   ! impendace of free space (Ohm)
+   real(r8), parameter :: z0 = sqrt(mu0/eps0)   ! impedance of free space (Ohm)
    real(r8), parameter :: eps_w_inf = 4.9       ! dielectric constant at infinite frequency (Stogryn 1971),
    real(r8), parameter :: eps_0 = 8.854e-12     ! dielectric constant of free space (Klein and Swift 1977) [Farads/meter]
    real(r8), parameter :: rho_soil = 2.66       ! soil specific density (g/cm3)

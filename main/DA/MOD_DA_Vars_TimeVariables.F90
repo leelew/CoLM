@@ -38,7 +38,7 @@ MODULE MOD_DA_Vars_TimeVariables
    real(r8), allocatable :: tleaf_noda         (:) ! leaf temperature [K]
    real(r8), allocatable :: ldew_noda          (:) ! depth of water on foliage [mm]
    real(r8), allocatable :: ldew_rain_noda     (:) ! depth of rain on foliage [mm]
-   real(r8), allocatable :: ldew_snow_noda     (:) ! depth of rain on foliage [mm]
+   real(r8), allocatable :: ldew_snow_noda     (:) ! depth of snow on foliage [mm]
    real(r8), allocatable :: fwet_snow_noda     (:) ! vegetation snow fractional cover [-]
    real(r8), allocatable :: sag_noda           (:) ! non dimensional snow age [-]
    real(r8), allocatable :: scv_noda           (:) ! snow cover, water equivalent [mm]
@@ -83,7 +83,7 @@ MODULE MOD_DA_Vars_TimeVariables
    real(r8), allocatable :: tleaf_ens         (:,:) ! leaf temperature [K]
    real(r8), allocatable :: ldew_ens          (:,:) ! depth of water on foliage [mm]
    real(r8), allocatable :: ldew_rain_ens     (:,:) ! depth of rain on foliage [mm]
-   real(r8), allocatable :: ldew_snow_ens     (:,:) ! depth of rain on foliage [mm]
+   real(r8), allocatable :: ldew_snow_ens     (:,:) ! depth of snow on foliage [mm]
    real(r8), allocatable :: fwet_snow_ens     (:,:) ! vegetation snow fractional cover [-]
    real(r8), allocatable :: sag_ens           (:,:) ! non dimensional snow age [-]
    real(r8), allocatable :: scv_ens           (:,:) ! snow cover, water equivalent [mm]
@@ -539,8 +539,8 @@ CONTAINS
       CALL ncio_write_vector (file_restart, 'alb',         'band',     2, 'rtyp', 2, 'ens', DEF_DA_ENS_NUM, 'patch', landpatch, alb_ens,  compress) ! averaged albedo [-]
       CALL ncio_write_vector (file_restart, 'ssun',        'band',     2, 'rtyp', 2, 'ens', DEF_DA_ENS_NUM, 'patch', landpatch, ssun_ens, compress) ! sunlit canopy absorption for solar radiation (0-1)
       CALL ncio_write_vector (file_restart, 'ssha',        'band',     2, 'rtyp', 2, 'ens', DEF_DA_ENS_NUM, 'patch', landpatch, ssha_ens, compress) ! shaded canopy absorption for solar radiation (0-1)
-      CALL ncio_write_vector (file_restart, 'ssoi',        'band',     2, 'rtyp', 2, 'ens', DEF_DA_ENS_NUM, 'patch', landpatch, ssoi_ens, compress) ! shaded canopy absorption for solar radiation (0-1)
-      CALL ncio_write_vector (file_restart, 'ssno',        'band',     2, 'rtyp', 2, 'ens', DEF_DA_ENS_NUM, 'patch', landpatch, ssno_ens, compress) ! shaded canopy absorption for solar radiation (0-1)
+      CALL ncio_write_vector (file_restart, 'ssoi',        'band',     2, 'rtyp', 2, 'ens', DEF_DA_ENS_NUM, 'patch', landpatch, ssoi_ens, compress) ! ground soil absorption [-]
+      CALL ncio_write_vector (file_restart, 'ssno',        'band',     2, 'rtyp', 2, 'ens', DEF_DA_ENS_NUM, 'patch', landpatch, ssno_ens, compress) ! ground snow absorption [-]
       CALL ncio_write_vector (file_restart, 'thermk',      'ens',      DEF_DA_ENS_NUM,     'patch', landpatch, thermk_ens,    compress) ! canopy gap fraction for tir radiation
       CALL ncio_write_vector (file_restart, 'extkb',       'ens',      DEF_DA_ENS_NUM,     'patch', landpatch, extkb_ens,     compress) ! (k, g(mu)/mu) direct solar extinction coefficient
       CALL ncio_write_vector (file_restart, 'extkd',       'ens',      DEF_DA_ENS_NUM,     'patch', landpatch, extkd_ens,     compress) ! diffuse and scattered diffuse PAR extinction coefficient
@@ -676,7 +676,7 @@ CONTAINS
       CALL check_vector_data ('ldew        [mm]   ', ldew_ens        ) ! depth of water on foliage [mm]
       CALL check_vector_data ('ldew_rain   [mm]   ', ldew_rain_ens   ) ! depth of rain on foliage [mm]
       CALL check_vector_data ('ldew_snow   [mm]   ', ldew_snow_ens   ) ! depth of snow on foliage [mm]
-      CALL check_vector_data ('fwet_snow   [mm]   ', fwet_snow_ens   ) ! vegetation snow fractional cover [-]
+      CALL check_vector_data ('fwet_snow   [-]   ', fwet_snow_ens   ) ! vegetation snow fractional cover [-]
       CALL check_vector_data ('sag         [-]    ', sag_ens         ) ! non dimensional snow age [-]
       CALL check_vector_data ('scv         [mm]   ', scv_ens         ) ! snow cover, water equivalent [mm]
       CALL check_vector_data ('snowdp      [m]    ', snowdp_ens      ) ! snow depth [meter]
@@ -702,7 +702,7 @@ CONTAINS
       CALL check_vector_data ('wetwat      [mm]   ', wetwat_ens      ) ! water storage in wetland [mm]
       CALL check_vector_data ('t_lake      [K]    ', t_lake_ens      ) ! lake temperature [K]
       CALL check_vector_data ('lake_icefrc [-]    ', lake_icefrac_ens) ! lake ice fraction [-]
-      CALL check_vector_data ('savedtke1   [W/m K]', savedtke1_ens   ) ! saved tke1 [m2/s2]
+      CALL check_vector_data ('savedtke1   [W/m K]', savedtke1_ens   ) ! top level eddy conductivity (W/m K)
 
 #ifdef USEMPI
       CALL mpi_barrier(p_comm_glb, p_err)

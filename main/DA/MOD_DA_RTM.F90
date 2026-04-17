@@ -144,9 +144,9 @@ CONTAINS
 
       ! calculate lower bound of snow
       lb = 0
-      DO i = 0, maxsnl
-         IF (wliq_soisno(i) < 0.0) THEN
-            lb = i+1
+      DO i = maxsnl+1, 0
+         IF (wliq_soisno(i) + wice_soisno(i) > 0.0) THEN
+            lb = i
             EXIT
          ENDIF
       ENDDO
@@ -466,7 +466,7 @@ CONTAINS
          IF (ffrz > 0.95) THEN
             CALL diel_ice(t_surf, ew)
          ELSE
-            CALL diel_water(-1, liq_surf, t_surf, wf_sand_surf, wf_clay_surf, BD_all_surf, sal_soil, ew)
+            CALL diel_water(2, liq_surf, t_surf, wf_sand_surf, wf_clay_surf, BD_all_surf, sal_soil, ew)
          END IF
 
          ! caculate dielectric constant in mixed soil
@@ -665,7 +665,7 @@ CONTAINS
 
          ! diel constant of sea water [1] eq.21
          eps_w = eps_w_inf + (eps_w0 - eps_w_inf)/(1 - jj*omega*tau_w) + jj*sigma/(omega*eps_0)
-      ELSE
+      ELSEIF (type == 2) THEN
          ! calculate soil conductivity
          sigma = -1.645 + 1.939*BD_all - 0.02256*wf_sand + 0.01594*wf_clay
          IF (sigma < 0.) THEN
@@ -868,19 +868,19 @@ CONTAINS
 !  Initializing the GRMDM spectroscopic parameters with clay (fraction)
 !------------------------------------------------------------------------
       ! RI & NAC of dry soils
-      nd = 1.634 - 0.539 * (wf_clay/100) + 0.2748 * (wf_clay/100) ** 2   ! [1](11)
-      kd = 0.03952 - 0.04038 * (wf_clay/100)                             ! [1](12)
+      nd = 1.634 - 0.539e-2 * wf_clay + 0.2748e-4 * (wf_clay ** 2)   ! [1](11)
+      kd = 0.03952 - 0.04038e-2 * wf_clay                            ! [1](12)
 
       ! maximum bound water fraction
-      mvt = 0.02863 + 0.30673 * (wf_clay/100)                            ! [1](13)
+      mvt = 0.02863 + 0.30673e-2 * wf_clay                           ! [1](13)
 
       ! starting temperature for parameters' fit ([1] p.413)
       ts = 20.
 
       ! eb0 computation
-      e0b  = 79.8 - 85.4 * wf_clay + 32.7 * (wf_clay/100) **2                                                                    ! [1](14)
-      Bb   = 8.67e-19 - 0.00126 * (wf_clay/100) + 0.00184 * (wf_clay/100) ** 2  - 9.77e-10*(wf_clay**3) - 1.39e-15 *(wf_clay**4) ! [1](15)
-      Bsgb = 0.0028  + 0.02094e-2*wf_clay - 0.01229e-4*(wf_clay**2) - 5.03e-22*(wf_clay**3) + 4.163e-24*(wf_clay**4)             ! [1](23)
+      e0b  = 79.8 - 85.4e-2 * wf_clay + 32.7e-4 * (wf_clay **2)      ! [1](14)                                                               ! [1](14)
+      Bb   = 8.67e-19 - 0.00126e-2 * wf_clay + 0.00184e-4 * (wf_clay ** 2)  - 9.77e-10*(wf_clay**3) - 1.39e-15 *(wf_clay**4)   ! [1](15)
+      Bsgb = 0.0028  + 0.02094e-2*wf_clay - 0.01229e-4*(wf_clay**2) - 5.03e-22*(wf_clay**3) + 4.163e-24*(wf_clay**4)           ! [1](23)
       Fb   = log((e0b - 1)/(e0b + 2))                                                        ! [1](8)(ep0->e0p)
       eb0  = (1 + 2*exp(Fb-Bb*(t-ts))) / (1 - exp(Fb-Bb*(t-ts)))                             ! [1](7)(e0p->ep0)
 
@@ -892,7 +892,7 @@ CONTAINS
       ! sigmab computation
       sigmabt = 0.3112 + 0.467e-2*wf_clay                                                   ! [1](22)
       sigmab  = sigmabt + Bsgb*(t-ts)                                                       ! [1](10)
-
+  
       ! unbound (free) water parameters
       !-------------------
       !  eu0 computation
@@ -913,7 +913,7 @@ CONTAINS
       !----------------------
       !  sigmau computation
       !----------------------
-      sigmaut = 0.05_r8 + 1.4_r8*(1.0_r8 - (1.0_r8 - wf_clay*1.e-2_r8)**4.664_r8)                                    ! [1](24)
+      sigmaut = 0.05 + 1.4*(1.0 - (1.0 - wf_clay*1.e-2)**4.664)                                                      ! [1](24)
       sigmau  = sigmaut + Bsgu*(t-ts)                                                                                ! [1](10)
 
       !--------------------------------------------------
@@ -1375,7 +1375,7 @@ CONTAINS
                   (z0*cos(theta) + z_s*cos(theta_s)))**2
             END IF
 
-            ! calculate snow grain size (mm) (Anderson 1976, eq.5.1) TODO
+            ! calculate snow grain size (mm) (Anderson 1976, eq.5.1) 
             d = min(1000*(1.6e-4 + 1.1e-13*((rho_snow*1000.0)**4)), 3.0)
 
             ! extinction coefficient of dry snow

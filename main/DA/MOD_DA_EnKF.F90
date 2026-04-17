@@ -99,6 +99,15 @@ CONTAINS
         lwork = 4 * num_ens
         allocate( work(lwork) )
         CALL dsyev('V', 'U', num_ens, pa_inv, num_ens, eigval, work, lwork, err)
+
+        IF (err < 0) THEN
+            WRITE(*,*) 'LETKF error: DSYEV argument ', -err, ' had an illegal value.'
+            CALL CoLM_stop()
+        ELSE IF (err > 0) THEN
+            WRITE(*,*) 'LETKF error: DSYEV failed to converge, INFO = ', err
+            CALL CoLM_stop()
+        END IF
+
         eigvec = pa_inv !(kxk)
 
         ! calculate background error covariance matrix pa = eigvec (eigval)^-1 eigvec^T
