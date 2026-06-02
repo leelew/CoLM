@@ -1573,7 +1573,7 @@ ENDIF
 
 #ifdef DataAssimilation
       IF (p_is_worker) THEN
-         DO i = 1, DEF_DA_ENS_NUM
+         DO i = 0, DEF_DA_ENS_NUM
             z_sno_ens(:, i, :) = z_sno
             dz_sno_ens(:, i, :) = dz_sno
             t_soisno_ens(:, i, :) = t_soisno

@@ -36,7 +36,6 @@ MODULE MOD_DA_Vars_TimeVariables
 #endif
    IMPLICIT NONE
    SAVE
-   PRIVATE
 
    PUBLIC :: allocate_DATimeVariables
    PUBLIC :: deallocate_DATimeVariables
