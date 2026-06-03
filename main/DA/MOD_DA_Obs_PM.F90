@@ -279,26 +279,16 @@ CONTAINS
       CALL this%clear()
 
       ! read obs
-      IF (p_is_master) WRITE(*,'(A,A)') '[CoLM-DA-DEBUG] PM before obs read sensor=', trim(this%y%sensor_name)
       CALL this%y%read(idate, deltim)
-      IF (p_is_master) WRITE(*,'(A,A,A,I0)') '[CoLM-DA-DEBUG] PM after obs read sensor=', &
-         trim(this%y%sensor_name), ' nobs=', this%y%nobs
       IF (this%y%nobs == 0) RETURN
 
       ! forward operator and map H(x) to y locations
-      IF (p_is_master) WRITE(*,'(A,A)') '[CoLM-DA-DEBUG] PM before calcp sensor=', trim(this%y%sensor_name)
       CALL this%calcp()
-      IF (p_is_master) WRITE(*,'(A,A)') '[CoLM-DA-DEBUG] PM after calcp sensor=', trim(this%y%sensor_name)
 
       ! Keep the mapped numerator and area denominator on the same valid patches.
       allocate (filter(numpatch))
       IF (p_is_worker) filter(:) = patchtype(:) <= 2 .and. &
          all(this%hx_pset(1:DEF_DA_ENS_NUM,:) /= spval, dim=1)
-      IF (p_is_worker) THEN
-         nvalid_patch = count(filter)
-         WRITE(*,'(A,I0,A,A,A,I0)') '[CoLM-DA-DEBUG] worker=', p_iam_glb, &
-            ' PM valid hx patches sensor=', trim(this%y%sensor_name), ' count=', nvalid_patch
-      ENDIF
 
       ! mapping H(x) from patch to y grid
       IF (p_is_io) THEN
@@ -315,8 +305,6 @@ CONTAINS
       IF (p_is_io) THEN
          allocate (iloc(this%y%nobs))
          this%hx = spval
-         WRITE(*,'(A,I0,A,A)') '[CoLM-DA-DEBUG] io=', p_iam_glb, &
-            ' PM crop hx start sensor=', trim(this%y%sensor_name)
 
          ndata = 0
          DO iobs = 1, this%y%nobs
@@ -341,8 +329,6 @@ CONTAINS
 
 #ifdef USEMPI
          smesg = (/p_iam_glb, ndata/)
-         WRITE(*,'(A,I0,A,I0,A,A)') '[CoLM-DA-DEBUG] io=', p_iam_glb, &
-            ' PM send header ndata=', ndata, ' sensor=', trim(this%y%sensor_name)
          CALL mpi_send(smesg, 2, MPI_INTEGER, p_address_master, mpi_tag_mesg, p_comm_glb, p_err)
 
          IF (ndata > 0) THEN
@@ -361,13 +347,9 @@ CONTAINS
 #ifdef USEMPI
       IF (p_is_master) THEN
          this%hx = spval
-         WRITE(*,'(A,I0,A,A)') '[CoLM-DA-DEBUG] master waiting PM io headers count=', &
-            p_np_io, ' sensor=', trim(this%y%sensor_name)
 
          DO ip = 0, p_np_io - 1
             CALL mpi_recv(rmesg, 2, MPI_INTEGER, MPI_ANY_SOURCE, mpi_tag_mesg, p_comm_glb, p_stat, p_err)
-            WRITE(*,'(A,I0,A,I0,A,A)') '[CoLM-DA-DEBUG] master got PM header source=', &
-               rmesg(1), ' ndata=', rmesg(2), ' sensor=', trim(this%y%sensor_name)
 
             ndata = rmesg(2)
             IF (ndata > 0) THEN
@@ -383,10 +365,8 @@ CONTAINS
                deallocate (tmp_data)
             ENDIF
          ENDDO
-         WRITE(*,'(A,A)') '[CoLM-DA-DEBUG] master before PM hx bcast sensor=', trim(this%y%sensor_name)
       ENDIF
       CALL mpi_bcast(this%hx, this%y%nobs*DEF_DA_ENS_NUM, MPI_REAL8, p_address_master, p_comm_glb, p_err)
-      IF (p_is_master) WRITE(*,'(A,A)') '[CoLM-DA-DEBUG] master after PM hx bcast sensor=', trim(this%y%sensor_name)
 #endif
 
    END SUBROUTINE PM_calc_on_grid

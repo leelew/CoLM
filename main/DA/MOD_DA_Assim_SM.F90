@@ -91,6 +91,8 @@ CONTAINS
       real(r8), allocatable :: trans(:,:)
       real(r8), allocatable :: wliq_ens_f(:,:)
       real(r8), allocatable :: wliq_ens_a(:,:)
+      real(r8), allocatable :: tsoi_ens_f(:,:)
+      real(r8), allocatable :: tsoi_ens_a(:,:)
 
 !-----------------------------------------------------------------------------
       ! calculate y and H(x) at y locations from different sources
@@ -122,15 +124,23 @@ CONTAINS
 
             allocate(wliq_ens_f(nl_soil, DEF_DA_ENS_NUM))
             allocate(wliq_ens_a(nl_soil, DEF_DA_ENS_NUM))
+            allocate(tsoi_ens_f(nl_soil, DEF_DA_ENS_NUM))
+            allocate(tsoi_ens_a(nl_soil, DEF_DA_ENS_NUM))
             DO iens = 1, DEF_DA_ENS_NUM
                wliq_ens_f(:,iens) = wliq_soisno_ens(1:,iens,np)
+               tsoi_ens_f(:,iens) = t_soisno_ens(1:,iens,np)
             ENDDO
             CALL dgemm('N', 'N', nl_soil, DEF_DA_ENS_NUM, DEF_DA_ENS_NUM, &
                         1.0_r8, wliq_ens_f, nl_soil, trans, DEF_DA_ENS_NUM, &
                         0.0_r8, wliq_ens_a, nl_soil)
+            CALL dgemm('N', 'N', nl_soil, DEF_DA_ENS_NUM, DEF_DA_ENS_NUM, &
+                        1.0_r8, tsoi_ens_f, nl_soil, trans, DEF_DA_ENS_NUM, &
+                        0.0_r8, tsoi_ens_a, nl_soil)
             wliq_ens_a = max(0.0_r8, wliq_ens_a)
             DO iens = 1, DEF_DA_ENS_NUM
                wliq_soisno_ens(1:2,iens,np) = wliq_ens_a(1:2,iens)
+               t_soisno_ens(1:2,iens,np) = t_soisno_ens(1:2,iens,np) + &
+                  max(-20.0_r8, min(20.0_r8, tsoi_ens_a(1:2,iens) - t_soisno_ens(1:2,iens,np)))
             ENDDO
 
             ! postprocess soil moisture to ensure physical consistency
@@ -159,6 +169,7 @@ CONTAINS
 
             deallocate(y_p, r_p, hx_p, trans)
             deallocate(wliq_ens_f, wliq_ens_a)
+            deallocate(tsoi_ens_f, tsoi_ens_a)
          ENDDO
       ENDIF
 
