@@ -100,11 +100,7 @@ CONTAINS
 
       IF (p_is_worker .and. numpatch > 0) THEN
          wliq_soisno_ol(:,:) = wliq_soisno_ens(:,0,:)
-         wice_soisno_ol(:,:) = wice_soisno_ens(:,0,:)
-         t_soisno_ol   (:,:) = t_soisno_ens   (:,0,:)
          wliq_soisno_f (:,:) = sum(wliq_soisno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2) / DEF_DA_ENS_NUM
-         wice_soisno_f (:,:) = sum(wice_soisno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2) / DEF_DA_ENS_NUM
-         t_soisno_f    (:,:) = sum(t_soisno_ens   (:,1:DEF_DA_ENS_NUM,:), dim=2) / DEF_DA_ENS_NUM
       ENDIF
 
       ! loop over patches and perform assimilation for each patch
@@ -152,14 +148,9 @@ CONTAINS
                      ENDIF
                   ENDIF
 
-                  wliq_soisno_ens(il,iens,np) = min( &
-                     porsl(il,np)*(dz_soi(il)*denh2o), &
-                     wliq_soisno_ens(il,iens,np))
-                  eff_porsl = max(0.0_r8, porsl(il,np) - &
-                     wliq_soisno_ens(il,iens,np)/(dz_soi(il)*denh2o))
-                  wice_soisno_ens(il,iens,np) = min( &
-                     eff_porsl*(dz_soi(il)*denice), &
-                     wice_soisno_ens(il,iens,np))
+                  wliq_soisno_ens(il,iens,np) = min(porsl(il,np)*(dz_soi(il)*denh2o), wliq_soisno_ens(il,iens,np))
+                  eff_porsl = max(0.0_r8, porsl(il,np) - wliq_soisno_ens(il,iens,np)/(dz_soi(il)*denh2o))
+                  wice_soisno_ens(il,iens,np) = min(eff_porsl*(dz_soi(il)*denice), wice_soisno_ens(il,iens,np))
                ENDDO
             ENDDO
 
@@ -175,8 +166,6 @@ CONTAINS
       ! values for each configured observation stream.
       IF (p_is_worker .and. numpatch > 0) THEN
          wliq_soisno_a(:,:) = sum(wliq_soisno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2) / DEF_DA_ENS_NUM
-         wice_soisno_a(:,:) = sum(wice_soisno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2) / DEF_DA_ENS_NUM
-         t_soisno_a   (:,:) = sum(t_soisno_ens   (:,1:DEF_DA_ENS_NUM,:), dim=2) / DEF_DA_ENS_NUM
       ENDIF
       CALL sm%calcp()
       CALL sm%save(.true.)

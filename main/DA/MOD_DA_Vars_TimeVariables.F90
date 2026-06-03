@@ -29,7 +29,7 @@ MODULE MOD_DA_Vars_TimeVariables
    USE MOD_Precision
    USE MOD_Vars_Global
    USE MOD_SPMD_Task
-   USE MOD_LandPatch
+   USE MOD_LandPatch, only: numpatch, landpatch
    USE MOD_NetCDFVector
 #ifdef RangeCheck
       USE MOD_RangeCheck
@@ -200,7 +200,7 @@ CONTAINS
             allocate (wliq_soisno_ol            (maxsnl+1:nl_soil,      numpatch)); wliq_soisno_ol    (:,:) = spval
             allocate (wliq_soisno_f             (maxsnl+1:nl_soil,      numpatch)); wliq_soisno_f     (:,:) = spval
             allocate (wliq_soisno_a             (maxsnl+1:nl_soil,      numpatch)); wliq_soisno_a     (:,:) = spval
-             
+
             allocate (trad_ens                        (0:DEF_DA_ENS_NUM,numpatch)); trad_ens          (:,:) = spval
             allocate (tref_ens                        (0:DEF_DA_ENS_NUM,numpatch)); tref_ens          (:,:) = spval
             allocate (qref_ens                        (0:DEF_DA_ENS_NUM,numpatch)); qref_ens          (:,:) = spval

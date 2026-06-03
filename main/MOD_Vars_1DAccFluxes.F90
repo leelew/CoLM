@@ -113,23 +113,15 @@ MODULE MOD_Vars_1DAccFluxes
    real(r8), allocatable :: a_o3uptakesha(:)
 
 #ifdef DataAssimilation
-   real(r8), allocatable :: a_hx_ol   (:,:)
-   real(r8), allocatable :: a_hx_f_ens(:,:,:)
-   real(r8), allocatable :: a_hx_a_ens(:,:,:)
-   real(r8), allocatable :: a_hx_f    (:,:)
-   real(r8), allocatable :: a_hx_a    (:,:)
+   real(r8), allocatable :: a_hx_ol          (:,:)
+   real(r8), allocatable :: a_hx_f_ens       (:,:,:)
+   real(r8), allocatable :: a_hx_a_ens       (:,:,:)
+   real(r8), allocatable :: a_hx_f           (:,:)
+   real(r8), allocatable :: a_hx_a           (:,:)
    real(r8), allocatable :: a_wliq_soisno_ol (:,:)
    real(r8), allocatable :: a_wliq_soisno_f  (:,:)
    real(r8), allocatable :: a_wliq_soisno_a  (:,:)
-   real(r8), allocatable :: a_wice_soisno_ol (:,:)
-   real(r8), allocatable :: a_wice_soisno_f  (:,:)
-   real(r8), allocatable :: a_wice_soisno_a  (:,:)
-   real(r8), allocatable :: a_t_soisno_ol    (:,:)
-   real(r8), allocatable :: a_t_soisno_f     (:,:)
-   real(r8), allocatable :: a_t_soisno_a     (:,:)
    real(r8), allocatable :: a_wliq_soisno_ens(:,:,:)
-   real(r8), allocatable :: a_wice_soisno_ens(:,:,:)
-   real(r8), allocatable :: a_t_soisno_ens   (:,:,:)
 #endif
 
 #ifdef URBAN_MODEL
@@ -1124,15 +1116,7 @@ CONTAINS
             deallocate (a_wliq_soisno_ol )
             deallocate (a_wliq_soisno_f  )
             deallocate (a_wliq_soisno_a  )
-            deallocate (a_wice_soisno_ol )
-            deallocate (a_wice_soisno_f  )
-            deallocate (a_wice_soisno_a  )
-            deallocate (a_t_soisno_ol    )
-            deallocate (a_t_soisno_f     )
-            deallocate (a_t_soisno_a     )
             deallocate (a_wliq_soisno_ens)
-            deallocate (a_wice_soisno_ens)
-            deallocate (a_t_soisno_ens   )
 #endif
 
 #ifdef URBAN_MODEL
@@ -1628,15 +1612,7 @@ CONTAINS
             a_wliq_soisno_ol (:,:)   = spval
             a_wliq_soisno_f  (:,:)   = spval
             a_wliq_soisno_a  (:,:)   = spval
-            a_wice_soisno_ol (:,:)   = spval
-            a_wice_soisno_f  (:,:)   = spval
-            a_wice_soisno_a  (:,:)   = spval
-            a_t_soisno_ol    (:,:)   = spval
-            a_t_soisno_f     (:,:)   = spval
-            a_t_soisno_a     (:,:)   = spval
             a_wliq_soisno_ens(:,:,:) = spval
-            a_wice_soisno_ens(:,:,:) = spval
-            a_t_soisno_ens   (:,:,:) = spval
 #endif
 
 #ifdef URBAN_MODEL
@@ -2251,15 +2227,7 @@ CONTAINS
             CALL acc2d (wliq_soisno_ol, a_wliq_soisno_ol)
             CALL acc2d (wliq_soisno_f , a_wliq_soisno_f )
             CALL acc2d (wliq_soisno_a , a_wliq_soisno_a )
-            CALL acc2d (wice_soisno_ol, a_wice_soisno_ol)
-            CALL acc2d (wice_soisno_f , a_wice_soisno_f )
-            CALL acc2d (wice_soisno_a , a_wice_soisno_a )
-            CALL acc2d (t_soisno_ol   , a_t_soisno_ol   )
-            CALL acc2d (t_soisno_f    , a_t_soisno_f    )
-            CALL acc2d (t_soisno_a    , a_t_soisno_a    )
             CALL acc3d (wliq_soisno_ens(:,1:DEF_DA_ENS_NUM,:), a_wliq_soisno_ens)
-            CALL acc3d (wice_soisno_ens(:,1:DEF_DA_ENS_NUM,:), a_wice_soisno_ens)
-            CALL acc3d (t_soisno_ens   (:,1:DEF_DA_ENS_NUM,:), a_t_soisno_ens   )
 #endif
 
 #ifdef URBAN_MODEL

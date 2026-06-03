@@ -12,11 +12,10 @@ MODULE MOD_DA_Vars_1DFluxes
    USE MOD_Precision
    USE MOD_Vars_Global
    USE MOD_SPMD_Task
-   USE MOD_LandPatch
+   USE MOD_LandPatch, only: numpatch
    USE MOD_Namelist, only: DEF_DA_ENS_NUM
    IMPLICIT NONE
    SAVE
-   PRIVATE
 
    PUBLIC :: allocate_1D_DAFluxes
    PUBLIC :: deallocate_1D_DAFluxes
