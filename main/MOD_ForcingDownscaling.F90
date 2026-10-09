@@ -21,38 +21,21 @@ MODULE MOD_ForcingDownscaling
    USE MOD_Const_Physical
    USE MOD_Vars_Global
    USE MOD_UserDefFun
+   USE MOD_SpatialMapping
+   USE MOD_Vars_TimeInvariants
+   USE MOD_Vars_TimeVariables
+   USE MOD_Vars_1DForcing
+   USE MOD_OrbCoszen
+   USE MOD_OrbCosazi
+   USE MOD_DataType
+   USE MOD_SpatialMapping
+   USE MOD_SPMD_Task
 
    IMPLICIT NONE
 
-   real(r8), parameter :: SHR_CONST_MWDAIR = 28.966_r8       ! molecular weight dry air [kg/kmole]
-   real(r8), parameter :: SHR_CONST_MWWV   = 18.016_r8       ! molecular weight water vapor
-   real(r8), parameter :: SHR_CONST_AVOGAD = 6.02214e26_r8   ! Avogadro's number [molecules/kmole]
-   real(r8), parameter :: SHR_CONST_BOLTZ  = 1.38065e-23_r8  ! Boltzmann's constant [J/K/molecule]
-   ! Universal gas constant [J/K/kmole]
-   real(r8), parameter :: SHR_CONST_RGAS   = SHR_CONST_AVOGAD*SHR_CONST_BOLTZ
-   ! Dry air gas constant [J/K/kg]
-   real(r8), parameter :: rair             = SHR_CONST_RGAS/SHR_CONST_MWDAIR
-
-   ! On the windward side of the range, annual mean lapse rates of 3.9-5.2 (deg km-1), substantially
-   ! smaller than the often-assumed 6.5 (deg km-1).  The data sets show similar seasonal and diurnal
-   ! variability, with lapse rates smallest (2.5-3.5 deg km-1) in late-summer minimum temperatures,
-   ! and largest (6.5-7.5 deg km-1) in spring maximum temperatures. Geographic (windward versus lee
-   ! side) differences in lapse rates are substantial. [Minder et al., 2010, Surface temperature
-   ! lapse rates over complex terrain: Lessons from the Cascade Mountains. JGR, 115,
-   ! doi:10.1029/2009JD013493]
-   !
-   ! Kunkel, K. E., 1989: Simple procedures for extrapolation of humidity variables in the
-   ! mountainous western United States.  J. Climate, 2, 656-669. lapse_rate = /Jan -
-   ! Dec/4.4,5.9,7.1,7.8,8.1,8.2,8.1,8.1,7.7,6.8,5.5,4.7/ (deg km-1)
-   real(r8), parameter :: lapse_rate = 0.006_r8         ! surface temperature lapse rate (deg m-1)
-
    SAVE
 
-! PUBLIC MEMBER FUNCTIONS:
-   PUBLIC :: downscale_forcings     ! Downscale atmospheric forcing
-
-! PRIVATE MEMBER FUNCTIONS:
-   PRIVATE :: rhos                  ! calculate atmospheric density
+   PUBLIC :: downscale_forcings 
 
 !-----------------------------------------------------------------------------
 
@@ -60,990 +43,624 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   PURE FUNCTION rhos(qbot, pbot, tbot)
+   SUBROUTINE downscale_forcings (&
+         mapping,                           &
+         julian_day,                        &
+         forc_elv_part,  forc_maxelv_part,  &
+         forc_t_part,    forc_q_part,       &
+         forc_pbot_part, forc_rhoair_part,  &
+         forc_prc_part,  forc_prl_part,     &
+         forc_frl_part,  forc_swrad_part,   &
+         forc_us_part,   forc_vs_part
+         )
 
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
-! Compute atmospheric density (kg/m**3)
+!  Downscale atmospheric forcings using elevation differences 
+!  and subgrid topographic characteristics and deep generative models.
+!
+! REFERENCES:
+!  Chen,S., Li,L., & Dai, Y (2024). 
+!  Exploring topography downscaling methods for hyper‐resolution land surface modeling.
+!  Journal of Geophysical Research: Atmospheres, 129, e2024JD041338.
+!
+!  Chen,S., Li,L., & Dai, Y (2026).
+!  Deep generative downscaling of precipitation for hyper-Resolution land surface modeling.
+!  Journal of Advances in Modeling Earth Systems.
 !-----------------------------------------------------------------------------
 
    IMPLICIT NONE
 
-   ! ARGUMENTS:
-   real(r8) :: rhos              ! function result: atmospheric density (kg/m**3)
-   real(r8), intent(in) :: qbot  ! atmospheric specific humidity (kg/kg)
-   real(r8), intent(in) :: pbot  ! atmospheric pressure (Pa)
-   real(r8), intent(in) :: tbot  ! atmospheric temperature (K)
+!------------------------ Dummy Argument -------------------------------------
+   type(spatial_mapping_type), intent(in):: mapping                ! mapping of forcing grids to patch (also part)
+   real(r8), intent(in)                  :: julian_day             ! day of year
 
-   ! LOCAL VARIABLES:
-   real(r8) :: egcm
-   real(r8) :: wv_to_dair_weight_ratio ! ratio of molecular weight of water vapor to dry air [-]
+   type(pointer_real8_1d), intent(in)    :: forc_elv_part(:)       ! map surface height of coarse forcing grid at part[m]
+   type(pointer_real8_1d), intent(in)    :: forc_maxelv_part(:)    ! map max surface height of coarse forcing grid at part [m]
 
-      wv_to_dair_weight_ratio = SHR_CONST_MWWV/SHR_CONST_MWDAIR
+   type(pointer_real8_1d), intent(inout) :: forc_t_part(:)         ! atmospheric temperature [Kelvin]
+   type(pointer_real8_1d), intent(inout) :: forc_q_part(:)         ! atmospheric specific humidity [kg/kg]
+   type(pointer_real8_1d), intent(inout) :: forc_pbot_part(:)      ! atmospheric pressure [Pa]
+   type(pointer_real8_1d), intent(inout) :: forc_rhoair_part(:)    ! atmospheric density [kg/m**3]
+   type(pointer_real8_1d), intent(inout) :: forc_prc_part(:)       ! column convective precipitation [mm/s]
+   type(pointer_real8_1d), intent(inout) :: forc_prl_part(:)       ! column large-scale precipitation [mm/s]
+   type(pointer_real8_1d), intent(inout) :: forc_frl_part(:)       ! column downward longwave [W/m**2]
+   type(pointer_real8_1d), intent(inout) :: forc_swrad_part(:)     ! column downward shortwave [W/m**2]
+   type(pointer_real8_1d), intent(inout) :: forc_us_part(:)        ! column eastward wind [m/s]
+   type(pointer_real8_1d), intent(inout) :: forc_vs_part(:)        ! column northward wind [m/s]
 
-      egcm = qbot*pbot / (wv_to_dair_weight_ratio + (1._r8 - wv_to_dair_weight_ratio)*qbot)
-      rhos = (pbot - (1._r8 - wv_to_dair_weight_ratio)*egcm) / (rair*tbot)
+!------------------------ Local Variables ------------------------------------
+   ! forcing fields before downscaling
+   real(r8) :: forc_t_g      
+   real(r8) :: forc_q_g      
+   real(r8) :: forc_pbot_g   
+   real(r8) :: forc_rhoair_g 
+   real(r8) :: forc_prc_g   
+   real(r8) :: forc_prl_g    
+   real(r8) :: forc_frl_g    
+   real(r8) :: forc_swrad_g  
+   real(r8) :: forc_hgt_g    
+   real(r8) :: forc_us_g    
+   real(r8) :: forc_vs_g     
 
-   END FUNCTION rhos
+   ! forcing fields after downscaling
+   real(r8) :: forc_t_c     
+   real(r8) :: forc_q_c     
+   real(r8) :: forc_pbot_c  
+   real(r8) :: forc_rhoair_c
+   real(r8) :: forc_prc_c   
+   real(r8) :: forc_prl_c   
+   real(r8) :: forc_frl_c   
+   real(r8) :: forc_swrad_c 
+   real(r8) :: forc_us_c    
+   real(r8) :: forc_vs_c   
 
+   ! terrain parameters
+   real(r8) :: elv_g
+   real(r8) :: elv_c
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE downscale_forcings (&
-                  glaciers, &
+   IF (p_is_worker) THEN
+      DO np = 1, mapping%npset
+         DO ipart = 1, mapping%npart(np)
 
-                  ! non-adjusted forcing
-                  forc_topo_g ,forc_maxelv_g ,forc_t_g   ,forc_th_g  ,forc_q_g     ,&
-                  forc_pbot_g ,forc_rho_g    ,forc_prc_g ,forc_prl_g ,forc_lwrad_g ,&
-                  forc_hgt_g  ,forc_swrad_g  ,forc_us_g  ,forc_vs_g  , &
-
-                  ! topography-based factor on patch
-                  slp_type_c, asp_type_c, cur_c, &
-
-                  ! other factors
-                  julian_day, coszen, cosazi, &
-
-                  ! adjusted forcing
-                  forc_topo_c ,forc_t_c   ,forc_th_c  ,forc_q_c     ,forc_pbot_c ,&
-                  forc_rho_c  ,forc_prc_c ,forc_prl_c ,forc_lwrad_c, forc_swrad_c, &
-                  forc_us_c   ,forc_vs_c, &
-
-                  ! optional parameters for full downscaling
-                  area_type_c, svf_c, alb, &
+            ! Prepare terrain factors
 #ifdef SinglePoint
-                  sf_lut_c &
+            elv_g = elvf
 #else
-                  sf_curve_c &
+            elv_g = forc_elv_part(np)%val(ipart)
 #endif
-                  )
+            elv_c = forc_topo(np)
 
-!-----------------------------------------------------------------------------
-! !DESCRIPTION:
-!  Downscale atmospheric forcing fields.
-!
-!  Downscaling is done based on the difference between each land model
-!  column's elevation and the atmosphere's surface elevation (which is
-!  the elevation at which the atmospheric forcings are valid).
-!
-!  Note that the downscaling procedure can result in changes in grid
-!  cell mean values compared to what was provided by the atmosphere. We
-!  conserve fluxes of mass and energy, but allow states such as
-!  temperature to differ.
-!-----------------------------------------------------------------------------
+            slp_c = slp(:,np)
+            area_c = area(:,np)
+            cur_c = cur(np)
+            IF (DEF_DS_MODE == 'C') THEN
+               asp_c = asp(:,np)
+               svf_c = svf(np)
+               sf_c = sf(:,:,np)
+            ELSE
+               asp_c(1) = 0.0_r8*PI/180     ! north
+               asp_c(2) = 45.0_r8*PI/180    ! northeast
+               asp_c(3) = 90.0_r8*PI/180    ! east
+               asp_c(4) = 135.0_r8*PI/180   ! southeast
+               asp_c(5) = 180.0_r8*PI/180   ! south
+               asp_c(6) = 225.0_r8*PI/180   ! southwest
+               asp_c(7) = 270.0_r8*PI/180   ! west
+               asp_c(8) = 315.0_r8*PI/180   ! northwest
+               asp_c(9) = -9999.0_r8        ! flat
+               svf_c = -9999.
+               sf_c = -9999.
+            ENDIF
 
-   IMPLICIT NONE
+            balb = alb
+            IF (forc_sols(np)+forc_solsd(np)+forc_soll(np)+forc_solld(np) == 0.) THEN
+               balb = 0
+            ELSE
+               balb = ( alb(1,1,np)*forc_sols (np) + alb(1,2,np)*forc_solsd(np)   &
+                     + alb(2,1,np)*forc_soll (np) + alb(2,2,np)*forc_solld(np) ) &
+                  / (forc_sols(np)+forc_solsd(np)+forc_soll(np)+forc_solld(np))
+            ENDIF
 
-   integer,  parameter :: S = 1370             ! solar constant (W/m**2)
-   real(r8), parameter :: thr = 85*PI/180      ! threshold of zenith angle
+            ! Prepare 
+            coszen = orb_coszen(julian_day, patchlonr(np), patchlatr(np))
+            cosazi = orb_cosazi(julian_day, patchlonr(np), patchlatr(np), coszen)
 
-   ! ARGUMENTS:
-   logical,  intent(in) :: glaciers            ! true: glacier column (itypwat = 3)
-   real(r8), intent(in) :: julian_day          ! day of year
-   real(r8), intent(in) :: coszen              ! cosine of sun zenith angle at an hour
-   real(r8), intent(in) :: cosazi              ! cosine of sun azimuth angle at an hour
+            ! Prepare 
+            forc_t_g = forc_t_part(np)%val(ipart)
+            forc_pbot_g = forc_pbot_part(np)%val(ipart)
+            forc_q_g = forc_q_part(np)%val(ipart)
+            forc_frl_g = forc_frl_part(np)%val(ipart)
 
-   ! topography-based factor
-   real(r8), intent(in) :: cur_c               ! curvature
-   ! topographic aspect of each type of one patch(rad) - can be different dimensions
-   real(r8), intent(in) :: asp_type_c (:)
-   ! topographic slope of each character of one patch - can be different dimensions  
-   real(r8), intent(in) :: slp_type_c (:)
+            ! Downscaling
+            CALL downscale_t (&
+                     elv_g, forc_t_g, &
+                     elv_c, forc_t_c)
 
-   ! optional parameters for complex downscaling
-   real(r8), intent(in), optional :: alb                 ! blue sky albedo
-   real(r8), intent(in), optional :: svf_c               ! sky view factor
-   ! area percentage of each character of one patch
-   real(r8), intent(in), optional :: area_type_c(:)
-#ifdef SinglePoint
-   ! look up table of shadow mask of a patch
-   real(r8), intent(in), optional :: sf_lut_c   (:,:)
-#else
-   ! curve of shadow mask of a patch
-   real(r8), intent(in), optional :: sf_curve_c (:,:)
-#endif
+            CALL downscale_pbot (&
+                     elv_g, forc_t_g, forc_pbot_g, &
+                     elv_c, forc_t_c, forc_pbot_c)
 
-   ! non-downscaled fields:
-   real(r8), intent(in) :: forc_topo_g   ! atmospheric surface height [m]
-   real(r8), intent(in) :: forc_maxelv_g ! max atmospheric surface height [m]
-   real(r8), intent(in) :: forc_t_g      ! atmospheric temperature [Kelvin]
-   real(r8), intent(in) :: forc_th_g     ! atmospheric potential temperature [Kelvin]
-   real(r8), intent(in) :: forc_q_g      ! atmospheric specific humidity [kg/kg]
-   real(r8), intent(in) :: forc_pbot_g   ! atmospheric pressure [Pa]
-   real(r8), intent(in) :: forc_rho_g    ! atmospheric density [kg/m**3]
-   real(r8), intent(in) :: forc_prc_g    ! convective precipitation in grid [mm/s]
-   real(r8), intent(in) :: forc_prl_g    ! large-scale precipitation in grid [mm/s]
-   real(r8), intent(in) :: forc_lwrad_g  ! grid downward longwave [W/m**2]
-   real(r8), intent(in) :: forc_swrad_g  ! grid downward shortwave [W/m**2]
-   real(r8), intent(in) :: forc_hgt_g    ! atmospheric reference height [m]
-   real(r8), intent(in) :: forc_us_g     ! eastward wind [m/s]
-   real(r8), intent(in) :: forc_vs_g     ! northward wind [m/s]
+            CALL downscale_q (&
+                     forc_t_g, forc_pbot_g, forc_q_g, &
+                     forc_t_c, forc_pbot_c, forc_q_c)
 
-   ! downscaled fields:
-   real(r8), intent(in)  :: forc_topo_c  ! column surface height [m]
-   real(r8), intent(out) :: forc_t_c     ! atmospheric temperature [Kelvin]
-   real(r8), intent(out) :: forc_th_c    ! atmospheric potential temperature [Kelvin]
-   real(r8), intent(out) :: forc_q_c     ! atmospheric specific humidity [kg/kg]
-   real(r8), intent(out) :: forc_pbot_c  ! atmospheric pressure [Pa]
-   real(r8), intent(out) :: forc_rho_c   ! atmospheric density [kg/m**3]
-   real(r8), intent(out) :: forc_prc_c   ! column convective precipitation [mm/s]
-   real(r8), intent(out) :: forc_prl_c   ! column large-scale precipitation [mm/s]
-   real(r8), intent(out) :: forc_lwrad_c ! column downward longwave [W/m**2]
-   real(r8), intent(out) :: forc_swrad_c ! column downward shortwave [W/m**2]
-   real(r8), intent(out) :: forc_us_c    ! column eastward wind [m/s]
-   real(r8), intent(out) :: forc_vs_c    ! column northward wind [m/s]
+            CALL downscale_rhoair (&
+                     forc_t_c, forc_pbot_c, forc_q_c, forc_rhoair_c)
 
-   ! Local variables for topo downscaling:
-   real(r8) :: hsurf_g, hsurf_c
-   real(r8) :: Hbot, zbot
-   real(r8) :: tbot_g, pbot_g, thbot_g, qbot_g, qs_g, es_g, rhos_g
-   real(r8) :: tbot_c, pbot_c, thbot_c, qbot_c, qs_c, es_c, rhos_c
-   real(r8) :: rhos_c_estimate, rhos_g_estimate
-   real(r8) :: dum1, dum2
-   real(r8) :: max_elev_c    ! the maximum column level elevation value within the grid
-   real(r8) :: delta_prc_c   ! deviation of the column convective prec. from the grid level prec.
-   real(r8) :: delta_prl_c   ! deviation of the column large-scale prec. from the grid level prec.
+            CALL downscale_frl (&
+                     elv_g, forc_t_g, forc_q_g, forc_pbot_g, forc_frl_g, &
+                     elv_c, forc_t_c, forc_q_c, forc_pbot_c, forc_frl_c)
 
-!-----------------------------------------------------------------------------
+            CALL downscale_swrad (&
+                     julian_day, coszen, cosazi,              &
+                     slp_c, asp_c, area_c, svf_c, sf_c, balb, &
+                     forc_pbot_g, forc_swrad_g,               &
+                     forc_pbot_c, forc_swrad_c)
 
-      ! --------------------------------------------------------------------------------------
-      ! 1. adjust air temperature, potential temperature, specific humidity, pressure, density
-      ! --------------------------------------------------------------------------------------
-      hsurf_g = forc_topo_g             ! gridcell sfc elevation
-      tbot_g  = forc_t_g                ! atm sfc temp
-      thbot_g = forc_th_g               ! atm sfc pot temp
-      qbot_g  = forc_q_g                ! atm sfc spec humid
-      pbot_g  = forc_pbot_g             ! atm sfc pressure
-      rhos_g  = forc_rho_g              ! atm density
-      zbot    = forc_hgt_g              ! atm ref height
+            CALL downscale_ws (&
+                     )
 
-      hsurf_c = forc_topo_c                           ! column sfc elevation
-      tbot_c  = tbot_g-lapse_rate*(hsurf_c-hsurf_g)   ! adjust [temp] for column
-      Hbot    = rair*0.5_r8*(tbot_g+tbot_c)/grav      ! scale ht at avg temp
-      pbot_c  = pbot_g*exp(-(hsurf_c-hsurf_g)/Hbot)   ! adjust [press] for column
+            
+         ENDDO
+      ENDDO
+   ENDIF
 
-      ! Derivation of potential temperature calculation:
-      !
-      ! The textbook definition would be:
-      ! thbot_c = tbot_c * (p0/pbot_c)^(rair/cpair)
-      !
-      ! Note that pressure is related to scale height as:
-      ! pbot_c = p0 * exp(-zbot/Hbot)
-      !
-      ! Plugging this in to the textbook definition, then manipulating, we get:
-      ! thbot_c = tbot_c * (p0/(p0*exp(-zbot/Hbot)))^(rair/cpair)
-      !         = tbot_c * (1/exp(-zbot/Hbot))^(rair/cpair)
-      !         = tbot_c * (exp(zbot/Hbot))^(rair/cpair)
-      !         = tbot_c * exp((zbot/Hbot) * (rair/cpair))
 
-      ! But we want everything expressed in delta form, resulting in:
-      ! adjust [pot temp] for column
-      thbot_c = thbot_g + (tbot_c - tbot_g)*exp((zbot/Hbot)*(rair/cpair))
 
-      CALL Qsadv(tbot_g,pbot_g,es_g,dum1,qs_g,dum2) ! es, qs for gridcell
-      CALL Qsadv(tbot_c,pbot_c,es_c,dum1,qs_c,dum2) ! es, qs for column
-      qbot_c = qbot_g*(qs_c/qs_g) ! adjust [q] for column
-
-      rhos_c_estimate = rhos(qbot=qbot_c, pbot=pbot_c, tbot=tbot_c)
-      rhos_g_estimate = rhos(qbot=qbot_g, pbot=pbot_g, tbot=tbot_g)
-      rhos_c = rhos_g * (rhos_c_estimate / rhos_g_estimate) ! adjust [density] for column
-
-      ! save
-      forc_t_c    = tbot_c
-      forc_th_c   = thbot_c
-      forc_q_c    = qbot_c
-      forc_pbot_c = pbot_c
-      forc_rho_c  = rhos_c
-
-      ! --------------------------------------------------------------------------------------
-      ! 2. adjust wind speed
-      ! --------------------------------------------------------------------------------------
-      forc_us_c = forc_us_g
-      forc_vs_c = forc_vs_g
-
-      ! --------------------------------------------------------------------------------------
-      ! 3. adjust longwave radiation and shortwave radiation
-      ! --------------------------------------------------------------------------------------
-      CALL downscale_longwave (glaciers, &
-                     forc_topo_g, forc_t_g, forc_q_g, forc_pbot_g, forc_lwrad_g, &
-                     forc_topo_c, forc_t_c, forc_q_c, forc_pbot_c, forc_lwrad_c)
-
-      ! Check if optional parameters are present for complex downscaling
-      IF (present(area_type_c) .and. present(svf_c) .and. present(alb) .and. &
-#ifdef SinglePoint
-          present(sf_lut_c) &
-#else
-          present(sf_curve_c) &
-#endif
-          ) THEN
-         ! Complex downscaling with topographic effects
-         CALL downscale_shortwave(&
-                        forc_topo_g, forc_pbot_g, forc_swrad_g, &
-                        forc_topo_c, forc_pbot_c, forc_swrad_c, &
-                        julian_day, coszen, cosazi, alb, &
-                        slp_type_c, asp_type_c, svf_c,   &
-#ifdef SinglePoint
-                        sf_lut_c,   &
-#else
-                        sf_curve_c, &
-#endif
-                        area_type_c)
-      ELSE
-         ! Simple downscaling
-         CALL downscale_shortwave_simple(&
-                        forc_topo_g, forc_pbot_g, forc_swrad_g, &
-                        forc_topo_c, forc_pbot_c, forc_swrad_c, &
-                        julian_day, coszen, cosazi, &
-                        slp_type_c, asp_type_c)
-      ENDIF
-
-      ! --------------------------------------------------------------------------------------
-      ! 4. adjust precipitation
-      ! --------------------------------------------------------------------------------------
-      IF (trim(DEF_DS_precipitation_adjust_scheme) == 'I') THEN
-         ! Tesfa et al, 2020: Exploring Topography-Based Methods for Downscaling
-         ! Subgrid Precipitation for Use in Earth System Models. Equation (5)
-         ! https://doi.org/ 10.1029/2019JD031456
-
-         IF (forc_maxelv_g /= 0.) THEN
-            delta_prc_c = forc_prc_g * (forc_topo_c - forc_topo_g) / forc_maxelv_g
-         ELSE
-            delta_prc_c = 0.
-         ENDIF
-         forc_prc_c  = forc_prc_g + delta_prc_c     ! convective precipitation [mm/s]
-         IF (forc_prc_c<=0) forc_prc_c = forc_prc_g ! the limit value is non-negative
-         IF (forc_prc_c==0) forc_prc_c = 1.0e-10_r8 ! avoid denominator being 0 when conserving water quantity
-
-         IF (forc_maxelv_g /= 0.) THEN
-            delta_prl_c = forc_prl_g * (forc_topo_c - forc_topo_g) / forc_maxelv_g
-         ELSE
-            delta_prl_c = 0.
-         ENDIF
-         forc_prl_c  = forc_prl_g + delta_prl_c    ! large scale precipitation [mm/s]
-         IF (forc_prl_c<=0) forc_prl_c = forc_prl_g ! the limit value is non-negative
-         IF (forc_prl_c==0) forc_prl_c = 1.0e-10_r8 ! avoid denominator being 0 when conserving water quantity
-
-      ELSEIF (trim(DEF_DS_precipitation_adjust_scheme) == 'II') THEN
-         ! Liston, G. E. and Elder, K.: A meteorological distribution system
-         ! for high-resolution terrestrial modeling (MicroMet), J. Hydrometeorol., 7, 217-234, 2006.
-         ! Equation (33) and Table 1: chi range from January to December:
-         ! [0.35,0.35,0.35,0.30,0.25,0.20,0.20,0.20,0.20,0.25,0.30,0.35] (1/km)
-
-         delta_prc_c = forc_prc_g *1.0*0.27*(forc_topo_c - forc_topo_g) &
-            /(1.0 - 0.27*(forc_topo_c - forc_topo_g))
-         forc_prc_c = forc_prc_g + delta_prc_c   ! large scale precipitation [mm/s]
-
-         delta_prl_c = forc_prl_g *1.0*0.27*(forc_topo_c - forc_topo_g) &
-            /(1.0 - 0.27*(forc_topo_c - forc_topo_g))
-         forc_prl_c = forc_prl_g + delta_prl_c   ! large scale precipitation [mm/s]
-      ENDIF
-
-      IF (forc_prl_c < 0) THEN
-         write(*,*) 'negative prl', forc_prl_g, forc_maxelv_g, forc_topo_c, forc_topo_g
-         forc_prl_c = 0.
-      ENDIF
-
-      IF (forc_prc_c < 0) THEN
-         write(*,*) 'negative prc', forc_prc_g, forc_maxelv_g, forc_topo_c, forc_topo_g
-         forc_prc_c = 0.
-      ENDIF
 
    END SUBROUTINE downscale_forcings
-!-----------------------------------------------------------------------------
-
-   SUBROUTINE downscale_wind(forc_us_g, forc_vs_g, &
-                             slp_type_c, asp_type_c, area_type_c, cur_c)
 
 !-----------------------------------------------------------------------------
-! !DESCRIPTION:
-!  Downscale wind speed
+
+   SUBROUTINE downscale_t (elv_g, forc_t_g, elv_c, forc_t_c)
+
+!-----------------------------------------------------------------------------
+! DESCRIPTION:
+!  Adjust air temperature for the elevation difference between the
+!  forcing grid and the target patch using a fixed surface lapse rate:
 !
-!  Liston, G. E. and Elder, K.: A meteorological distribution system for
-!  high-resolution terrestrial modeling (MicroMet), J. Hydrometeorol.,
-!  7, 217-234, 2006.
+! NOTES:
+!  - The lapse rate is set to 6 K km-1.
+!  - Surface lapse rates vary with location, season, and time of day.
+!    The fixed value is a simplification.
+!  - Minder et al. (2010) report annual mean lapse rates of
+!    3.9-5.2 K km-1 on the windward side of the Cascade Mountains,
+!    below the commonly assumed value of 6.5 K km-1. Rates range
+!    from 2.5-3.5 K km-1 for late-summer minimum temperatures to
+!    6.5-7.5 K km-1 for spring maximum temperatures. Windward and
+!    leeward slopes also show substantial differences.
+!  - Kunkel (1989) reports monthly lapse rates (January-December)
+!    of 4.4, 5.9, 7.1, 7.8, 8.1, 8.2, 8.1, 8.1, 7.7, 6.8, 5.5,
+!    and 4.7 K km-1, illustrating seasonal variability.
 !-----------------------------------------------------------------------------
 
    IMPLICIT NONE
 
-   ! ARGUMENTS:
-   real(r8), intent(inout)  :: forc_us_g         ! eastward wind (m/s)
-   real(r8), intent(inout)  :: forc_vs_g         ! northward wind (m/s)
+   real(r8), intent(in)  :: elv_g                    ! forcing-grid elevation [m]
+   real(r8), intent(in)  :: elv_c                    ! target column elevation [m]
+   real(r8), intent(in)  :: forc_t_g                 ! forcing-grid air temperature [K]
+   real(r8), intent(out) :: forc_t_c                 ! column temperature [K]
 
-   real(r8), intent(in) :: cur_c                 ! curvature
-   ! topographic aspect of each character of one patch
-   real(r8), intent(in) :: asp_type_c  (1:num_slope_type)
-   ! topographic slope of each character of one patch
-   real(r8), intent(in) :: slp_type_c  (1:num_slope_type)
-   ! area percentage of each character of one patch
-   real(r8), intent(in) :: area_type_c (1:num_slope_type)
+   real(r8), parameter   :: lapse_rate = 0.006_r8    ! temperature lapse rate [K/m]
+!-----------------------------------------------------------------------------
 
-   ! local variables
-   real(r8) :: wind_dir                          ! wind direction
-   real(r8) :: ws_g                              ! non-downscaled wind speed
-   real(r8) :: wind_dir_slp (1:num_slope_type)   ! the slope in the direction of the wind
-   real(r8) :: ws_c_type(1:num_slope_type)       ! downscaled wind speed of each type in each patch
-   real(r8) :: ws_c                              ! downscaled wind speed
-   real(r8) :: scale_factor                      ! Combined scaling factor for regulating wind speed
-   integer :: g, c, i
+      forc_t_c = forc_t_g - lapse_rate * (elv_c - elv_g)
+
+   END SUBROUTINE downscale_t
 
 !-----------------------------------------------------------------------------
 
-      ! calculate wind direction
-      IF (forc_us_g == 0.) THEN
-         wind_dir  = PI/2
-      ELSE
-         wind_dir  = atan(forc_vs_g /forc_us_g)
-      ENDIF
-
-      ! non-adjusted wind speed
-      ws_g  = sqrt(forc_vs_g *forc_vs_g +forc_us_g *forc_us_g )
-
-      ! compute the slope in the direction of the wind
-      DO i = 1, num_slope_type
-         wind_dir_slp(i) = slp_type_c(i)*cos(wind_dir-asp_type_c(i))
-      ENDDO
-
-      ! compute wind speed adjustment
-      DO i = 1, num_slope_type
-         scale_factor = (1+(0.58*wind_dir_slp(i))+0.42*cur_c)
-         ! Limiting the scope of proportionality adjustments
-         IF (scale_factor>1.5) THEN
-             scale_factor = 1.5
-         ELSEIF (scale_factor<-1.5) THEN
-             scale_factor = -1.5
-         ENDIF
-         ws_c_type(i) = ws_g *scale_factor*area_type_c(i)
-      ENDDO
-
-      ! adjusted wind speed
-      ws_c = sum(ws_c_type(:))
-      forc_us_g = ws_c*cos(wind_dir)
-      forc_vs_g = ws_c*sin(wind_dir)
-
-   END SUBROUTINE downscale_wind
+   SUBROUTINE downscale_pbot (elv_g, forc_t_g, forc_pbot_g, elv_c, forc_t_c, forc_pbot_c)
 
 !-----------------------------------------------------------------------------
-
-   SUBROUTINE downscale_wind_simple(forc_us_g, forc_vs_g, &
-                                    slp_type_c, area_type_c, cur_c)
-
-!-----------------------------------------------------------------------------
-! !DESCRIPTION:
-!  Downscale wind speed using a simple method for land-atmosphere coupling models
+! DESCRIPTION:
+!  Adjust air pressure from the forcing-grid elevation to the target
+!  column elevation using an exponential pressure-height relation.
 !-----------------------------------------------------------------------------
 
    IMPLICIT NONE
 
-   ! ARGUMENTS:
-   real(r8), intent(inout)  :: forc_us_g         ! eastward wind (m/s)
-   real(r8), intent(inout)  :: forc_vs_g         ! northward wind (m/s)
+   real(r8), intent(in)  :: elv_g        ! forcing-grid elevation [m]
+   real(r8), intent(in)  :: elv_c        ! target column elevation [m]
+   real(r8), intent(in)  :: forc_t_g     ! forcing-grid air temperature [K]
+   real(r8), intent(in)  :: forc_t_c     ! column air temperature [K]
+   real(r8), intent(in)  :: forc_pbot_g  ! forcing-grid air pressure [Pa]
+   real(r8), intent(out) :: forc_pbot_c  ! column air pressure [Pa]
 
-   real(r8), intent(in) :: cur_c                 ! curvature
-   ! topographic slope of each character of one patch
-   real(r8), intent(in) :: slp_type_c  (1:num_aspect_type)
-   ! area percentage of each character of one patch
-   real(r8), intent(in) :: area_type_c (1:num_aspect_type)
-
-   ! local variables
-   real(r8) :: asp_type_c(1:num_aspect_type)        ! topographic aspect of each type of one patch (rad)
-   real(r8) :: slp_type_c_rad                       ! Convert tan slope value to slope angle value
-
-   real(r8) :: wind_dir                             ! wind direction
-   real(r8) :: ws_g                                 ! non-downscaled wind speed
-   real(r8) :: wind_dir_slp (1:num_aspect_type)     ! the slope in the direction of the wind
-   real(r8) :: ws_c_type(1:num_aspect_type)         ! downscaled wind speed of each type in each patch
-   real(r8) :: ws_c                                 ! downscaled wind speed
-   real(r8) :: scale_factor                         ! Combined scaling factor for regulating wind speed
-   integer :: u_sign, v_sign, i, wind_dir_u, wind_dir_v
-
-   ! Initialize aspect type
-   asp_type_c(1) = 0.0_r8*PI/180     ! north
-   asp_type_c(2) = 45.0_r8*PI/180    ! northeast
-   asp_type_c(3) = 90.0_r8*PI/180    ! east
-   asp_type_c(4) = 135.0_r8*PI/180   ! southeast
-   asp_type_c(5) = 180.0_r8*PI/180   ! south
-   asp_type_c(6) = 225.0_r8*PI/180   ! southwest
-   asp_type_c(7) = 270.0_r8*PI/180   ! west
-   asp_type_c(8) = 315.0_r8*PI/180   ! northwest
-   asp_type_c(9) = -9999.0_r8        ! flat
+   real(r8) :: shbot                     ! pressure scale height [m]
 !-----------------------------------------------------------------------------
 
-      ! calculate wind direction
-      IF (forc_us_g == 0.) THEN
-         wind_dir  = PI/2
-      ELSE
-         wind_dir  = atan2(forc_vs_g, forc_us_g)
-      ENDIF
+      ! Scale height based on the mean air temperature [m].
+      shbot = rgas * 0.5_r8 * (forc_t_g + forc_t_c) / grav
 
-      ! convert to 0-2*PI range
-      !wind_dir = wind_dir + 3*PI/2 
-      !wind_dir = mod(wind_dir, 2*PI)
+      ! Pressure at column elevation from the hydrostatic relation [Pa].
+      forc_pbot_c = forc_pbot_g * exp(-(elv_c-elv_g)/shbot)
 
-      ! 0° is north 
-      IF (wind_dir > PI/2) THEN
-         wind_dir = 2*PI - wind_dir + PI/2
-      ELSE
-         wind_dir = PI/2 - wind_dir
-      ENDIF
-
-      ! non-adjusted wind speed
-      ws_g  = sqrt(forc_vs_g *forc_vs_g +forc_us_g *forc_us_g )
-
-      ! log the + - sign of the u,v direction
-      IF (forc_us_g >= 0.0_r8) THEN
-         u_sign = 1
-      ELSE
-         u_sign = -1
-      ENDIF 
-      IF (forc_vs_g >= 0.0_r8) THEN
-         v_sign = 1
-      ELSE
-         v_sign = -1
-      ENDIF
-
-
-      ! compute the slope in the direction of the wind
-      DO i = 1, num_aspect_type
-         IF (slp_type_c(i) == -1.0e36) THEN
-            ! no slope in the direction of the aspect
-            wind_dir_slp(i) = -1.0e36
-         ELSE
-            ! slope in the direction of the wind
-            slp_type_c_rad = atan(slp_type_c(i))
-            wind_dir_slp(i) = slp_type_c_rad*cos(wind_dir-asp_type_c(i))
-         ENDIF
-      ENDDO
-
-      ! compute wind speed adjustment
-      DO i = 1, num_aspect_type
-         ! For the flat area, we do not adjust the wind speed
-         IF (asp_type_c(i) == -9999.0_r8) THEN
-            scale_factor = 1.0_r8
-         ELSE IF ((wind_dir_slp(i) == -1.0e36).or.(cur_c == -1.0e36)) THEN
-            ! no slope in the direction of the aspect
-            scale_factor = -1.0e36
-         ELSE
-            scale_factor = (1+(0.58*wind_dir_slp(i))+0.42*cur_c)
-            !write(*,*) 'scale_factor', scale_factor, 'wind_dir_slp(i)', wind_dir_slp(i), 'cur_c', cur_c
-         ENDIF
-
-         ! Limiting the scope of proportionality adjustments
-         IF (scale_factor>1.5) THEN
-             scale_factor = 1.5
-         ELSEIF (scale_factor<-1.5) THEN
-             scale_factor = -1.5
-         ENDIF
-
-         ! Downscale wind speed for each type in each patch
-         IF ((scale_factor == -1.0e36).or.(area_type_c(i) == -1.0e36)) THEN
-            ws_c_type(i) = -1.0e36
-         ELSE
-            ws_c_type(i) = ws_g *scale_factor*area_type_c(i)
-         ENDIF
-
-      ENDDO
-
-      ! adjusted wind speed
-      ws_c = sum(ws_c_type(:),mask=ws_c_type(:) /= -1.0e36)
-
-      ! caculate u and v components of the wind
-      IF (wind_dir > PI/2) THEN
-         wind_dir = 2*PI - wind_dir + PI/2
-      ELSE
-         wind_dir = PI/2 - wind_dir
-      ENDIF
-      
-      forc_us_g = u_sign*sqrt((ws_c*cos(wind_dir))**2)
-      forc_vs_g = v_sign*sqrt((ws_c*sin(wind_dir))**2)
-
-   END SUBROUTINE downscale_wind_simple
-!-----------------------------------------------------------------------------
-
-   SUBROUTINE downscale_longwave (glaciers, &
-      forc_topo_g, forc_t_g, forc_q_g, forc_pbot_g, forc_lwrad_g, &
-      forc_topo_c, forc_t_c, forc_q_c, forc_pbot_c, forc_lwrad_c)
+   END SUBROUTINE downscale_pbot
 
 !-----------------------------------------------------------------------------
-! !DESCRIPTION:
+
+   SUBROUTINE downscale_q (forc_t_g, forc_pbot_g, forc_q_g, forc_t_c, forc_pbot_c, forc_q_c)
+
+!-----------------------------------------------------------------------------
+! DESCRIPTION:
+!  Adjust specific humidity using the ratio of saturation specific
+!  humidity at the column and forcing-grid temperature and pressure.
+!-----------------------------------------------------------------------------
+
+   IMPLICIT NONE
+
+   real(r8), intent(in)  :: forc_t_g     ! forcing-grid air temperature [K]
+   real(r8), intent(in)  :: forc_pbot_g  ! forcing-grid air pressure [Pa]
+   real(r8), intent(in)  :: forc_q_g     ! forcing-grid specific humidity [kg/kg]
+   real(r8), intent(in)  :: forc_t_c     ! column air temperature [K]
+   real(r8), intent(in)  :: forc_pbot_c  ! column air pressure [Pa]
+   real(r8), intent(out) :: forc_q_c     ! column specific humidity [kg/kg]
+
+   real(r8) :: es_g, es_c                ! saturation vapor pressure [Pa]
+   real(r8) :: qs_g, qs_c                ! saturation specific humidity [kg/kg]
+   real(r8) :: dum1, dum2
+!-----------------------------------------------------------------------------
+
+      ! Saturation specific humidity at forcing-grid conditions.
+      CALL Qsadv(forc_t_g, forc_pbot_g, es_g, dum1, qs_g, dum2)
+
+      ! Saturation specific humidity at column conditions.
+      CALL Qsadv(forc_t_c, forc_pbot_c, es_c, dum1, qs_c, dum2)
+
+      ! Preserve the grid relative humidity while adjusting specific humidity.
+      forc_q_c = forc_q_g * (qs_c / qs_g)
+
+   END SUBROUTINE downscale_q
+
+!-----------------------------------------------------------------------------
+
+   SUBROUTINE downscale_rhoair (forc_t_c, forc_q_c, forc_pbot_c, forc_rhoair_c)
+
+!-----------------------------------------------------------------------------
+! DESCRIPTION:
+!  Calculate column air density from the adjusted specific humidity,
+!  air pressure, and air temperature.
+!-----------------------------------------------------------------------------
+
+   IMPLICIT NONE
+
+   real(r8), intent(in)  :: forc_q_c      ! column specific humidity [kg/kg]
+   real(r8), intent(in)  :: forc_pbot_c   ! column air pressure [Pa]
+   real(r8), intent(in)  :: forc_t_c      ! column air temperature [K]
+   real(r8), intent(out) :: forc_rhoair_c ! column moist air density [kg/m3]
+
+   real(r8) :: e_c                        ! water-vapor partial pressure [Pa]
+   real(r8) :: pd_c                       ! dry-air partial pressure [Pa]
+   real(r8) :: rho_dryair                 ! dry-air density [kg/m3]
+   real(r8) :: rho_vapor                  ! water-vapor density [kg/m3]
+!-----------------------------------------------------------------------------
+
+      ! Convert specific humidity to water-vapor partial pressure.
+      e_c = forc_q_c * forc_pbot_c / (0.622_r8 + 0.378_r8 * forc_q_c)
+
+      ! The total pressure is the sum of dry-air and water-vapor pressures.
+      pd_c = forc_pbot_c - e_c
+
+      ! Calculate the density of each gas using its own gas constant.
+      rho_dryair = pd_c / (rgas * forc_t_c)
+      rho_vapor = e_c / (rwat * forc_t_c)
+
+      ! Moist-air density is the sum of dry-air and water-vapor densities.
+      forc_rhoair_c = rho_dryair + rho_vapor
+
+   END SUBROUTINE downscale_rhoair
+
+!-----------------------------------------------------------------------------
+
+   SUBROUTINE downscale_frl (&
+      elv_g, forc_t_g, forc_q_g, forc_pbot_g, forc_frl_g, &
+      elv_c, forc_t_c, forc_q_c, forc_pbot_c, forc_frl_c)
+
+!-----------------------------------------------------------------------------
+! DESCRIPTION:
 !  Downscale longwave radiation
+
+! REFERENCE:
+!  Fiddes and Gruber, 2014
+!  TopoSCALE v.1.0: downscaling gridded climate data in complex terrain. 
+!  Geosci. Model Dev., 7, 387-405.  
 !-----------------------------------------------------------------------------
 
    IMPLICIT NONE
 
-   ! ARGUMENTS:
-   logical,  intent(in) :: glaciers      ! true: glacier column
+   real(r8), intent(in) :: elv_g           ! atmospheric surface height (m)
+   real(r8), intent(in) :: forc_t_g        ! forcing-grid atmospheric temperature [Kelvin]
+   real(r8), intent(in) :: forc_q_g        ! forcing-grid atmospheric specific humidity [kg/kg]
+   real(r8), intent(in) :: forc_pbot_g     ! forcing-grid atmospheric pressure [Pa]
+   real(r8), intent(in) :: forc_frl_g      ! forcing-grid downward longwave (W/m**2)
 
-   real(r8), intent(in) :: forc_topo_g   ! atmospheric surface height (m)
-   real(r8), intent(in) :: forc_t_g      ! atmospheric temperature [Kelvin]
-   real(r8), intent(in) :: forc_q_g      ! atmospheric specific humidity [kg/kg]
-   real(r8), intent(in) :: forc_pbot_g   ! atmospheric pressure [Pa]
-   real(r8), intent(in) :: forc_lwrad_g  ! downward longwave (W/m**2)
+   real(r8), intent(in) :: elv_c           ! column surface height (m)
+   real(r8), intent(in) :: forc_t_c        ! column atmospheric temperature [Kelvin]
+   real(r8), intent(in) :: forc_q_c        ! column atmospheric specific humidity [kg/kg]
+   real(r8), intent(in) :: forc_pbot_c     ! column atmospheric pressure [Pa]
+   real(r8), intent(out):: forc_frl_c      ! column downward longwave (W/m**2)
 
-   real(r8), intent(in) :: forc_topo_c   ! column surface height (m)
-   real(r8), intent(in) :: forc_t_c      ! atmospheric temperature [Kelvin]
-   real(r8), intent(in) :: forc_q_c      ! atmospheric specific humidity [kg/kg]
-   real(r8), intent(in) :: forc_pbot_c   ! atmospheric pressure [Pa]
-   real(r8), intent(out):: forc_lwrad_c  ! downward longwave (W/m**2)
+   real(r8) :: e_g                         ! forcing-grid water vapor pressure [Pa]
+   real(r8) :: e_c                         ! column water vapor pressure [Pa]
+   real(r8) :: emis_clearsky_g             ! forcing-grid clear-sky emissivity [-]
+   real(r8) :: emis_clearsky_c             ! column clear-sky emissivity [-]
+   real(r8) :: emis_allsky_g               ! forcing-grid all-sky emissivity [-]
 
-   ! LOCAL VARIABLES:
-   real(r8) :: hsurf_c  ! column-level elevation (m)
-   real(r8) :: hsurf_g  ! gridcell-level elevation (m)
-
-   real(r8) :: pv_g ! the water vapor pressure at grid cell (hPa)
-   real(r8) :: pv_c ! the water vapor pressure at column (hPa)
-   real(r8) :: emissivity_clearsky_g ! clear-sky emissivity at grid cell
-   real(r8) :: emissivity_clearsky_c ! clear-sky emissivity at grid column
-   real(r8) :: emissivity_allsky_g   ! all-sky emissivity at grid cell
-   real(r8) :: es_g, es_c, dum1, dum2, dum3
-
-   real(r8), parameter :: lapse_rate_longwave = 0.032_r8 ! longwave radiation lapse rate (W m-2 m-1)
-   ! relative limit for how much longwave downscaling can be done (unitless)
-   real(r8), parameter :: longwave_downscaling_limit = 0.5_r8
-
+   real(r8), parameter :: frl_bd = 0.5_r8  ! boundary factor of adjustment
 !--------------------------------------------------------------------------
 
-      ! Initialize (needs to be done for ALL active columns)
-      forc_lwrad_c = forc_lwrad_g
-      hsurf_g = forc_topo_g
-      hsurf_c = forc_topo_c
+      ! Cal vapor pressure [Pa] at forcing-grid & column
+      e_g = forc_q_g * forc_pbot_g / (0.622_r8 + 0.378_r8 * forc_q_g)
+      e_c = forc_q_c * forc_pbot_c / (0.622_r8 + 0.378_r8 * forc_q_c)
 
-      IF (trim(DEF_DS_longwave_adjust_scheme) == 'I') THEN
-         ! Fiddes and Gruber, 2014, TopoSCALE v.1.0: downscaling gridded climate data in complex
-         ! terrain. Geosci. Model Dev., 7, 387-405. doi:10.5194/gmd-7-387-2014.  Equation (1) (2)
-         ! (3); here, the empirical parameters x1 and x2 are different from Konzelmann et al. (1994)
-         ! where x1 = 0.443 and x2 = 8 (optimal for measurements on the Greenland ice sheet)
+      ! Cal clear-sky emissivity from vapor pressure [hPa].
+      emis_clearsky_g = 0.23_r8 + 0.43_r8*((e_g/100)*forc_t_g)**(1._r8/5.7_r8)
+      emis_clearsky_c = 0.23_r8 + 0.43_r8*((e_c/100)/forc_t_c)**(1._r8/5.7_r8)
 
-         CALL Qsadv(forc_t_g, forc_pbot_g, es_g,dum1,dum2,dum3)
-         CALL Qsadv(forc_t_c, forc_pbot_c, es_c,dum1,dum2,dum3)
-         pv_g = forc_q_g*es_g/100._r8  ! (hPa)
-         pv_c = forc_q_c*es_c/100._r8  ! (hPa)
+      ! Infer grid-cell all-sky emissivity from the incoming longwave forcing.
+      emis_allsky_g = forc_frl_g / (5.67e-8_r8 * forc_t_g**4)
 
-         emissivity_clearsky_g = 0.23_r8 + 0.43_r8*(pv_g/forc_t_g)**(1._r8/5.7_r8)
-         emissivity_clearsky_c = 0.23_r8 + 0.43_r8*(pv_c/forc_t_c)**(1._r8/5.7_r8)
-         emissivity_allsky_g = forc_lwrad_g / (5.67e-8_r8*forc_t_g**4)
-
-         forc_lwrad_c = &
-            (emissivity_clearsky_c + (emissivity_allsky_g - emissivity_clearsky_g)) &
-            * 5.67e-8_r8*forc_t_c**4
-      ELSE
-         ! Longwave radiation is downscaled by assuming a linear decrease in downwelling longwave
-         ! radiation with increasing elevation (0.032 W m-2 m-1, limited to 0.5 - 1.5 times the
-         ! gridcell mean value, then normalized to conserve gridcell total energy) (Van Tricht et
-         ! al., 2016, TC) Figure 6, doi:10.5194/tc-10-2379-2016
-
-         IF (glaciers) THEN
-            forc_lwrad_c = forc_lwrad_g - lapse_rate_longwave * (hsurf_c-hsurf_g)
-
-            ! Here we assume that deltaLW = (dLW/dT)*(dT/dz)*deltaz
-            ! We get dLW/dT = 4*eps*sigma*T^3 = 4*LW/T from the Stefan-Boltzmann law,
-            ! evaluated at the mean temp. We assume the same temperature lapse rate as above.
-
-         ELSE
-            forc_lwrad_c = forc_lwrad_g &
-               - 4.0_r8 * forc_lwrad_g/(0.5_r8*(forc_t_c+forc_t_g)) &
-               * lapse_rate * (hsurf_c - hsurf_g)
-         ENDIF
-      ENDIF
-
+      ! Apply the column clear-sky emissivity while retaining the grid cloudy-sky emissivity.
+      forc_frl_c = (emis_clearsky_c + (emis_allsky_g - emis_clearsky_g)) * 5.67e-8_r8*forc_t_c**4
+   
       ! But ensure that we don't depart too far from the atmospheric forcing value:
       ! negative values of lwrad are certainly bad, but small positive values might
       ! also be bad. We can especially run into trouble due to the normalization: a
       ! small lwrad value in one column can lead to a big normalization factor,
       ! leading to huge lwrad values in other columns.
+      forc_frl_c = min(forc_frl_c, forc_frl_g * (1._r8 + frl_bd))
+      forc_frl_c = max(forc_frl_c, forc_frl_g * (1._r8 - frl_bd))
 
-      forc_lwrad_c = min(forc_lwrad_c, forc_lwrad_g * (1._r8 + longwave_downscaling_limit))
-      forc_lwrad_c = max(forc_lwrad_c, forc_lwrad_g * (1._r8 - longwave_downscaling_limit))
-
-   END SUBROUTINE downscale_longwave
-
-!-----------------------------------------------------------------------------   
-   SUBROUTINE downscale_shortwave( &
-                        forc_topo_g, forc_pbot_g, forc_swrad_g, &
-                        forc_topo_c, forc_pbot_c, forc_swrad_c, &
-                        julian_day, coszen, cosazi, alb, &
-                        slp_type_c, asp_type_c, svf_c,   &
-#ifdef SinglePoint
-                        sf_lut_c,   &
-#else
-                        sf_curve_c, &
-#endif
-                        area_type_c)
+   END SUBROUTINE downscale_frl
 
 !-----------------------------------------------------------------------------
-! !DESCRIPTION:
+
+   SUBROUTINE downscale_swrad (&
+      julian_day, coszen, cosazi,   &
+      slp, asp, area, svf, sf, balb, &
+      forc_pbot_g, forc_swrad_g,    &
+      forc_pbot_c, forc_swrad_c)
+
+!-----------------------------------------------------------------------------
+! DESCRIPTION:
+!  Downscale shortwave radiation
+
+! REFERENCE:
+!  Rouf, T., Mei, Y., Maggioni, V., Houser, P., & Noonan, M. (2020). 
+!  A Physically Based Atmospheric Variables Downscaling Technique. 
+!  Journal of Hydrometeorology, 21(1), 93-108.
 !
-!  Rouf, T., Mei, Y., Maggioni, V., Houser, P., & Noonan, M. (2020). A
-!  Physically Based Atmospheric Variables Downscaling Technique. Journal
-!  of Hydrometeorology, 21(1), 93-108.
-!  https://doi.org/10.1175/JHM-D-19-0109.1
-!
-!  Sisi Chen, Lu Li, Yongjiu Dai, et al. Exploring Topography
-!  Downscaling Methods for Hyper-Resolution Land Surface Modeling.
-!  Authorea. April 25, 2024.  DOI: 10.22541/au.171403656.68476353/v1
-!
-!  Must be done after downscaling of surface pressure
+!  Chen,S., Li,L., & (2024).
+!  Exploring topography downscaling methods for hyper-resolution land surface modeling.
+!  Journal of Geophysical Research: Atmospheres, 129, e2024JD041338.
 !-----------------------------------------------------------------------------
 
    IMPLICIT NONE
 
-   integer,  parameter :: S = 1370                               ! solar constant (W/m**2)
-   real(r8), parameter :: thr = 85*PI/180                        ! threshold of zenith
-   ! relative limit for how much shortwave downscaling can be done (unitless)
-   real(r8), parameter :: shortwave_downscaling_limit = 0.5_r8
+   integer,  intent(in) :: julian_day
+   real(r8), intent(in) :: coszen
+   real(r8), intent(in) :: cosazi
 
-   ! ARGUMENTS:
-   real(r8), intent(in) :: julian_day          ! day of year
-   real(r8), intent(in) :: coszen              ! zenith angle at an hour
-   real(r8), intent(in) :: cosazi              ! azimuth angle at an hour
-   real(r8), intent(in) :: alb                 ! blue sky albedo
+   real(r8), intent(in) :: slp(:)
+   real(r8), intent(in) :: asp(:)
+   real(r8), intent(in) :: area(:)
+   real(r8), intent(in), optional :: svf
+   real(r8), intent(in), optional :: sf(:,:)
+   real(r8), intent(in), optional :: balb
 
-   real(r8), intent(in) :: forc_topo_g         ! atmospheric surface height (m)
-   real(r8), intent(in) :: forc_pbot_g         ! atmospheric pressure [Pa]
-   real(r8), intent(in) :: forc_swrad_g        ! downward shortwave (W/m**2)
+   real(r8), intent(in) :: forc_pbot_g       ! forcing-grid atmospheric pressure [Pa]
+   real(r8), intent(in) :: forc_swrad_g      ! forcing-grid downward shortwave (W/m**2)
+   real(r8), intent(in) :: forc_pbot_c       ! column atmospheric pressure [Pa]
+   real(r8), intent(out):: forc_swrad_c      ! column downward shortwave (W/m**2)
 
-   real(r8), intent(in) :: forc_topo_c         ! column surface height (m)
-   real(r8), intent(in) :: forc_pbot_c         ! atmospheric pressure [Pa]
-   real(r8), intent(out):: forc_swrad_c        ! downward shortwave (W/m**2)
+   integer  :: i                             ! Terrain-type index
+   integer  :: idx_azi                       ! Solar-azimuth sector index
 
-   real(r8), intent(in) :: svf_c               ! sky view factor
-# ifdef SinglePoint
-   ! look up table of shadow mask of a patch
-   real(r8), intent(in) :: sf_lut_c   (1:num_azimuth,1:num_zenith)
-# else
-   ! curve of shadow mask of a patch
-   real(r8), intent(in) :: sf_curve_c (1:num_azimuth,1:num_zenith_parameter)
-# endif
-   ! topographic aspect of each character of one patch (°)
-   real(r8), intent(in) :: asp_type_c (1:num_slope_type)
-   ! topographic slope of each character of one patch
-   real(r8), intent(in) :: slp_type_c (1:num_slope_type)
-   ! area percentage of each character of one patch
-   real(r8), intent(in) :: area_type_c(1:num_slope_type)
+   real(r8) :: cloud                         ! Cloudiness index
+   real(r8) :: difrat                        ! Diffuse fraction of incoming shortwave radiation
+   real(r8) :: beam_swrad_g                  ! Direct shortwave radiation at the forcing grid
+   real(r8) :: dif_swrad_g                   ! Diffuse shortwave radiation at the forcing grid
+   real(r8) :: beam_swrad_c                  ! Area-weighted direct shortwave radiation for the column
+   real(r8) :: dif_swrad_c                   ! Diffuse shortwave radiation for the column
+   real(r8) :: refl_swrad_c                  ! Terrain-reflected shortwave radiation for the column
+   real(r8) :: toa_swrad                     ! Top-of-atmosphere incident shortwave radiation
+   real(r8) :: clr_idx                       ! Atmospheric clearness index
+   real(r8) :: k_c                           ! Broadband atmospheric attenuation coefficient
+   real(r8) :: opt_factor                    ! Optical-path correction factor
+   real(r8) :: rt_R                          ! Earth-Sun distance correction factor
+   real(r8) :: zen_rad                       ! Solar zenith angle (rad)
+   real(r8) :: zenith_segment                ! Zenith-angle threshold for the shadow function (rad)
+   real(r8) :: a1                            ! First fitted parameter of the shadow function
+   real(r8) :: a2                            ! Second fitted parameter of the shadow function
+   real(r8) :: swrad_bd                      ! Lower bound for the shortwave scaling factor
+   real(r8) :: cosill(size(slp))             ! Illumination correction for each terrain type
+   real(r8) :: beam_swrad_c_sub(size(slp))   ! Direct shortwave contribution from each terrain type
+   real(r8) :: tcf(size(slp))                ! Terrain configuration factor for each terrain type
+   real(r8) :: refl_swrad_c_sub(size(slp))   ! Reflected shortwave contribution from each terrain type
+!--------------------------------------------------------------------------
 
-   ! LOCAL VARIABLES:
-   real(r8) :: zen_rad, zen_deg, azi_rad, azi_deg ! rad and deg of sun zenith and azimuth angle
-   integer  :: idx_azi, idx_zen                   ! index used to cal shadow factor from
-                                                  ! look up table
-   real(r8) :: sf_c                               ! shadow factor
-   real(r8) :: rt_R                               ! The ratio of the current distance between
-                                                  ! the sun and the earth
-   real(r8) :: toa_swrad                          ! top of atmosphere shortwave radiation
-   real(r8) :: clr_idx                            ! atmospheric transparency
-   real(r8) :: diff_wgt                           ! diffuse weight
-   real(r8) :: k_c                                ! column broadband attenuation coefficient [Pa^-1]
-   real(r8) :: opt_factor                         ! optical length factor
-   real(r8) :: a_p
-   real(r8) :: svf, balb
-
-   real(r8) :: diff_swrad_g, beam_swrad_g              ! diffuse and beam radiation
-   real(r8) :: diff_swrad_c, beam_swrad_c, refl_swrad_c! downscaled diffuse, beam radiation
-                                                       ! and reflect radiation
-   real(r8) :: beam_swrad_type (1:num_slope_type)      ! beam radiation of one characterized patch
-   real(r8) :: refl_swrad_type (1:num_slope_type)      ! refl. radiation of one characterized patch
-   real(r8) :: tcf_type        (1:num_slope_type)      ! terrain configure factor
-   real(r8) :: cosill_type     (1:num_slope_type)      ! illumination angle (cos) at defined types
-
-   real(r8) :: zenith_segment, a1, a2                  ! Segmented function segmentation
-                                                       ! points (rad), parameter1, parameter2
-
-   integer  :: i
-
-!-----------------------------------------------------------------------------
-
-      ! calculate shadow factor according to sun zenith and azimuth angle
-      zen_rad = acos(coszen)
-      azi_rad = acos(cosazi)
-      azi_deg = azi_rad*180.0/PI ! turn deg
-
-      idx_azi = INT(azi_deg*num_azimuth/360)
-
-      IF (idx_azi==0) idx_azi = 1
-
-#ifdef SinglePoint
-      zen_deg = zen_rad*180/PI ! turn deg
-      idx_zen = INT(zen_deg*num_zenith/90)
-      IF (idx_zen==0) idx_zen = 1
-      !constrain the upper boundary of zenith angle to 90 deg
-      IF (idx_zen>num_zenith) idx_zen = num_zenith
-
-      sf_c = sf_lut_c(idx_azi, idx_zen)
-#else
-      ! Constructing a shadow factor function from zenith angle parameters
-      ! shadow factor = exp(-1*exp(a1*zenith+a2))
-      zenith_segment = sf_curve_c(idx_azi, 1)       ! Segmented function segmentation points (rad)
-      a1 = sf_curve_c(idx_azi, 2)                   ! parameter of function
-      a2 = sf_curve_c(idx_azi, 3)                   ! parameter of function
-
-      IF (zen_rad <= zenith_segment) THEN
-         sf_c = 1.
-      ELSEIF (a1<=1e-10) THEN
-         sf_c = 1.
+      ! Participate diffuse and beam radiation
+      IF (coszen .eq. 0)THEN
+         cloud = 0.
       ELSE
-         sf_c = exp(-1*exp(min(a1*zen_rad+a2,3.5)))
+         cloud = (1160.*coszen-forc_swrad_g)/(963.*coszen)
       ENDIF
-#endif
+      cloud = max(cloud,0.)
+      cloud = min(cloud,1.)
+      cloud = max(0.58,cloud)
 
-      IF (sf_c<0) sf_c = 0
-      IF (sf_c>1) sf_c = 1
+      difrat = 0.0604/(coszen-0.0223)+0.0683
+      IF(difrat.lt.0.) difrat = 0.
+      IF(difrat.gt.1.) difrat = 1.
 
-      ! calculate top-of-atmosphere incident shortwave radiation
-      rt_R = 1-0.01672*cos(0.9856*(julian_day-4))
+      difrat = difrat+(1.0-difrat)*cloud
+
+      diff_swrad_g = forc_swrad_g * difrat
+      beam_swrad_g = forc_swrad_g * (1-difrat)
+
+      ! Cal top-of-atmosphere shortwave radiation, accounting for
+      ! the seasonal variation in Earth-Sun distance and solar zenith angle.
+      rt_R = 1 - 0.01672 * cos(0.9856*(julian_day-4)*PI/180._r8)
       toa_swrad = S*(rt_R**2)*coszen
 
-      ! calculate clearness index
-      IF (toa_swrad.eq.0) THEN
-         clr_idx = 0
-      ELSE
-         clr_idx = forc_swrad_g/toa_swrad
-      ENDIF
-      IF (clr_idx>1) clr_idx = 1
+      ! Derive the broadband attenuation coefficient k_c [Pa-1] from the
+      ! ratio of surface to top-of-atmosphere shortwave radiation. Following
+      ! Rouf et al. (2020), pressure represents the atmospheric optical path.
+      clr_idx = max(min(forc_swrad_g/toa_swrad, 1), 0)
 
-      ! calculate diffuse weight
-      ! Ruiz-Arias, J. A., Alsamamra, H., Tovar-Pescador, J., & Pozo-Vázquez, D. (2010).
-      ! Proposal of a regressive model for the hourly diffuse solar radiation under all sky
-      ! conditions. Energy Conversion and Management, 51(5), 881-893.
-      ! https://doi.org/10.1016/j.enconman.2009.11.024
-      diff_wgt = 0.952-1.041*exp(-1*exp(min(2.3-4.702*clr_idx,3.5)))
-      IF (diff_wgt>1) diff_wgt = 1
-      IF (diff_wgt<0) diff_wgt = 0
-
-      ! calculate diffuse and beam radiation
-      diff_swrad_g = forc_swrad_g*diff_wgt
-      beam_swrad_g = forc_swrad_g*(1-diff_wgt)
-
-      ! calculate broadband attenuation coefficient [Pa^-1]
       IF (clr_idx.le.0) THEN
          k_c = 0
       ELSE
          k_c = log(clr_idx)/forc_pbot_c
       ENDIF
-
-      ! calculate factor to account for the difference of optical path length
-      ! due to pressure difference
-      opt_factor = exp(k_c*(forc_pbot_g-forc_pbot_c))
-      ! Control the boundary of optical path length
-      IF ((opt_factor>10000).or.(opt_factor<-10000)) opt_factor = 0
-
-      ! Adjust the zenith angle so that the range of zenith angles is less than 85°
-      IF (zen_rad>thr) zen_rad=thr
-
-      ! loop for four defined types to downscale beam radiation
-      DO i = 1, num_slope_type
-         ! calculate the cosine of solar illumination angle, cos(θ),
-         ! ranging between −1 and 1, indicates if the sun is below or
-         ! above the local horizon (note that values lower than 0 are set to 0 indicate self shadow)
-         cosill_type(i) = cos(slp_type_c(i))+tan(zen_rad)*sin(slp_type_c(i))*cos(asp_type_c(i))
-         IF (cosill_type(i)>1) cosill_type(i) = 1
-         IF (cosill_type(i)<0) cosill_type(i) = 0
-
-         ! downscaling beam radiation
-         a_p = area_type_c(i)
-         IF (a_p.gt.1.0) a_p = 1
-         IF (a_p.lt.0) a_p = 0
-         beam_swrad_type(i) = sf_c*cosill_type(i)*opt_factor*a_p*beam_swrad_g
-      ENDDO
-      beam_swrad_c = sum(beam_swrad_type)
-
-      ! downscaling diffuse radiation
-      svf = svf_c
-      IF (svf>1) svf = 1
-      IF (svf<0) svf = 0
-      diff_swrad_c = svf*diff_swrad_g
-
-      ! downscaling reflected radiation
-      balb = alb
-      DO i = 1, num_slope_type
-         tcf_type(i) = (1+cos(slp_type_c(i)))/2-svf
-         IF (tcf_type(i)<0) tcf_type(i) = 0
-
-         IF (isnan_ud(alb)) THEN
-            refl_swrad_type(i) = -1.0e36
-         ELSE
-            IF ((balb<0).or.(balb>1)) balb = 0
-            refl_swrad_type(i) = balb*tcf_type(i)*(beam_swrad_c*coszen+(1-svf)*diff_swrad_c)
-         ENDIF
-      ENDDO
-      refl_swrad_c = sum(refl_swrad_type, mask = refl_swrad_type /= -1.0e36)
-      forc_swrad_c = beam_swrad_c+diff_swrad_c+refl_swrad_c
-
-      ! But ensure that we don't depart too far from the atmospheric forcing value:
-      ! negative values of swrad are certainly bad, but small positive values might
-      ! also be bad. We can especially run into trouble due to the normalization: a
-      ! small swrad value in one column can lead to a big normalization factor,
-      ! leading to huge swrad values in other columns.
-
-      forc_swrad_c = min(forc_swrad_c, &
-               forc_swrad_g * (1._r8 + shortwave_downscaling_limit))
-      forc_swrad_c = max(forc_swrad_c, &
-               forc_swrad_g * (1._r8 - shortwave_downscaling_limit))
-      ! Ensure that the denominator is not 0 during shortwave normalization
-      IF (forc_swrad_c==0.) forc_swrad_c = 0.0001
-
-   END SUBROUTINE downscale_shortwave
-
-!-----------------------------------------------------------------------------
-   SUBROUTINE downscale_shortwave_simple( &
-                        forc_topo_g, forc_pbot_g, forc_swrad_g, &
-                        forc_topo_c, forc_pbot_c, forc_swrad_c, &
-                        julian_day, coszen, cosazi, &
-                        slp_type_c, area_type_c)
-!-----------------------------------------------------------------------------
-! !DESCRIPTION:
-! This subroutine performs a simple downscaling of shortwave radiation for
-! land-atmosphere coupling models. The adjustments are only made for direct
-! radiation without considering the impact of shadow factor.
-!
-   IMPLICIT NONE
-
-   integer,  parameter :: S = 1370                               ! solar constant (W/m**2)
-   real(r8), parameter :: thr = 85*PI/180                        ! threshold of zenith
-   ! relative limit for how much shortwave downscaling can be done (unitless)
-   real(r8), parameter :: shortwave_downscaling_limit = 0.2_r8
-
-   ! ARGUMENTS:
-   real(r8), intent(in) :: julian_day          ! day of year
-   real(r8), intent(in) :: coszen              ! zenith angle at an hour
-   real(r8), intent(in) :: cosazi              ! azimuth angle at an hour
-
-   real(r8), intent(in) :: forc_topo_g         ! atmospheric surface height (m)
-   real(r8), intent(in) :: forc_pbot_g         ! atmospheric pressure [Pa]
-   real(r8), intent(in) :: forc_swrad_g        ! downward shortwave (W/m**2)
-
-   real(r8), intent(in) :: forc_topo_c         ! column surface height (m)
-   real(r8), intent(in) :: forc_pbot_c         ! atmospheric pressure [Pa]
-   real(r8), intent(out):: forc_swrad_c        ! downward shortwave (W/m**2)
-
-   ! tan value of topographic slope of each direction of one patch
-   real(r8), intent(in) :: slp_type_c (1:num_aspect_type)
-   ! area percentage of each character of one patch
-   real(r8), intent(in) :: area_type_c(1:num_aspect_type)
-
-   ! LOCAL VARIABLES:
-
-   real(r8) :: asp_type_c (1:num_aspect_type)     ! topographic aspect fraction of one patch (%100) num_aspect_type = 1:north, 2:northeast, 3:east, 
-                                                  ! 4:southeast, 5:south, 6:southwest, 7:west, 8:northwest, 9:flat
-   real(r8) :: slp_type_c_rad                     ! Convert tan slope value to slope angle value
-
-   real(r8) :: zen_rad, azi_rad                   ! rad of sun zenith and azimuth angle
-   integer  :: idx_azi, idx_zen                   ! index used to cal shadow factor from
-                                                  ! look up table
-   real(r8) :: sf_c                               ! shadow factor
-   real(r8) :: rt_R                               ! The ratio of the current distance between
-                                                  ! the sun and the earth
-   real(r8) :: toa_swrad                          ! top of atmosphere shortwave radiation
-   real(r8) :: clr_idx                            ! atmospheric transparency
-   real(r8) :: diff_wgt                           ! diffuse weight
-   real(r8) :: k_c                                ! column broadband attenuation coefficient [Pa^-1]
-   real(r8) :: opt_factor                         ! optical length factor
-   real(r8) :: a_p
-   real(r8) :: diff_swrad_g, beam_swrad_g              ! diffuse and beam radiation
-   real(r8) :: diff_swrad_c, beam_swrad_c              ! downscaled diffuse, beam radiation
-                                                       
-   real(r8) :: beam_swrad_type (1:num_aspect_type)      ! beam radiation of one characterized patch
-   real(r8) :: cosill_type     (1:num_aspect_type)      ! illumination angle (cos) at defined types
-
-   integer  :: i
-!------------------------------------------------------------------------------
-
-      ! Initialize aspect type
-      asp_type_c(1) = 0.0_r8*PI/180     ! north
-      asp_type_c(2) = 45.0_r8*PI/180    ! northeast
-      asp_type_c(3) = 90.0_r8*PI/180    ! east
-      asp_type_c(4) = 135.0_r8*PI/180   ! southeast
-      asp_type_c(5) = 180.0_r8*PI/180   ! south
-      asp_type_c(6) = 225.0_r8*PI/180   ! southwest
-      asp_type_c(7) = 270.0_r8*PI/180   ! west
-      asp_type_c(8) = 315.0_r8*PI/180   ! northwest
-      asp_type_c(9) = -9999.0_r8        ! flat
-
-      ! calculate shadow factor according to sun zenith and azimuth angle
-      zen_rad = acos(coszen)
-      azi_rad = acos(cosazi)
       
-      ! calculate top-of-atmosphere incident shortwave radiation
-      rt_R = 1-0.01672*cos(0.9856*(julian_day-4))
-      toa_swrad = S*(rt_R**2)*coszen
+      ! Account for the optical-path difference caused by the pressure
+      ! difference between the forcing grid and target column.
+      opt_factor = exp(k_c * (forc_pbot_g - forc_pbot_c))
 
-      ! calculate clearness index
-      IF (toa_swrad < 1.e-7) THEN
-         clr_idx = 0
-      ELSE
-         clr_idx = forc_swrad_g/toa_swrad
-      ENDIF
-      IF (clr_idx>1) clr_idx = 1
+      ! Adjust beam radiation according to illustration angle and optical-path difference
+      zen_rad = min(acos(coszen), 85*PI/180.)
+      azi_rad = acos(cosazi)
 
-      ! calculate diffuse weight
-      ! Ruiz-Arias, J. A., Alsamamra, H., Tovar-Pescador, J., & Pozo-Vázquez, D. (2010).
-      ! Proposal of a regressive model for the hourly diffuse solar radiation under all sky
-      ! conditions. Energy Conversion and Management, 51(5), 881-893.
-      ! https://doi.org/10.1016/j.enconman.2009.11.024
-      diff_wgt = 0.952-1.041*exp(-1*exp(min(2.3-4.702*clr_idx,3.5)))
-      IF (diff_wgt>1) diff_wgt = 1
-      IF (diff_wgt<0) diff_wgt = 0
-
-      ! calculate diffuse and beam radiation
-      diff_swrad_g = forc_swrad_g*diff_wgt
-      beam_swrad_g = forc_swrad_g*(1-diff_wgt)
-
-      ! calculate broadband attenuation coefficient [Pa^-1]
-      IF (clr_idx.le.0) THEN
-         k_c = 0
-      ELSE
-         k_c = log(clr_idx)/forc_pbot_c
-      ENDIF
-
-      ! calculate factor to account for the difference of optical path length
-      ! due to pressure difference
-      opt_factor = exp(k_c*(forc_pbot_g-forc_pbot_c))
-      ! Control the boundary of optical path length
-      IF ((opt_factor>10000).or.(opt_factor<-10000)) opt_factor = 0
-
-      ! Adjust the zenith angle so that the range of zenith angles is less than 85°
-      IF (zen_rad>thr) zen_rad = thr
-
-      ! loop for four defined types to downscale beam radiation
-      DO i = 1, num_aspect_type
-         ! calculate the cosine of solar illumination angle, cos(θ),
-         ! ranging between −1 and 1, indicates if the sun is below or
-         ! above the local horizon (note that values lower than 0 are set to 0 indicate self shadow)
-         IF (i == 9) THEN
-            ! flat area, no slope
-            cosill_type(i) = 1.0_r8
+      DO i = 1, size(slp)
+         IF (slp(i) == spval) THEN
+            beam_swrad_c_sub(i) = spval
          ELSE
-            slp_type_c_rad = atan(slp_type_c(i))
-            cosill_type(i) = cos(slp_type_c_rad)+tan(zen_rad)*sin(slp_type_c_rad)*cos(asp_type_c(i))
+            IF (asp(i) >= 0._r8) THEN 
+               cosill(i) = cos(atan(slp(i)))+tan(zen_rad)*sin(atan(slp(i)))*cos(azi_rad-asp(i))
+               cosill(i) = max(cosill(i), 0)
+            ELSE 
+               cosill(i) = 1.
+            ENDIF
+
+            beam_swrad_c_sub(i) = beam_swrad_g * cosill(i) * opt_factor * area(i)
+         ENDIF
+      ENDDO
+
+      beam_swrad_c = sum(beam_swrad_c_sub, mask=beam_swrad_c_sub/=spval)
+      diff_swrad_c = diff_swrad_g
+      refl_swrad_c = 0
+
+      ! Adjust shortwave radiation using other factors in complex mode
+      IF (DEF_DS_MODE == 'C') THEN
+
+         ! Cal shadow factor using shadow factor parameters
+         ! sf = exp(-1 * exp(a1*zenith + a2))
+         idx_azi = int((azi_rad*180/PI)/(360/16))+1
+         zen_segment = sf(idx_azi, 1)      
+         a1 = sf(idx_azi, 2)                   
+         a2 = sf(idx_azi, 3)                
+
+         IF (zen_rad <= zen_segment) THEN
+            sf_c = 1.
+         ELSEIF (a1<=1e-10) THEN
+            sf_c = 1.
+         ELSE
+            sf_c = exp(-1*exp(min(a1*zen_rad+a2,3.5)))
          ENDIF
 
-         ! Ensure that the cosine of illumination angle is between 0 and 1
-         IF (cosill_type(i)>1) cosill_type(i) = 1
-         IF (cosill_type(i)<0) cosill_type(i) = 0
+         ! Adjust beam radiation using shadow factor
+         beam_swrad_c = beam_swrad_c * sf_c
 
-         ! downscaling beam radiation
-         a_p = area_type_c(i)
-         IF (a_p.gt.1.0) a_p = 1
-         IF (a_p.lt.0) a_p = 0
-         beam_swrad_type(i) = cosill_type(i)*opt_factor*a_p*beam_swrad_g
-      ENDDO
-      beam_swrad_c = sum(beam_swrad_type)
+         ! Adjust diffuse radiation using sky view factor
+         diff_swrad_c = diff_swrad_g * svf
 
-      ! do not downscale diffuse radiation
-      diff_swrad_c = diff_swrad_g
+         ! Cal reflect radiation by surronding terrains by configuration factor
+         DO i = 1, size(slp)
+            tcf(i) = max((1+cos(slp(i)))/2-svf, 0)
 
-      forc_swrad_c = beam_swrad_c+diff_swrad_c
+            IF (slp(i) == spval) THEN
+               refl_swrad_c_sub(i) = spval
+            ELSE
+               refl_swrad_c_sub(i) = balb * tcf(i) * (beam_swrad_c*coszen+(1-svf)*diff_swrad_c)
+            ENDIF
+         ENDDO
+         refl_swrad_c = sum(refl_swrad_c_sub, mask=refl_swrad_c_sub/=spval)
+      ENDIF
 
-      ! But ensure that we don't depart too far from the atmospheric forcing value:
-      ! negative values of swrad are certainly bad, but small positive values might
-      ! also be bad. We can especially run into trouble due to the normalization: a
-      ! small swrad value in one column can lead to a big normalization factor,
-      ! leading to huge swrad values in other columns.
-
-      forc_swrad_c = min(forc_swrad_c, &
-               forc_swrad_g * (1._r8 + shortwave_downscaling_limit)) 
-      forc_swrad_c = max(forc_swrad_c, &
-               forc_swrad_g * (1._r8 - shortwave_downscaling_limit))
-      ! Ensure that the denominator is not 0 during shortwave normalization
+      ! bound the downscaled shortwave radiation to ensure that the denominator 
+      ! is not 0 during shortwave normalization
+      forc_swrad_c = beam_swrad_c + diff_swrad_c + refl_swrad_c
+      forc_swrad_c = min(forc_swrad_c, forc_swrad_g * (1._r8 + swrad_bd)) 
+      forc_swrad_c = max(forc_swrad_c, forc_swrad_g * (1._r8 - swrad_bd))
       IF (forc_swrad_c < 1.e-4) forc_swrad_c = 0.0001
 
-   END SUBROUTINE downscale_shortwave_simple
+   END SUBROUTINE downscale_swrad
 
+!-----------------------------------------------------------------------------
 
+   SUBROUTINE downscale_wind ( &
+         slp_c, asp_c, cur_c, area_c, &
+         forc_us_g, forc_vs_g,        &
+         forc_us_c, forc_vs_c)
 
+!-----------------------------------------------------------------------------
+! DESCRIPTION:
+!  Adjust wind speed using slope along the wind direction and curvature.
+!  Average terrain classes by area and retain the original vector direction.
+!
+! REFERENCE:
+!  Liston, G. E. and Elder, K. (2006)
+!  A meteorological distribution system for high-resolution terrestrial modeling (MicroMet)
+!  Journal of Hydrometeorology, 7, 217-234.
+!-----------------------------------------------------------------------------
+
+   IMPLICIT NONE
+
+   real(r8), intent(in)  :: forc_us_g, forc_vs_g                 ! grid eastward/northward wind [m/s]
+   real(r8), intent(in)  :: slp_c(:)                             ! slope angle [rad]; -1.e36: missing
+   real(r8), intent(in)  :: asp_c(:)                             ! clockwise from north [rad]; -9999: flat
+   real(r8), intent(in)  :: cur_c                                ! normalized terrain curvature [-]
+   real(r8), intent(in)  :: area_c(:)                            ! terrain-class area fraction [-]
+   real(r8), intent(out) :: forc_us_c, forc_vs_c                 ! column eastward/northward wind [m/s]
+
+   integer               :: i
+   real(r8)              :: ws_dir, slp_ws_dir, scale_factor, weighted_scale
+!-----------------------------------------------------------------------------
+
+      ! Cal wind speed and direction and convert angles to match the aspect-data convention.
+      ! Before: east = 0, [-PI, PI].
+      !
+      !                         N (PI/2) 
+      !                            |
+      !             W (+/-PI) -----+----- E (0)
+      !                            |
+      !                         S (-PI/2)
+      !
+      ! After: north = 0, [0, 2*PI).
+      !
+      !                         N (0)
+      !                            |
+      !             W (3*PI/2) ----+----- E (PI/2)
+      !                            |
+      !                         S (PI)
+      !
+      ws_dir = modulo(PI/2.0_r8 - atan2(forc_vs_g, forc_us_g), 2.0_r8*PI)
+      ws_g = sqrt(forc_us_g**2 + forc_vs_g**2)
+
+      !
+      DO i = 1, size(slp_c)
+         IF (slp_c(i) == spval) THEN  ! no this terrain type
+            ws_c_sub(i) = spval
+         ELSE
+            ws_dir_slp = slp_c(i) * cos(ws_dir - asp_c(i))
+            IF (asp_c(i) == -9999) THEN  ! flatten area
+               scale_factor = 1.0
+            ELSE
+               scale_factor = min(1.5_r8, abs(1.0_r8 + 0.58_r8*slp_ws_dir + 0.42_r8*cur_c))  ! We let scale factor larger than 0
+            ENDIF
+            ws_c_sub(i) = ws_g * scale_factor * area_c(i)
+         ENDIF
+      ENDDO
+      ws_c = sum(ws_c_sub(:), mask=ws_c_sub(:)/=spval)
+
+      ! NOTE: we use the wind direction after coverting to the aspect-data convention to calculate the eastward/northward wind components.
+      forc_us_c = ws_c * sin(ws_dir)
+      forc_vs_c = ws_c * cos(ws_dir)
+
+   END SUBROUTINE downscale_wind
+
+!-----------------------------------------------------------------------------
 END MODULE MOD_ForcingDownscaling
