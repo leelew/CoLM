@@ -31,6 +31,9 @@ MODULE MOD_Hist
 #endif
 #ifdef GridRiverLakeFlow
    USE MOD_Grid_RiverLakeHist
+#ifdef DataAssimilation
+   USE MOD_DA_Hist, only: hist_DA_riverlake_out
+#endif
 #endif
 #ifdef EXTERNAL_LAKE
    USE MOD_Lake_Hist
@@ -142,7 +145,7 @@ CONTAINS
 #endif
    USE MOD_Forcing, only: forcmask_pch
 #ifdef DataAssimilation
-   USE MOD_DA_TWS, only: fslp_k_mon
+   USE MOD_DA_Assim_TWS, only: fslp_k_mon
    USE MOD_Vars_Global
    USE MOD_DA_Vars_TimeVariables
    USE MOD_Const_Physical, only: denh2o
@@ -194,20 +197,11 @@ CONTAINS
 
 #ifdef DataAssimilation
    integer :: np
-   real(r8), allocatable ::  a_wliq_h2osoi_5cm (:)
-   real(r8), allocatable ::  a_t_soisno_5cm (:)
-   real(r8), allocatable ::  a_wliq_soisno_ens_mean (:,:)
-   real(r8), allocatable ::  a_wliq_soisno_5cm_ens (:,:)
-   real(r8), allocatable ::  a_wliq_h2osoi_5cm_a (:)
-   real(r8), allocatable ::  a_t_soisno_ens_mean (:,:)
-   real(r8), allocatable ::  a_t_soisno_5cm_ens (:,:)
-   real(r8), allocatable ::  a_t_soisno_5cm_a (:)
-   real(r8), allocatable ::  a_t_brt_smap_a (:,:)
-   real(r8), allocatable ::  a_t_brt_fy3d_a (:,:)
-   real(r8), allocatable ::  a_wliq_soisno_5cm_ens_std (:)
-   real(r8), allocatable ::  a_t_soisno_5cm_ens_std (:)
-   real(r8), allocatable ::  a_t_brt_smap_ens_std (:,:)
-   real(r8), allocatable ::  a_t_brt_fy3d_ens_std (:,:)
+   logical,  allocatable ::  filter_hx (:,:)
+   real(r8), allocatable ::  a_wliq_soisno_o_5cm (:)
+   real(r8), allocatable ::  a_wliq_soisno_a_5cm (:)
+   real(r8), allocatable ::  a_hx_f_std (:,:)
+   real(r8), allocatable ::  a_hx_a_std (:,:)
 #endif
 
       IF (itstamp <= ptstamp) THEN
@@ -614,7 +608,7 @@ CONTAINS
             'total runoff','mm/s')
 
 #ifdef DataAssimilation
-         IF (DEF_DA_TWS_GRACE) THEN
+         IF (ANY(DEF_DA_OBS_TARGET == 'TWS')) THEN
             ! slope factors for runoff [-]
             IF (p_is_worker .and. (numpatch > 0)) THEN
                vecacc = fslp_k_mon(month, :)
@@ -4173,118 +4167,58 @@ ENDIF
 
 
 #ifdef DataAssimilation
-         IF (p_is_worker) THEN
-            allocate (a_wliq_h2osoi_5cm     (numpatch                 )); a_wliq_h2osoi_5cm         = spval
-            allocate (a_t_soisno_5cm        (numpatch                 )); a_t_soisno_5cm            = spval
+         ! 0-5 cm surface liquid soil moisture [m3/m3]
+         allocate (a_wliq_soisno_o_5cm (numpatch))
+         allocate (a_wliq_soisno_a_5cm (numpatch))
+         a_wliq_soisno_o_5cm = spval
+         a_wliq_soisno_a_5cm = spval
 
-            allocate (a_wliq_soisno_ens_mean(maxsnl+1:nl_soil,numpatch)); a_wliq_soisno_ens_mean    = spval
-            allocate (a_wliq_soisno_5cm_ens (DEF_DA_ENS_NUM,numpatch  )); a_wliq_soisno_5cm_ens     = spval
-            allocate (a_wliq_h2osoi_5cm_a   (numpatch                 )); a_wliq_h2osoi_5cm_a       = spval
-
-            allocate (a_t_soisno_ens_mean   (maxsnl+1:nl_soil,numpatch)); a_t_soisno_ens_mean       = spval
-            allocate (a_t_soisno_5cm_ens    (DEF_DA_ENS_NUM,numpatch  )); a_t_soisno_5cm_ens        = spval
-            allocate (a_t_soisno_5cm_a      (numpatch                 )); a_t_soisno_5cm_a          = spval
-
-            allocate (a_t_brt_smap_a        (2,numpatch               )); a_t_brt_smap_a            = spval
-            allocate (a_t_brt_fy3d_a        (2,numpatch               )); a_t_brt_fy3d_a            = spval
-
-            allocate (a_wliq_soisno_5cm_ens_std(numpatch              )); a_wliq_soisno_5cm_ens_std = spval
-            allocate (a_t_soisno_5cm_ens_std   (numpatch              )); a_t_soisno_5cm_ens_std    = spval
-            allocate (a_t_brt_smap_ens_std     (2,numpatch            )); a_t_brt_smap_ens_std      = spval
-            allocate (a_t_brt_fy3d_ens_std     (2,numpatch            )); a_t_brt_fy3d_ens_std      = spval
-         END IF
-
-         IF (p_is_worker) THEN
-!#############################################################################
-! States before DA
-!#############################################################################
-            ! calculate surface liquid soil moisture (0-5cm) before DA
-            a_wliq_h2osoi_5cm = (a_wliq_soisno(1,:) + a_wliq_soisno(2,:) + &
-               a_wliq_soisno(3, :)*(0.05 - 0.0451)/(0.0906 - 0.0451))/(0.05*denh2o)
-
-            ! calculate surface liquid soil moisture (0-5cm) before DA
-            a_t_soisno_5cm = (a_t_soisno(1,:)*0.0175 + a_t_soisno(2,:)*(0.0451 - 0.0175))/(0.0451)
-
-!#############################################################################
-! States after DA
-!#############################################################################
-            ! calculate surface liquid soil moisture (0-5cm) after DA
-            a_wliq_soisno_ens_mean = sum(a_wliq_soisno_ens, dim=2) / DEF_DA_ENS_NUM
-            a_wliq_soisno_5cm_ens = (a_wliq_soisno_ens(1,:,:) + a_wliq_soisno_ens(2,:,:) + &
-               a_wliq_soisno_ens(3,:,:)*(0.05-0.0451)/(0.0906-0.0451))/(0.05*denh2o)
-            a_wliq_h2osoi_5cm_a = (a_wliq_soisno_ens_mean(1,:) + a_wliq_soisno_ens_mean(2,:) + &
-               a_wliq_soisno_ens_mean(3,:)*(0.05 - 0.0451)/(0.0906 - 0.0451))/(0.05*denh2o)
-
-            ! calculate surface soil temperature (0-5cm) before DA & after DA
-            a_t_soisno_ens_mean = sum(a_t_soisno_ens, dim=2) / DEF_DA_ENS_NUM
-            a_t_soisno_5cm_ens = (a_t_soisno_ens(1,:,:)*0.0175 + a_t_soisno_ens(2,:,:)*(0.0451 - 0.0175))/(0.0451)
-            a_t_soisno_5cm_a = (a_t_soisno_ens_mean(1,:)*0.0175 + a_t_soisno_ens_mean(2,:)*(0.0451 - 0.0175))/(0.0451)
-
-!#############################################################################
-! brightness temperature after DA
-!#############################################################################
-            a_t_brt_smap_a = sum(a_t_brt_smap_ens, dim=2) / DEF_DA_ENS_NUM
-            a_t_brt_fy3d_a = sum(a_t_brt_fy3d_ens, dim=2) / DEF_DA_ENS_NUM
-
-!#############################################################################
-! Standard deviation of states and brightness temperature
-!#############################################################################
-            ! calculate standard deviation of surface soil moisture, temperature and brightness temperature
-            DO np = 1, numpatch
-               a_wliq_soisno_5cm_ens_std(np) = &
-                  sqrt(sum((a_wliq_soisno_5cm_ens(:,np)-a_wliq_h2osoi_5cm_a(np))**2)/real(DEF_DA_ENS_NUM-1))
-               a_t_soisno_5cm_ens_std(np) = &
-                  sqrt(sum((a_t_soisno_5cm_ens(:,np)-a_t_soisno_5cm_a(np))**2)/real(DEF_DA_ENS_NUM-1))
-               IF (DEF_DA_SM_SMAP) THEN
-                  IF (patchtype(np) >= 3) cycle
-                  a_t_brt_smap_ens_std(1,np) = &
-                     sqrt(sum((a_t_brt_smap_ens(1,:,np)-a_t_brt_smap_a(1,np))**2)/real(DEF_DA_ENS_NUM-1))
-                  a_t_brt_smap_ens_std(2,np) = &
-                     sqrt(sum((a_t_brt_smap_ens(2,:,np)-a_t_brt_smap_a(2,np))**2)/real(DEF_DA_ENS_NUM-1))
-               ENDIF
-               IF (DEF_DA_SM_FY) THEN
-                  IF (patchtype(np) >= 3) cycle
-                  a_t_brt_fy3d_ens_std(1,np) = &
-                     sqrt(sum((a_t_brt_fy3d_ens(1,:,np)-a_t_brt_fy3d_a(1,np))**2)/real(DEF_DA_ENS_NUM-1))
-                  a_t_brt_fy3d_ens_std(2,np) = &
-                     sqrt(sum((a_t_brt_fy3d_ens(2,:,np)-a_t_brt_fy3d_a(2,np))**2)/real(DEF_DA_ENS_NUM-1))
-               ENDIF
-            ENDDO
+         IF (p_is_worker .and. numpatch > 0) THEN
+            a_wliq_soisno_o_5cm = (a_wliq_soisno_ol(1,:) + a_wliq_soisno_ol(2,:) + &
+               a_wliq_soisno_ol(3,:)*(0.05 - 0.0451)/(0.0906 - 0.0451)) / (0.05*denh2o)
+            a_wliq_soisno_a_5cm = (a_wliq_soisno_a(1,:) + a_wliq_soisno_a(2,:) + &
+               a_wliq_soisno_a(3,:)*(0.05 - 0.0451)/(0.0906 - 0.0451)) / (0.05*denh2o)
          ENDIF
 
-         ! surface soil moisture (0-5cm) before and after DA
-         CALL write_history_variable_2d(DEF_hist_vars%DA_wliq_h2osoi_5cm, &
-            a_wliq_h2osoi_5cm, file_hist, 'f_wliq_h2osoi_5cm', itime_in_file, &
-            sumarea, filter, 'Volumetric liquid water content in 0-5cm', 'm3/m3')
-         CALL write_history_variable_2d(DEF_hist_vars%DA_wliq_h2osoi_5cm_a, &
-            a_wliq_h2osoi_5cm_a, file_hist, 'f_wliq_h2osoi_5cm_a', itime_in_file, &
-            sumarea, filter, 'Analysis volumetric liquid water content in 0-5cm', 'm3/m3')
+         CALL write_history_variable_2d(DEF_hist_vars%DA_wliq_soisno_o_5cm, &
+            a_wliq_soisno_o_5cm, file_hist, 'f_wliq_soisno_o_5cm', itime_in_file, &
+            sumarea, filter, 'Open-loop volumetric liquid water content in 0-5 cm', 'm3/m3')
+         CALL write_history_variable_2d(DEF_hist_vars%DA_wliq_soisno_a_5cm, &
+            a_wliq_soisno_a_5cm, file_hist, 'f_wliq_soisno_a_5cm', itime_in_file, &
+            sumarea, filter, 'Analysis volumetric liquid water content in 0-5 cm', 'm3/m3')
 
-         ! surface soil temperature (0-5cm) before and after DA
-         CALL write_history_variable_2d(DEF_hist_vars%DA_t_soisno_5cm, &
-            a_t_soisno_5cm, file_hist, 'f_t_soisno_5cm', itime_in_file, &
-            sumarea, filter, 'Soil temperature in 0-5cm', 'K')
-         CALL write_history_variable_2d(DEF_hist_vars%DA_t_soisno_5cm_a, &
-            a_t_soisno_5cm_a, file_hist, 'f_t_soisno_5cm_a', itime_in_file, &
-            sumarea, filter, 'Analysis soil temperature in 0-5cm', 'K')
+         deallocate (a_wliq_soisno_o_5cm, a_wliq_soisno_a_5cm)
+
+         CALL write_history_variable_3d(DEF_hist_vars%DA_wliq_soisno_ol, &
+            a_wliq_soisno_ol, file_hist, 'f_wliq_soisno_ol', itime_in_file, &
+            'soilsnow', maxsnl + 1, nl_soil - maxsnl, sumarea, filter, &
+            'Open-loop liquid water in soil and snow layers', 'kg/m2')
+         CALL write_history_variable_3d(DEF_hist_vars%DA_wliq_soisno_f, &
+            a_wliq_soisno_f, file_hist, 'f_wliq_soisno_f', itime_in_file, &
+            'soilsnow', maxsnl + 1, nl_soil - maxsnl, sumarea, filter, &
+            'Forecast ensemble-mean liquid water in soil and snow layers', 'kg/m2')
+         CALL write_history_variable_3d(DEF_hist_vars%DA_wliq_soisno_a, &
+            a_wliq_soisno_a, file_hist, 'f_wliq_soisno_a', itime_in_file, &
+            'soilsnow', maxsnl + 1, nl_soil - maxsnl, sumarea, filter, &
+            'Analysis ensemble-mean liquid water in soil and snow layers', 'kg/m2')
+
+         CALL write_history_variable_3d(DEF_hist_vars%DA_t_soisno_ol, &
+            a_t_soisno_ol, file_hist, 'f_t_soisno_ol', itime_in_file, &
+            'soilsnow', maxsnl + 1, nl_soil - maxsnl, sumarea, filter, &
+            'Open-loop temperature in soil and snow layers', 'K')
+         CALL write_history_variable_3d(DEF_hist_vars%DA_t_soisno_f, &
+            a_t_soisno_f, file_hist, 'f_t_soisno_f', itime_in_file, &
+            'soilsnow', maxsnl + 1, nl_soil - maxsnl, sumarea, filter, &
+            'Forecast ensemble-mean temperature in soil and snow layers', 'K')
+         CALL write_history_variable_3d(DEF_hist_vars%DA_t_soisno_a, &
+            a_t_soisno_a, file_hist, 'f_t_soisno_a', itime_in_file, &
+            'soilsnow', maxsnl + 1, nl_soil - maxsnl, sumarea, filter, &
+            'Analysis ensemble-mean temperature in soil and snow layers', 'K')
 
          ! ensemble soil moisture & temperature in soil layers [kg/m2]
-         IF (DEF_DA_ENS_NUM > 1) THEN
-            CALL write_history_variable_4d(DEF_hist_vars%DA_wliq_soisno_ens, &
-               a_wliq_soisno_ens, file_hist, 'f_wliq_soisno_ens', itime_in_file, 'soilsnow', maxsnl + 1, nl_soil - maxsnl, &
-               'ens', 1, DEF_DA_ENS_NUM, sumarea, filter, 'ensemble liquid water in soil layers', 'kg/m2')
-            CALL write_history_variable_4d(DEF_hist_vars%DA_t_soisno_ens, &
-               a_t_soisno_ens, file_hist, 'f_t_soisno_ens', itime_in_file, 'soilsnow', maxsnl + 1, nl_soil - maxsnl, &
-               'ens', 1, DEF_DA_ENS_NUM, sumarea, filter, 'ensemble soil temperature', 'K')
-         ENDIF
-
-         ! standard deviation of ensemble surface soil moisture and temperature (0-5cm)
-         CALL write_history_variable_2d(DEF_hist_vars%DA_wliq_soisno_5cm_ens_std, &
-            a_wliq_soisno_5cm_ens_std, file_hist, 'f_wliq_soisno_ens_5cm_ens_std', itime_in_file, &
-            sumarea, filter, 'Standard deviation of ensemble volumetric liquid water content in 0-5cm', 'm3/m3')
-         CALL write_history_variable_2d(DEF_hist_vars%DA_t_soisno_5cm_ens_std, &
-            a_t_soisno_5cm_ens_std, file_hist, 'f_t_soisno_ens_5cm_ens_std', itime_in_file, &
-            sumarea, filter, 'Standard deviation of ensemble soil temperature in 0-5cm', 'K')
+         CALL write_history_variable_4d(DEF_hist_vars%DA_wliq_soisno_ens, &
+            a_wliq_soisno_ens, file_hist, 'f_wliq_soisno_ens', itime_in_file, 'soilsnow', maxsnl + 1, nl_soil - maxsnl, &
+            'ens', 1, DEF_DA_ENS_NUM, sumarea, filter, 'ensemble liquid water in soil layers', 'kg/m2')
 
          ! --------------------------------------------------------------------
          ! brightness temperature (excluding land ice, land water bodies and ocean patches)
@@ -4315,58 +4249,95 @@ ENDIF
             CALL mp2g_hist%get_sumarea(sumarea, filter)
          END IF
 
-         ! brightness temperature for SMAP and FY satellites
-         IF (DEF_DA_SM_SMAP) THEN
-            CALL write_history_variable_3d(DEF_hist_vars%DA_t_brt_smap, &
-               a_t_brt_smap, file_hist, 'f_t_brt_smap', itime_in_file, 'band', 1, 2, sumarea, filter, &
-               'H- & V- polarized brightness temperature for SMAP satellite (L-band, 1.4GHz)', 'K')
-            CALL write_history_variable_3d(DEF_hist_vars%DA_t_brt_smap_a, &
-               a_t_brt_smap_a, file_hist, 'f_t_brt_smap_a', itime_in_file, 'band', 1, 2, sumarea, filter, &
-               'Analysis H- & V- polarized brightness temperature for SMAP satellite (L-band,1.4GHz)', 'K')
+         ! Generic DA observation-space diagnostics. The source dimension follows
+         ! the order of DEF_DA_OBS_* entries whose TARGET is 'SM'.
+         IF (nsource > 0) THEN
+            allocate(filter_hx(nsource,numpatch))
+            allocate(a_hx_f_std(nsource,numpatch))
+            allocate(a_hx_a_std(nsource,numpatch))
+            a_hx_f_std = spval
+            a_hx_a_std = spval
+
+            ! Ensemble spread of H(x), on the raw accumulators: the writers'
+            ! in-place /nac scales spread and mean alike.
+            IF (DEF_DA_ENS_NUM > 1 .and. p_is_worker) THEN
+               DO np = 1, numpatch
+                  DO i = 1, nsource
+                     IF (a_hx_f(i,np) /= spval) a_hx_f_std(i,np) = &
+                        sqrt(sum((a_hx_f_ens(i,:,np) - a_hx_f(i,np))**2) &
+                           / real(DEF_DA_ENS_NUM - 1))
+                     IF (a_hx_a(i,np) /= spval) a_hx_a_std(i,np) = &
+                        sqrt(sum((a_hx_a_ens(i,:,np) - a_hx_a(i,np))**2) &
+                           / real(DEF_DA_ENS_NUM - 1))
+                  ENDDO
+               ENDDO
+            ENDIF
+
+            IF (p_is_worker) THEN
+               DO i = 1, nsource
+                  filter_hx(i,:) = filter .and. a_hx_ol(i,:) /= spval
+               ENDDO
+            ENDIF
+            CALL write_history_variable_3d(DEF_hist_vars%hx_ol, &
+               a_hx_ol, file_hist, 'f_hx_ol', itime_in_file, &
+               'source', 1, nsource, sumarea, filter, &
+               'Open-loop H(x) by DA observation source', 'source-dependent', &
+               filter_3d = filter_hx)
+
+            IF (p_is_worker) THEN
+               DO i = 1, nsource
+                  filter_hx(i,:) = filter .and. a_hx_f(i,:) /= spval
+               ENDDO
+            ENDIF
+            CALL write_history_variable_3d(DEF_hist_vars%hx_f, &
+               a_hx_f, file_hist, 'f_hx_f', itime_in_file, &
+               'source', 1, nsource, sumarea, filter, &
+               'Prior H(x) by DA observation source', 'source-dependent', &
+               filter_3d = filter_hx)
+
             IF (DEF_DA_ENS_NUM > 1) THEN
-               CALL write_history_variable_4d(DEF_hist_vars%DA_t_brt_smap_ens, &
-                  a_t_brt_smap_ens, file_hist, 'f_t_brt_smap_ens', itime_in_file, 'band', 1, 2, 'ens', 1, DEF_DA_ENS_NUM, &
-                  sumarea, filter, 'ensemble H- & V- polarized brightness temperature for SMAP satellite (L-band,1.4GHz)', 'K')
-            END IF
-            CALL write_history_variable_3d(DEF_hist_vars%DA_t_brt_smap_ens_std, &
-               a_t_brt_smap_ens_std, file_hist, 'f_t_brt_smap_ens_std', itime_in_file, 'band', 1, 2, &
-               sumarea, filter, 'Standard deviation of H- & V- polarized brightness temperature for SMAP satellite (L-band,1.4GHz)', 'K')
-         ENDIF
+               CALL write_history_variable_3d(DEF_hist_vars%hx_f_std, &
+                  a_hx_f_std, file_hist, 'f_hx_f_std', itime_in_file, &
+                  'source', 1, nsource, sumarea, filter, &
+                  'Prior ensemble spread of H(x) by DA observation source', &
+                  'source-dependent', filter_3d = filter_hx)
+            ENDIF
 
-         IF (DEF_DA_SM_FY) THEN
-            CALL write_history_variable_3d(DEF_hist_vars%DA_t_brt_fy3d, &
-               a_t_brt_fy3d, file_hist, 'f_t_brt_fy3d', itime_in_file, 'band', 1, 2, sumarea, filter, &
-               'H- & V- polarized brightness temperature for FY satellite (X-band, 10.65GHz)', 'K')
-            CALL write_history_variable_3d(DEF_hist_vars%DA_t_brt_fy3d_a, &
-               a_t_brt_fy3d_a, file_hist, 'f_t_brt_fy3d_a', itime_in_file, 'band', 1, 2, sumarea, filter, &
-               'Analysis H- & V- polarized brightness temperature for FY satellite (X-band, 10.65GHz)', 'K')
+            IF (p_is_worker) THEN
+               DO i = 1, nsource
+                  filter_hx(i,:) = filter .and. a_hx_a(i,:) /= spval
+               ENDDO
+            ENDIF
+            CALL write_history_variable_3d(DEF_hist_vars%hx_a, &
+               a_hx_a, file_hist, 'f_hx_a', itime_in_file, &
+               'source', 1, nsource, sumarea, filter, &
+               'Analysis H(x) by DA observation source', 'source-dependent', &
+               filter_3d = filter_hx)
+
             IF (DEF_DA_ENS_NUM > 1) THEN
-               CALL write_history_variable_4d(DEF_hist_vars%DA_t_brt_fy3d_ens, &
-                  a_t_brt_fy3d_ens, file_hist, 'f_t_brt_fy3d_ens', itime_in_file, 'band', 1, 2, 'ens', 1, DEF_DA_ENS_NUM, &
-                  sumarea, filter, 'ensemble H- & V- polarized brightness temperature for FY satellite (X-band, 10.65GHz)', 'K')
-            END IF
-            CALL write_history_variable_3d(DEF_hist_vars%DA_t_brt_fy3d_ens_std, &
-               a_t_brt_fy3d_ens_std, file_hist, 'f_t_brt_fy3d_ens_std', itime_in_file, 'band', 1, 2, &
-               sumarea, filter, 'Standard deviation of H- & V- polarized brightness temperature for FY satellite (X-band, 10.65GHz)', 'K')
+               CALL write_history_variable_3d(DEF_hist_vars%hx_a_std, &
+                  a_hx_a_std, file_hist, 'f_hx_a_std', itime_in_file, &
+                  'source', 1, nsource, sumarea, filter, &
+                  'Analysis ensemble spread of H(x) by DA observation source', &
+                  'source-dependent', filter_3d = filter_hx)
+            ENDIF
+
+            deallocate(filter_hx)
+            deallocate(a_hx_f_std, a_hx_a_std)
+
+            IF (DEF_DA_ENS_NUM > 1) THEN
+               CALL write_history_variable_4d(DEF_hist_vars%hx_f_ens, &
+                  a_hx_f_ens, file_hist, 'f_hx_f_ens', itime_in_file, &
+                  'source', 1, nsource, 'ens', 1, DEF_DA_ENS_NUM, &
+                  sumarea, filter, 'Prior ensemble H(x) by DA observation source', &
+                  'source-dependent')
+               CALL write_history_variable_4d(DEF_hist_vars%hx_a_ens, &
+                  a_hx_a_ens, file_hist, 'f_hx_a_ens', itime_in_file, &
+                  'source', 1, nsource, 'ens', 1, DEF_DA_ENS_NUM, &
+                  sumarea, filter, 'Analysis ensemble H(x) by DA observation source', &
+                  'source-dependent')
+            ENDIF
          ENDIF
-
-         IF (p_is_worker) THEN
-            deallocate (a_wliq_h2osoi_5cm)
-            deallocate (a_t_soisno_5cm)
-            deallocate (a_wliq_soisno_ens_mean)
-            deallocate (a_wliq_soisno_5cm_ens)
-            deallocate (a_wliq_h2osoi_5cm_a)
-            deallocate (a_t_soisno_ens_mean)
-            deallocate (a_t_soisno_5cm_ens)
-            deallocate (a_t_soisno_5cm_a)
-            deallocate (a_t_brt_smap_a)
-            deallocate (a_t_brt_fy3d_a)
-            deallocate (a_wliq_soisno_5cm_ens_std)
-            deallocate (a_t_soisno_5cm_ens_std)
-            deallocate (a_t_brt_smap_ens_std)
-            deallocate (a_t_brt_fy3d_ens_std)
-         END IF
-
 #endif
 
          ! --------------------------------------------------------------------
@@ -4731,6 +4702,10 @@ ENDIF
          CALL hist_grid_riverlake_out (file_hist, HistForm, idate, &
             itime_in_file, trim(file_hist)/=trim(file_last))
 
+#ifdef DataAssimilation
+         CALL hist_DA_riverlake_out (file_hist, idate)
+#endif
+
          IF (p_is_worker) THEN
             IF (numpatch > 0) THEN
                allocate (nac_one (numpatch))
@@ -4770,6 +4745,41 @@ ENDIF
                file_hist, 'f_floodarea', itime_in_file, sumarea_one, filter_inpm,       &
                'flooded area', 'km^2', nac_one)
          ENDIF
+
+#ifdef DataAssimilation
+         IF (DEF_DA_ENS_NUM > 1) THEN
+            CALL write_history_variable_2d ( DEF_hist_vars%riv_height, a_wdsrf_ucat_mean_pch,  &
+               file_hist, 'f_wdpth_ucat_regrid_mean', itime_in_file, sumarea_ucat, filter_ucat, &
+               'regridded deepest water depth in river and flood plain from the ensemble-mean state', &
+               'm', nac_one)
+
+            CALL write_history_variable_2d ( DEF_hist_vars%riv_veloct, a_veloc_riv_mean_pch,   &
+               file_hist, 'f_veloc_riv_regrid_mean', itime_in_file, sumarea_ucat, filter_ucat,  &
+               'regridded water velocity in river from the ensemble-mean state',               &
+               'm/s', nac_one)
+
+            CALL write_history_variable_2d ( DEF_hist_vars%discharge, a_discharge_mean_pch, &
+               file_hist, 'f_discharge_mean', itime_in_file, sumarea_one, filter_ucat,       &
+               'regridded discharge in river and flood plain from the ensemble-mean state',  &
+               'm^3/s', nac_one, input_mode = 'total')
+
+            CALL write_history_variable_2d ( DEF_hist_vars%discharge, a_dis_rmth_mean_pch,   &
+               file_hist, 'f_discharge_rivermouth_regrid_mean', itime_in_file, sumarea_one,   &
+               filter_ucat,                                                                   &
+               'regridded river mouth discharge into ocean from the ensemble-mean state',     &
+               'm^3/s', nac_one, input_mode = 'total')
+
+            CALL write_history_variable_2d ( DEF_hist_vars%floodfrc, a_floodfrc_mean_pch,      &
+               file_hist, 'f_floodfrc_mean', itime_in_file, sumarea_inpm, filter_inpm,          &
+               'flooded area fraction from the ensemble-mean state', '100%', nac_one)
+
+            IF (trim(HistForm) == 'Gridded') THEN
+               CALL write_history_variable_2d ( DEF_hist_vars%floodarea, a_floodfrc_mean_pch,  &
+                  file_hist, 'f_floodarea_mean', itime_in_file, sumarea_one, filter_inpm,       &
+                  'flooded area from the ensemble-mean state', 'km^2', nac_one)
+            ENDIF
+         ENDIF
+#endif
 
          IF (allocated(nac_one   )) deallocate (nac_one   )
 #endif
@@ -4909,7 +4919,7 @@ ENDIF
 
    SUBROUTINE write_history_variable_3d ( is_hist, &
          acc_vec, file_hist, varname, itime_in_file, dim1name, lb1, ndim1, &
-         sumarea, filter, longname, units)
+         sumarea, filter, longname, units, filter_3d)
 
    IMPLICIT NONE
 
@@ -4924,6 +4934,7 @@ ENDIF
 
    type(block_data_real8_2d), intent(in) :: sumarea
    logical, intent(in) :: filter(:)
+   logical, intent(in), optional :: filter_3d(:,:)
    character (len=*), intent(in) :: longname
    character (len=*), intent(in) :: units
 
@@ -4935,9 +4946,15 @@ ENDIF
 
       select CASE (HistForm)
       CASE ('Gridded')
-         CALL flux_map_and_write_3d ( &
-            acc_vec, file_hist, varname, itime_in_file, dim1name, lb1, ndim1, &
-            sumarea, filter, longname, units)
+         IF (present(filter_3d)) THEN
+            CALL flux_map_and_write_3d ( &
+               acc_vec, file_hist, varname, itime_in_file, dim1name, lb1, ndim1, &
+               sumarea, filter, longname, units, filter_3d)
+         ELSE
+            CALL flux_map_and_write_3d ( &
+               acc_vec, file_hist, varname, itime_in_file, dim1name, lb1, ndim1, &
+               sumarea, filter, longname, units)
+         ENDIF
 #if (defined UNSTRUCTURED || defined CATCHMENT)
       CASE ('Vector')
          CALL aggregate_to_vector_and_write_3d ( &

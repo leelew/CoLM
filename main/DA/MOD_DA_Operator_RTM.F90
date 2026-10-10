@@ -1,7 +1,7 @@
 #include <define.h>
 
 #ifdef DataAssimilation
-MODULE MOD_DA_RTM
+MODULE MOD_DA_Operator_RTM
 !-----------------------------------------------------------------------
 ! DESCRIPTION:
 !    Forward modeling of brightness temperature observations
@@ -14,15 +14,15 @@ MODULE MOD_DA_RTM
    USE MOD_Precision
    USE MOD_Const_Physical
    USE MOD_Vars_1DForcing
-   USE MOD_DA_Const
+   USE MOD_DA_Operator_Const
    USE MOD_SPMD_Task
-   USE MOD_Vars_Global, only: nl_soil, nl_lake, N_land_classification
+   USE MOD_Vars_Global, only: nl_soil, nl_lake, N_land_classification, maxsnl, spval, dz_soi
    USE MOD_Namelist
    IMPLICIT NONE
    SAVE
 
 ! public functions
-   PUBLIC   :: forward
+   PUBLIC   :: PM_RTM
 
 ! local variables (parameters depends on frequency and incidence angle of satellite)
    real(r8) :: fghz                       ! frequency of satellite (GHz)
@@ -40,11 +40,11 @@ CONTAINS
 
 !-----------------------------------------------------------------------
 
-   SUBROUTINE forward( &
+   SUBROUTINE PM_RTM ( &
       patchtype, patchclass, dz_sno, &
       forc_topo, htop, &
       tref, t_soisno, tleaf, &
-      wliq_soisno, wice_soisno, h2osoi, &
+      wliq_soisno, wice_soisno, &
       snowdp, lai, sai, &
       wf_clay, wf_sand, wf_silt, BD_all, porsl, &
       sat_theta, sat_fghz, &
@@ -54,10 +54,6 @@ CONTAINS
 ! DESCRIPTION:
 !   Forward modeling of brightness temperature observations
 !-----------------------------------------------------------------------
-      USE MOD_Precision
-      USE MOD_Const_Physical
-      USE MOD_Vars_Global, only: nl_soil, nl_lake, maxsnl, spval, dz_soi
-      USE MOD_DA_Const
       IMPLICIT NONE
 
 !------------------------ Dummy Argument ------------------------------
@@ -71,7 +67,6 @@ CONTAINS
       real(r8), intent(in)  :: t_soisno(maxsnl + 1:nl_soil)     ! soil temperature [K]
       real(r8), intent(in)  :: wliq_soisno(maxsnl + 1:nl_soil)  ! liquid water in layers [kg/m2]
       real(r8), intent(in)  :: wice_soisno(maxsnl + 1:nl_soil)  ! ice lens in layers [kg/m2]
-      real(r8), intent(in)  :: h2osoi(nl_soil)                  ! volumetric soil water in layers [m3/m3]
       real(r8), intent(in)  :: snowdp                           ! snow depth [meter]
       real(r8), intent(in)  :: lai                              ! leaf area index
       real(r8), intent(in)  :: sai                              ! stem area index
@@ -86,8 +81,10 @@ CONTAINS
       real(r8), intent(out) :: tb_toa_v                         ! brightness temperature of top-of-atmosphere for V- polarization
 
 !----------------------- Local Variables -------------------------------
+      real(r8) :: liq_soi(nl_soil)            ! liquid volumetric water content in layers [m3/m3]
+      real(r8) :: ice_soi(nl_soil)            ! ice volumetric water content in layers [m3/m3]
       logical  :: is_low_veg                  ! flag for low vegetation
-      real(r8) :: dz_soisno(maxsnl+1:nl_soil) ! liquid water in layers [kg/m2]
+      real(r8) :: dz_soisno(maxsnl+1:nl_soil) ! layer thickness (m)
       integer  :: lb                          ! lower bound of arrays
       real(r8) :: tau_atm                     ! atmospheric optical depth
       real(r8) :: r_r(2)                      ! rough surface reflectivity for H and V polarizations
@@ -108,7 +105,9 @@ CONTAINS
       real(r8) :: tb_4(2)                     ! the downwelling cosmic ray reflected by the soil and attenuated by the canopy layer
       real(r8) :: tb_toa(2)                   ! brightness temperature of top-of-atmosphere for H- and V- polarization
       real(r8) :: wf_total(nl_soil)           ! total gravimetric
-      real(r8) :: BD_all_surf                 ! bulk density of soil (g/m3) at surface
+      real(r8) :: BD_all_surf                 ! bulk density of soil (g/cm3) at surface
+      real(r8) :: wf_clay_norm(nl_soil)       ! normalized clay fraction(%)
+      real(r8) :: wf_sand_norm(nl_soil)       ! normalized sand fraction(%)
       real(r8) :: porsl_surf                  ! soil porosity at surface
       real(r8) :: t_surf                      ! soil temperature at surface (C)
       real(r8) :: t_deep                      ! soil temperature at deep layer (C)
@@ -129,24 +128,35 @@ CONTAINS
 
       ! calculate weighted parameters
       wf_total     = wf_clay + wf_sand + wf_silt
-      wf_clay_surf = (wf_clay(1)/wf_total(1)*0.0175 + wf_clay(2)/wf_total(2)*0.0276)/0.0451*100
-      wf_sand_surf = (wf_sand(1)/wf_total(1)*0.0175 + wf_sand(2)/wf_total(2)*0.0276)/0.0451*100
-      BD_all_surf  = (BD_all(1)*0.0175 + BD_all(2)*0.0276)/0.0451/1000
-      porsl_surf   = (porsl(1)*0.0175 + porsl(2)*0.0276)/0.0451
+      DO i = 1, nl_soil
+         wf_clay_norm(i) = (wf_clay(i) / wf_total(i)) * 100.0_r8
+         wf_sand_norm(i) = (wf_sand(i) / wf_total(i)) * 100.0_r8
+      END DO
+      ! surface is the (first layer only)
+      wf_clay_surf = wf_clay_norm(1)
+      wf_sand_surf = wf_sand_norm(1)
+      BD_all_surf  = BD_all(1) / 1000.0_r8
+      porsl_surf   = porsl(1)
 
-      ! caculate temperature (C) at surface and deep soil layers
-      t_surf = ((t_soisno(1)*(0.0175) + t_soisno(2)*(0.0451 - 0.0175))/0.0451) - tfrz
+      ! caculate temperature (℃) at surface and deep soil layers
+      t_surf = t_soisno(1) - tfrz
       t_deep = ((t_soisno(7)*(0.8289-0.5) + t_soisno(8)*(1.0 - 0.8289))/0.5) - tfrz
 
-      ! caculate liquid/ice volumetric water (first two layers)
-      liq_surf = (wliq_soisno(1) + wliq_soisno(2))/(0.0451*denh2o)
-      ice_surf = (wice_soisno(1) + wice_soisno(2))/(0.0451*denice)
+      ! caculate liquid/ice volumetric water (first layer only)
+      liq_surf = wliq_soisno(1) / (dz_soisno(1) * denh2o)
+      ice_surf = wice_soisno(1) / (dz_soisno(1) * denice)
+
+      ! calculate liquid/ice volumetric water profile for all soil layers
+      DO i = 1, nl_soil
+         liq_soi(i) = wliq_soisno(i) / (dz_soisno(i)*denh2o)
+         ice_soi(i) = wice_soisno(i) / (dz_soisno(i)*denice)
+      END DO
 
       ! calculate lower bound of snow
       lb = 0
-      DO i = 0, maxsnl
-         IF (wliq_soisno(i) < 0.0) THEN
-            lb = i+1
+      DO i = maxsnl+1, 0
+         IF (wliq_soisno(i) + wice_soisno(i) > 0.0) THEN
+            lb = i
             EXIT
          ENDIF
       ENDDO
@@ -170,7 +180,9 @@ CONTAINS
 ! soil module
 !#############################################################################
          CALL soil(&
-            patchclass, &
+            patchclass, nl_soil, dz_soi(1:nl_soil), t_soisno(1:nl_soil), &
+            liq_soi(1:nl_soil), ice_soi(1:nl_soil), wf_sand_norm(1:nl_soil), wf_clay_norm(1:nl_soil), &
+            BD_all(1:nl_soil), porsl(1:nl_soil), &
             t_surf, t_deep, &
             liq_surf, ice_surf, &
             wf_sand_surf, wf_clay_surf, BD_all_surf, porsl_surf, &
@@ -235,7 +247,13 @@ CONTAINS
          ! --------------------------------------------------------------------
          ELSE IF ((lai + sai > 1e-6) .and. (snowdp < 0.01)) THEN
             ! calculate brightness temperature of vegetation
-            CALL veg(patchclass, lai, htop, 0.0, tleaf, tb_veg, gamma_p)
+            IF (DEF_DA_OPERATOR_RTM_VEG == 0) THEN
+               CALL veg_wigneron(patchclass, lai, htop, 0.0_r8, tleaf, tb_veg, gamma_p)
+            ELSE IF (DEF_DA_OPERATOR_RTM_VEG == 1) THEN
+               CALL veg_jackson(patchclass, lai, htop, 0.0_r8, tleaf, tb_veg, gamma_p)
+            ELSE IF (DEF_DA_OPERATOR_RTM_VEG == 2) THEN
+               CALL veg_kirdyashev(patchclass, lai, htop, 0.0_r8, tleaf, tb_veg, gamma_p)
+            END IF
 
             DO i = 1, 2
                tb_2(i) = tb_veg(i)*gamma_p(i)*r_r(i)
@@ -267,8 +285,14 @@ CONTAINS
          ! --------------------------------------------------------------------
          ELSE IF ((lai + sai > 1e-6) .and. (snowdp > 0.01)) THEN
             IF (htop < snowdp) THEN
-               ! calculate brightness temperature of low vegetation
-               CALL veg(patchclass, lai, htop, snowdp, tleaf, tb_veg, gamma_p)
+               ! calculate brightness temperature of vegetation
+               IF (DEF_DA_OPERATOR_RTM_VEG == 0) THEN
+                  CALL veg_wigneron(patchclass, lai, htop, snowdp, tleaf, tb_veg, gamma_p)
+               ELSE IF (DEF_DA_OPERATOR_RTM_VEG == 1) THEN
+                  CALL veg_jackson(patchclass, lai, htop, snowdp, tleaf, tb_veg, gamma_p)
+               ELSE IF (DEF_DA_OPERATOR_RTM_VEG == 2) THEN
+                  CALL veg_kirdyashev(patchclass, lai, htop, snowdp, tleaf, tb_veg, gamma_p)
+               END IF
 
                ! calculate brightness temperature of top of vegetation
                DO i = 1, 2
@@ -293,8 +317,14 @@ CONTAINS
                ! calculate brightness temperature of snow-covered ground
                CALL snow(t_soisno(1), t_soisno(1), snowdp, rho_snow, liq_snow, r_r, r_snow, tb_tos)
 
-               ! calculate brightness temperature of high vegetation
-               CALL veg(patchclass, lai, htop, snowdp, tleaf, tb_veg, gamma_p)
+               ! calculate brightness temperature of vegetation
+               IF (DEF_DA_OPERATOR_RTM_VEG == 0) THEN
+                  CALL veg_wigneron(patchclass, lai, htop, snowdp, tleaf, tb_veg, gamma_p)
+               ELSE IF (DEF_DA_OPERATOR_RTM_VEG == 1) THEN
+                  CALL veg_jackson(patchclass, lai, htop, snowdp, tleaf, tb_veg, gamma_p)
+               ELSE IF (DEF_DA_OPERATOR_RTM_VEG == 2) THEN
+                  CALL veg_kirdyashev(patchclass, lai, htop, snowdp, tleaf, tb_veg, gamma_p)
+               END IF
 
                ! calculate brightness temperature of top of vegetation
                DO i = 1, 2
@@ -317,7 +347,7 @@ CONTAINS
       tb_toa_h = tb_toa(1)
       tb_toa_v = tb_toa(2)
 
-   END SUBROUTINE forward
+   END SUBROUTINE PM_RTM
 
 
 !-----------------------------------------------------------------------
@@ -325,8 +355,6 @@ CONTAINS
    SUBROUTINE calc_parameters (sat_theta, sat_fghz)
 
 !-----------------------------------------------------------------------
-      USE MOD_Precision
-      USE MOD_DA_Const
       IMPLICIT NONE
 
 !------------------------ Dummy Argument -------------------------------
@@ -357,8 +385,6 @@ CONTAINS
 !   [1] Pellarin, T., et al. (2003), Two-year global simulation of L-band brightness
 !       temperature over land, IEEE Trans. Geosci. Remote Sens., 41, 2135–2139.
 !-----------------------------------------------------------------------
-      USE MOD_Precision
-      USE MOD_Const_Physical
       IMPLICIT NONE
 
 !------------------------ Dummy Argument ------------------------------
@@ -393,7 +419,7 @@ CONTAINS
 !-----------------------------------------------------------------------
 
    SUBROUTINE soil( &
-      patchclass, &
+      patchclass, nl_soil, dz_soi, t_soi, liq_soi, ice_soi, wf_sand, wf_clay, BD_all, porsl, &
       t_surf, t_deep, &
       liq_surf, ice_surf, &
       wf_sand_surf, wf_clay_surf, BD_all_surf, porsl_surf, &
@@ -408,24 +434,39 @@ CONTAINS
 !       Description and calibration against experimental
 !       data sets over crop fields" Remote Sensing of Environment. Vol. 107, pp. 639-655k
 !-----------------------------------------------------------------------
-      USE MOD_Precision
-      USE MOD_Const_Physical
       IMPLICIT NONE
 
 !------------------------ Dummy Argument ------------------------------
       integer, intent(in)   :: patchclass               ! land cover class
+      integer, intent(in)   :: nl_soil                  ! number of soil layers
+      real(r8), intent(in)  :: dz_soi(nl_soil)          ! soil layer thickness profile (m)
+      real(r8), intent(in)  :: t_soi(nl_soil)           ! soil temperature profile (K)
+      real(r8), intent(in)  :: liq_soi(nl_soil)         ! liquid soil moisture profile (m3/m3)
+      real(r8), intent(in)  :: ice_soi(nl_soil)         ! ice soil moisture profile (m3/m3)
+      real(r8), intent(in)  :: wf_sand(nl_soil)         ! sand fraction profile (%)
+      real(r8), intent(in)  :: wf_clay(nl_soil)         ! clay fraction profile (%)
+      real(r8), intent(in)  :: BD_all(nl_soil)          ! bulk density profile (kg/m3)
+      real(r8), intent(in)  :: porsl(nl_soil)           ! porosity profile
+
       real(r8), intent(in)  :: t_surf                   ! soil temperature at surface (C)
       real(r8), intent(in)  :: t_deep                   ! soil temperature at deep layer (C)
       real(r8), intent(in)  :: liq_surf                 ! liquid volumetric water content at surface (m3/m3)
       real(r8), intent(in)  :: ice_surf                 ! ice volumetric water content at surface (m3/m3)
       real(r8), intent(in)  :: wf_sand_surf             ! gravimetric sand percent fraction(%) at surface
       real(r8), intent(in)  :: wf_clay_surf             ! gravimetric clay percent fraction(%) at surface
-      real(r8), intent(in)  :: BD_all_surf              ! bulk density of soil (g/m3) at surface
+      real(r8), intent(in)  :: BD_all_surf              ! bulk density of soil (g/cm3) at surface
       real(r8), intent(in)  :: porsl_surf               ! soil porosity at surface
       real(r8), intent(out) :: r_r(2)                   ! rough surface reflectivity for H and V polarizations
       real(r8), intent(out) :: tb_soil(2)               ! brightness temperature of soil
 
 !----------------------- Local Variables -------------------------------
+      complex(r8) :: eps_prof(nl_soil)          ! dielectric constant profile for multi-layer schemes
+      complex(r8) :: ew_layer                   ! dielectric constant of water for layer
+      real(r8)    :: ffrz_layer                 ! fraction of frozen soil for layer
+      logical     :: is_desert_layer            ! flag for desert soil for layer
+      real(r8)    :: BD_layer_gcm3              ! bulk density (g/cm3) for layer
+      integer     :: i_layer
+
       real(r8)    :: t_eff(2)                   ! effective temperature for H and V polarizations, [K]
       complex(r8) :: eps_soil                   ! dielectric constant of soil for H and V polarizations
       real(r8)    :: r_s(2)                     ! smooth surface reflectivity for H and V polarizations
@@ -435,6 +476,11 @@ CONTAINS
       complex(r8) :: eps_f = (5.0, 0.5)         ! dielectric constant of frozen soil
       real(r8)    :: sal_soil = 0.0             ! soil salinity (psu)
 
+      real(r8)    :: a0_surf, a0, r_surf, f_surf, Q_s_surf, k_s_surf, k_a_surf, g_surf, omega_surf
+      complex(r8) :: eps_grain                  ! dielectric constant of dry skeleton
+      real(r8)    :: y_R_surf
+      real(r8)    :: e_surf(2)
+
 !-----------------------------------------------------------------------
 
       ! whether this patch is desert
@@ -443,6 +489,8 @@ CONTAINS
          is_desert = .true.
       END IF
 
+      eps_grain = 4 + jj*0.05
+
       ! calculate ratio of freezed soil
       IF (liq_surf + ice_surf <= 0.0d0) THEN
         ffrz = 0.0d0
@@ -450,85 +498,605 @@ CONTAINS
         ffrz = ice_surf / (liq_surf + ice_surf)
       ENDIF
 
-      ! caculate effective temperature
-      CALL eff_soil_temp(liq_surf, t_surf, t_deep, t_eff)
-
       ! caculate dielectric constant of soil (mixture medium)
       IF (is_desert) THEN
          ! Microwave 1-10GHz permittivity of dry sand (matzler '98, eq.1)
          eps_soil = 2.53 + (2.79 - 2.53)/(1 - jj*(fghz/0.27)) + jj*0.002
       ELSE
-         ! define bulk density and porosity (CMEM)
-         ! BD_all_surf = (wf_sand_surf*1.60d0 + wf_clay_surf*1.10d0 + (100.0d0 - wf_sand_surf - wf_clay_surf)*1.20d0)/100.0d0
-         ! porsl_surf = 1.0d0 - BD_all_surf/2.660d0
-
          ! caculate ice or water dielectric constant
          IF (ffrz > 0.95) THEN
             CALL diel_ice(t_surf, ew)
          ELSE
-            CALL diel_water(-1, liq_surf, t_surf, wf_sand_surf, wf_clay_surf, BD_all_surf, sal_soil, ew)
+            CALL diel_water(2, liq_surf, t_surf, wf_sand_surf, wf_clay_surf, BD_all_surf, sal_soil, ew)
          END IF
 
          ! caculate dielectric constant in mixed soil
-         IF (DEF_DA_RTM_diel == 0) THEN
+         IF (DEF_DA_OPERATOR_RTM_DIEL == 0) THEN
             CALL diel_soil_W80 (ew, t_surf, liq_surf, wf_sand_surf, wf_clay_surf, porsl_surf, eps_soil)
-         ELSE IF (DEF_DA_RTM_diel == 1) THEN
-            CALL diel_soil_D85 (ew, liq_surf, wf_sand_surf, wf_clay_surf, BD_all_surf, eps_soil)
-         ELSE IF (DEF_DA_RTM_diel == 2) THEN
+            eps_soil = eps_soil*(1.-ffrz) + eps_f*ffrz
+         ELSE IF (DEF_DA_OPERATOR_RTM_DIEL == 1) THEN
+            CALL diel_soil_D85 (ew, liq_surf, ice_surf, wf_sand_surf, wf_clay_surf, BD_all_surf, eps_soil)
+         ELSE IF (DEF_DA_OPERATOR_RTM_DIEL == 2) THEN
             CALL diel_soil_M04 (liq_surf, wf_clay_surf, eps_soil)
-         ELSE IF (DEF_DA_RTM_diel == 3) THEN
+            eps_soil = eps_soil*(1.-ffrz) + eps_f*ffrz
+         ELSE IF (DEF_DA_OPERATOR_RTM_DIEL == 3) THEN
             CALL diel_soil_M09 (liq_surf, t_surf, wf_clay_surf, eps_soil)
+            eps_soil = eps_soil*(1.-ffrz) + eps_f*ffrz
          ENDIF
       END IF
 
-      ! mix dielectric constant of frozen and non-frozen soil
-      eps_soil = eps_soil*(1.-ffrz) + eps_f*ffrz
+      IF (DEF_DA_OPERATOR_RTM_TEFF == 0 .or. DEF_DA_OPERATOR_RTM_TEFF == 3 .or. DEF_DA_OPERATOR_RTM_TEFF == 4) THEN
+         DO i_layer = 1, nl_soil
+            is_desert_layer = .false.
+            IF (liq_soi(i_layer) < 0.02 .and. wf_sand(i_layer) > 90) THEN
+               is_desert_layer = .true.
+            END IF
+            IF (liq_soi(i_layer) + ice_soi(i_layer) <= 0.0d0) THEN
+               ffrz_layer = 0.0d0
+            ELSE
+               ffrz_layer = ice_soi(i_layer) / (liq_soi(i_layer) + ice_soi(i_layer))
+            END IF
+            IF (is_desert_layer) THEN
+               eps_prof(i_layer) = 2.53 + (2.79 - 2.53)/(1 - jj*(fghz/0.27)) + jj*0.002
+            ELSE
+               BD_layer_gcm3 = BD_all(i_layer) / 1000.0_r8
+               IF (ffrz_layer > 0.95) THEN
+                  CALL diel_ice(t_soi(i_layer)-tfrz, ew_layer)
+               ELSE
+                  CALL diel_water(2, liq_soi(i_layer), t_soi(i_layer)-tfrz, wf_sand(i_layer), wf_clay(i_layer), BD_layer_gcm3, sal_soil, ew_layer)
+               END IF
 
-      ! caculate smooth surface reflectivity
-      CALL smooth_reflectivity(eps_soil, r_s)
+               IF (DEF_DA_OPERATOR_RTM_DIEL == 0) THEN
+                  CALL diel_soil_W80 (ew_layer, t_soi(i_layer)-tfrz, liq_soi(i_layer), wf_sand(i_layer), wf_clay(i_layer), porsl(i_layer), eps_prof(i_layer))
+                  eps_prof(i_layer) = eps_prof(i_layer)*(1.-ffrz_layer) + eps_f*ffrz_layer
+               ELSE IF (DEF_DA_OPERATOR_RTM_DIEL == 1) THEN
+                  CALL diel_soil_D85 (ew_layer, liq_soi(i_layer), ice_soi(i_layer), wf_sand(i_layer), wf_clay(i_layer), BD_layer_gcm3, eps_prof(i_layer))
+               ELSE IF (DEF_DA_OPERATOR_RTM_DIEL == 2) THEN
+                  CALL diel_soil_M04 (liq_soi(i_layer), wf_clay(i_layer), eps_prof(i_layer))
+                  eps_prof(i_layer) = eps_prof(i_layer)*(1.-ffrz_layer) + eps_f*ffrz_layer
+               ELSE IF (DEF_DA_OPERATOR_RTM_DIEL == 3) THEN
+                  CALL diel_soil_M09 (liq_soi(i_layer), t_soi(i_layer)-tfrz, wf_clay(i_layer), eps_prof(i_layer))
+                  eps_prof(i_layer) = eps_prof(i_layer)*(1.-ffrz_layer) + eps_f*ffrz_layer
+               ENDIF
+            END IF
+         END DO
+      END IF
 
-      ! caculate rough surface reflectivity
+      IF (DEF_DA_OPERATOR_RTM_TEFF == 0) THEN
+         !0: Wilheit (1975)
+         CALL eff_soil_temp_Wilheit(nl_soil, dz_soi, t_soi, eps_prof, t_eff, r_s)
+      ELSE IF (DEF_DA_OPERATOR_RTM_TEFF == 1) THEN
+         !1: Wigneron (2001)
+         CALL eff_soil_temp_Wigneron(liq_surf, t_surf, t_deep, t_eff)
+      ELSE IF (DEF_DA_OPERATOR_RTM_TEFF == 2) THEN
+         !2: Holmes (2006)
+         CALL eff_soil_temp_Holmes(t_surf, t_deep, eps_soil, t_eff)
+      ELSE IF (DEF_DA_OPERATOR_RTM_TEFF == 3) THEN
+         !3: Lv (2014)
+         CALL eff_soil_temp_Lv(nl_soil, dz_soi, t_soi, eps_prof, t_eff)
+      END IF
+
+      IF (DEF_DA_OPERATOR_RTM_TEFF /= 0) THEN
+         CALL smooth_reflectivity(eps_soil, r_s)
+      END IF
       CALL rough_reflectivity(is_desert, patchclass, r_s, r_r)
 
-      ! calculate brightness temperature
-      IF (is_desert) THEN
-         CALL desert(t_eff, r_r, eps_soil, tb_soil)
+      IF (DEF_DA_OPERATOR_RTM_TEFF == 4) THEN
+         CALL calc_tb_soil_liu(nl_soil, dz_soi, t_soi, eps_prof, &
+                               wf_sand, porsl, eps_grain, r_r, tb_soil)
+      ELSE IF (DEF_DA_OPERATOR_RTM_TEFF == 5) THEN
+         CALL calc_tb_soil_LandEM(fghz, t_surf + tfrz, t_deep + tfrz, r_r, tb_soil)
       ELSE
-         tb_soil = t_eff * (1 - r_r)
+         IF (is_desert) THEN
+            CALL desert(t_eff, r_r, eps_soil, tb_soil)
+         ELSE
+            tb_soil = t_eff * (1.0_r8 - r_r)
+         END IF
       END IF
 
    END SUBROUTINE soil
 
 !-----------------------------------------------------------------------
-
-   SUBROUTINE eff_soil_temp(wc_surf, t_surf, t_deep, t_eff)
-
+   SUBROUTINE calc_tb_soil_liu(nl_soil, dz_soi, t_soi, eps_prof, wf_sand, porsl, eps_grain, r_r, tb_soil)
 !-----------------------------------------------------------------------
 ! DESCRIPTION:
-!   Calculate the effective temperature of soil
-!
-! REFERENCES:
-!   [1] An improved two-layer algorithm for estimating effective soil
-!       temperature in microwave radiometry using in situ temperature
-!       and soil moisture measurements
+!   Calculate brightness temperature of soil using the full N-layer dual-stream
+!   radiative transfer model with volume scattering and Fresnel interlayer reflections.
+!   * UPDATED *: Analytical decoupled scheme to explicitly solve for layer emission
+!   weights (f_i) and the bulk effective surface reflectivity (f_down).
 !-----------------------------------------------------------------------
-      USE MOD_Precision
       IMPLICIT NONE
 
+!------------------------ Dummy Argument ------------------------------
+      integer, intent(in)     :: nl_soil
+      real(r8), intent(in)    :: dz_soi(:)
+      real(r8), intent(in)    :: t_soi(:)
+      complex(r8), intent(in) :: eps_prof(:)
+      real(r8), intent(in)    :: wf_sand(:)   ! gravimetric sand fraction (%)
+      real(r8), intent(in)    :: porsl(:)
+      complex(r8), intent(in) :: eps_grain
+      real(r8), intent(inout) :: r_r(2)       ! surface reflectivity -> effective reflectivity
+      real(r8), intent(out)   :: tb_soil(2)
+
+!----------------------- Local Variables -------------------------------
+      integer  :: i, pol, row
+      real(r8) :: k_a, k_s, g_asym, omega_albedo, a_j, b_j, L_pen, mu_z, kappa_z
+      real(r8) :: r_j, f_j, Q_s, y_R, r_sand, r_clay, sin2theta
+      complex(r8) :: c_j, c_jp1
+
+      real(r8) :: R_int(nl_soil)
+      real(r8) :: r_inf(nl_soil), tau_arr(nl_soil)
+
+      integer  :: n_sys
+      real(r8) :: M(2*nl_soil, 2*nl_soil), M_trans(2*nl_soil, 2*nl_soil)
+      real(r8) :: C_rhs(2*nl_soil), W1(2*nl_soil), W2(2*nl_soil)
+      real(r8) :: K_vec(2*nl_soil), U_vec(nl_soil)
+      real(r8) :: f_weights(nl_soil), f_down, R0_tilde
+!-----------------------------------------------------------------------
+
+      sin2theta = sin(theta)**2
+      y_R = real((eps_grain - 1.0_r8) / (eps_grain + 2.0_r8))
+      r_sand = 0.5e-3_r8
+      r_clay = 0.01e-3_r8
+      n_sys = 2 * nl_soil
+
+      DO pol = 1, 2
+         DO i = 1, nl_soil
+            mu_z = sqrt((abs(eps_prof(i) - sin2theta) + real(eps_prof(i)) - sin2theta) / &
+                        (abs(eps_prof(i) - sin2theta) + real(eps_prof(i)) + sin2theta))
+            mu_z = max(mu_z, 0.001_r8)
+
+            k_a = 2.0_r8 * k * abs(aimag(sqrt(eps_prof(i))))
+            k_a = max(k_a, 1.0e-12_r8)
+
+            r_j = r_clay + (r_sand - r_clay) * (wf_sand(i) / 100.0_r8)
+            f_j = (1.0_r8 - porsl(i)) * (wf_sand(i) / 100.0_r8)
+
+            Q_s = (8.0_r8 / 3.0_r8) * (k * r_j)**4 * (y_R**2) * &
+                  ( ((1.0_r8 - f_j)**4) / ( ((1.0_r8 + 2.0_r8 * f_j)**2) * &
+                  ((1.0_r8 - f_j * y_R)**1.5_r8) * ((1.0_r8 + 2.0_r8 * f_j * y_R)**0.5_r8) ) )
+
+            k_s = (3.0_r8 * f_j / (4.0_r8 * r_j)) * Q_s
+            g_asym = 0.23_r8 * (k * r_j)**2
+
+            omega_albedo = min(max(k_s / (k_s + k_a), 0.0_r8), 0.9999_r8)
+            a_j = sqrt((1.0_r8 - omega_albedo) / (1.0_r8 - omega_albedo * g_asym))
+
+            r_inf(i) = (1.0_r8 - a_j) / (1.0_r8 + a_j)
+            L_pen = a_j / k_a
+            kappa_z = 1.0_r8 / (mu_z * L_pen)
+            tau_arr(i) = exp(-kappa_z * dz_soi(i))
+         END DO
+
+         DO i = 1, nl_soil - 1
+            c_j = sqrt(eps_prof(i) - sin2theta)
+            c_jp1 = sqrt(eps_prof(i+1) - sin2theta)
+            IF (pol == 1) THEN
+               R_int(i) = abs((c_j - c_jp1) / (c_j + c_jp1))**2
+            ELSE
+               R_int(i) = abs((c_j/eps_prof(i) - c_jp1/eps_prof(i+1)) / &
+                              (c_j/eps_prof(i) + c_jp1/eps_prof(i+1)))**2
+            END IF
+         END DO
+
+         M = 0.0_r8
+         R0_tilde = r_r(pol)
+
+         M(1, 1) = r_inf(1) - R0_tilde
+         M(1, 2) = 1.0_r8 - R0_tilde * r_inf(1)
+
+         DO i = 1, nl_soil - 1
+            row = 2 * i
+            M(row, 2*i-1) = (1.0_r8 - R_int(i)*r_inf(i)) / tau_arr(i)
+            M(row, 2*i)   = (r_inf(i) - R_int(i)) * tau_arr(i)
+            M(row, 2*i+1) = -(1.0_r8 - R_int(i))
+            M(row, 2*i+2) = -(1.0_r8 - R_int(i)) * r_inf(i+1)
+
+            M(row+1, 2*i-1) = -(1.0_r8 - R_int(i)) * r_inf(i) / tau_arr(i)
+            M(row+1, 2*i)   = -(1.0_r8 - R_int(i)) * tau_arr(i)
+            M(row+1, 2*i+1) = r_inf(i+1) - R_int(i)
+            M(row+1, 2*i+2) = 1.0_r8 - R_int(i) * r_inf(i+1)
+         END DO
+
+         M(n_sys, n_sys-1) = 1.0_r8
+
+         M_trans = transpose(M)
+         C_rhs = 0.0_r8
+         C_rhs(1) = 1.0_r8
+         CALL solve_linear_system(n_sys, M_trans, C_rhs, W1)
+
+         M_trans = transpose(M)
+         C_rhs = 0.0_r8
+         C_rhs(2) = 1.0_r8
+         CALL solve_linear_system(n_sys, M_trans, C_rhs, W2)
+
+         DO i = 1, n_sys
+            K_vec(i) = W1(i) + r_inf(1) * W2(i)
+         END DO
+
+         U_vec = 0.0_r8
+         DO i = 1, nl_soil - 1
+            U_vec(i) = (K_vec(2*i) - K_vec(2*i+1)) * (1.0_r8 - R_int(i))
+         END DO
+
+         f_down = (1.0_r8 - R0_tilde)**2 * K_vec(1) + R0_tilde
+
+         IF (nl_soil == 1) THEN
+            f_weights(1) = (1.0_r8 - R0_tilde) * (1.0_r8 - K_vec(1)*(1.0_r8 - R0_tilde))
+         ELSE
+            f_weights(1) = (1.0_r8 - R0_tilde) * (1.0_r8 - K_vec(1)*(1.0_r8 - R0_tilde) - U_vec(1))
+            DO i = 2, nl_soil - 1
+               f_weights(i) = (1.0_r8 - R0_tilde) * (U_vec(i-1) - U_vec(i))
+            END DO
+            f_weights(nl_soil) = (1.0_r8 - R0_tilde) * U_vec(nl_soil-1)
+         END IF
+
+         tb_soil(pol) = 0.0_r8
+         DO i = 1, nl_soil
+            tb_soil(pol) = tb_soil(pol) + f_weights(i) * t_soi(i)
+         END DO
+
+         r_r(pol) = f_down
+      END DO
+
+   END SUBROUTINE calc_tb_soil_liu
+
+!-----------------------------------------------------------------------
+   SUBROUTINE solve_linear_system(n, A, b, x)
+!-----------------------------------------------------------------------
+      IMPLICIT NONE
+      integer, intent(in)     :: n
+      real(r8), intent(inout) :: A(n, n), b(n)
+      real(r8), intent(out)   :: x(n)
+
+      integer  :: i, j, k, max_idx
+      real(r8) :: temp, factor
+
+      DO i = 1, n - 1
+         max_idx = i
+         DO j = i + 1, n
+            IF (abs(A(j, i)) > abs(A(max_idx, i))) max_idx = j
+         END DO
+         IF (max_idx /= i) THEN
+            DO k = i, n
+               temp = A(i, k)
+               A(i, k) = A(max_idx, k)
+               A(max_idx, k) = temp
+            END DO
+            temp = b(i)
+            b(i) = b(max_idx)
+            b(max_idx) = temp
+         END IF
+         DO j = i + 1, n
+            factor = A(j, i) / A(i, i)
+            DO k = i, n
+               A(j, k) = A(j, k) - factor * A(i, k)
+            END DO
+            b(j) = b(j) - factor * b(i)
+         END DO
+      END DO
+
+      x(n) = b(n) / A(n, n)
+      DO i = n - 1, 1, -1
+         temp = b(i)
+         DO j = i + 1, n
+            temp = temp - A(i, j) * x(j)
+         END DO
+         x(i) = temp / A(i, i)
+      END DO
+   END SUBROUTINE solve_linear_system
+
+!-----------------------------------------------------------------------
+   SUBROUTINE calc_tb_soil_LandEM(fghz, t_surf_k, t_deep_k, r_r, tb_soil)
+!-----------------------------------------------------------------------
+      IMPLICIT NONE
+
+!------------------------ Dummy Argument ------------------------------
+      real(r8), intent(in)  :: fghz           ! frequency (GHz)
+      real(r8), intent(in)  :: t_surf_k       ! surface temperature (Kelvin)
+      real(r8), intent(in)  :: t_deep_k       ! deep soil temperature (Kelvin)
+      real(r8), intent(in)  :: r_r(2)         ! rough surface reflectivity
+      real(r8), intent(out) :: tb_soil(2)     ! brightness temperature of soil
+
+!----------------------- Local Variables -------------------------------
+      real(r8) :: C_2_arms
+      real(r8) :: gsect0
+      real(r8) :: esh, esv
+      real(r8) :: t_deep_eff
+!-----------------------------------------------------------------------
+
+      IF ((t_deep_k <= 100.0_r8 .OR. t_deep_k >= 350.0_r8) .AND. &
+          (t_surf_k >= 100.0_r8 .AND. t_surf_k <= 350.0_r8)) THEN
+         t_deep_eff = t_surf_k
+      ELSE
+         t_deep_eff = t_deep_k
+      END IF
+
+      C_2_arms = 0.0479924_r8
+
+      gsect0 = (exp(C_2_arms * fghz / t_surf_k) - 1.0_r8) / &
+               (exp(C_2_arms * fghz / t_deep_eff) - 1.0_r8)
+
+      esh = (1.0_r8 - r_r(1)) * gsect0
+      esv = (1.0_r8 - r_r(2)) * gsect0
+
+      esh = min(max(esh, 0.25_r8), 1.0_r8)
+      esv = min(max(esv, 0.30_r8), 1.0_r8)
+
+      tb_soil(1) = esh * t_surf_k
+      tb_soil(2) = esv * t_surf_k
+
+   END SUBROUTINE calc_tb_soil_LandEM
+
+!-----------------------------------------------------------------------
+   SUBROUTINE eff_soil_temp_Holmes(t_surf, t_deep, eps_surf, t_eff)
+!-----------------------------------------------------------------------
+      IMPLICIT NONE
+
+!------------------------ Dummy Argument ------------------------------
+      real(r8), intent(in)    :: t_surf         ! soil temperature at surface (C)
+      real(r8), intent(in)    :: t_deep         ! soil temperature at deep layer (C)
+      complex(r8), intent(in) :: eps_surf       ! dielectric constant of surface soil
+      real(r8), intent(out)   :: t_eff(2)       ! effective temperature for H and V [K]
+
+!----------------------- Local Variables -------------------------------
+      real(r8) :: eps_r, eps_i, C_param
+      real(r8), parameter :: eps_0 = 0.08_r8
+      real(r8), parameter :: b_param = 0.87_r8
+!-----------------------------------------------------------------------
+
+      eps_r = real(eps_surf)
+      eps_i = abs(aimag(eps_surf))
+
+      IF (eps_r > 0.0_r8) THEN
+         C_param = ((eps_i / eps_r) / eps_0) ** b_param
+      ELSE
+         C_param = 1.0_r8
+      END IF
+
+      C_param = max(0.001_r8, C_param)
+
+      t_eff(1) = t_deep + (t_surf - t_deep) * C_param + tfrz
+      t_eff(2) = t_eff(1)
+
+   END SUBROUTINE eff_soil_temp_Holmes
+
+!-----------------------------------------------------------------------
+   SUBROUTINE eff_soil_temp_Wilheit(nl_soil, dz_soi, t_soi, eps_prof, t_eff, r_s)
+!-----------------------------------------------------------------------
+      IMPLICIT NONE
+
+!------------------------ Dummy Argument ------------------------------
+      integer, intent(in)     :: nl_soil
+      real(r8), intent(in)    :: dz_soi(:)
+      real(r8), intent(in)    :: t_soi(:)
+      complex(r8), intent(in) :: eps_prof(:)
+      real(r8), intent(out)   :: t_eff(2)
+      real(r8), intent(out)   :: r_s(2)
+
+!----------------------- Local Variables -------------------------------
+      integer                 :: i
+      complex(r8)             :: eps_layer
+      complex(r8)             :: nref(nl_soil + 1)
+      real(r8)                :: zsoil_wil(nl_soil + 1)
+      complex(r8)             :: cp_h(nl_soil + 1)
+      complex(r8)             :: cp_v(nl_soil + 1)
+      real(r8)                :: sumtfa, sumfa, fa
+!-----------------------------------------------------------------------
+
+      zsoil_wil(1) = 1.0_r8
+      nref(1) = (1.0_r8, 0.0_r8)
+
+      DO i = 1, nl_soil
+         zsoil_wil(i+1) = dz_soi(i)
+         eps_layer = eps_prof(i)
+         nref(i+1) = sqrt(eps_layer)
+      END DO
+
+      CALL wilheit_hpld(nl_soil + 1, nref, zsoil_wil, cp_h)
+      r_s(1) = real(cp_h(1))
+
+      sumtfa = 0.0_r8
+      sumfa  = 0.0_r8
+      DO i = 1, nl_soil
+         fa = real(cp_h(i+1))
+         sumtfa = sumtfa + fa * t_soi(i)
+         sumfa  = sumfa  + fa
+      END DO
+
+      IF (sumfa > 0.0_r8) THEN
+         t_eff(1) = sumtfa / sumfa
+      ELSE
+         t_eff(1) = t_soi(1)
+      END IF
+
+      IF (theta /= 0.0_r8) THEN
+         CALL wilheit_vpld(nl_soil + 1, nref, zsoil_wil, cp_v)
+         r_s(2) = real(cp_v(1))
+         sumtfa = 0.0_r8
+         sumfa  = 0.0_r8
+         DO i = 1, nl_soil
+            fa = real(cp_v(i+1))
+            sumtfa = sumtfa + fa * t_soi(i)
+            sumfa  = sumfa  + fa
+         END DO
+         IF (sumfa > 0.0_r8) THEN
+            t_eff(2) = sumtfa / sumfa
+         ELSE
+            t_eff(2) = t_soi(1)
+         END IF
+      ELSE
+         t_eff(2) = t_eff(1)
+         r_s(2) = r_s(1)
+      END IF
+
+   END SUBROUTINE eff_soil_temp_Wilheit
+
+!-----------------------------------------------------------------------
+   SUBROUTINE wilheit_hpld(n, cn, del, cp)
+!-----------------------------------------------------------------------
+      IMPLICIT NONE
+      integer, intent(in)     :: n
+      complex(r8), intent(in) :: cn(n)
+      real(r8), intent(in)    :: del(n)
+      complex(r8), intent(out):: cp(n)
+
+      integer     :: i, j, ii, nl_w, nmax, ll
+      real(r8)    :: r, s_val, arg, e2, dp, x
+      complex(r8) :: cs, cc, carg, csj, ccj, csjp1, ccjp1, ca, cb, cx, cxp
+      complex(r8) :: cep(n), cem(n)
+
+      s_val = sin(theta)
+      cp(1) = (1.0_r8, 0.0_r8)
+      nl_w = n - 1
+      nmax = 1
+
+      DO i = 2, nl_w
+         nmax = i + 1
+         cs = cn(1) * s_val / cn(i)
+         cc = sqrt((1.0_r8, 0.0_r8) - cs*cs)
+         arg = del(i) * k
+         carg = 2.0_r8 * arg * cn(i) * cc * (0.0_r8, 1.0_r8)
+         cp(i) = exp(carg) * cp(i-1)
+         IF (abs(cp(i)) < 0.0001_r8) EXIT
+      END DO
+
+      cep(nmax) = (1.0_r8, 0.0_r8)
+      cem(nmax) = (0.0_r8, 0.0_r8)
+
+      DO ii = 2, nmax
+         j = nmax - ii + 1
+         csj = cn(1) * s_val / cn(j)
+         ccj = sqrt((1.0_r8, 0.0_r8) - csj*csj)
+         csjp1 = cn(1) * s_val / cn(j+1)
+         ccjp1 = sqrt((1.0_r8, 0.0_r8) - csjp1*csjp1)
+         ca = 2.0_r8 * cn(j) * ccj / (cn(j)*ccj + cn(j+1)*ccjp1)
+         cb = (cn(j)*ccj - cn(j+1)*ccjp1) / ((cn(j)*ccj + cn(j+1)*ccjp1) * cp(j))
+         cep(j) = cep(j+1)/ca + cb*cem(j+1)/ca
+         cem(j) = cem(j+1) + (cep(j+1)-cep(j))*cp(j)
+      END DO
+
+      cx = cep(1)
+      DO j = 1, nmax
+         cep(j) = cep(j) / cx
+         cem(j) = cem(j) / cx
+      END DO
+
+      DO j = nmax, n
+         cp(j) = (0.0_r8, 1.0_r8) / (1.E15_r8)
+      END DO
+
+      ll = nmax - 1
+      DO ii = 1, ll
+         j = nmax - ii + 1
+         cs = sin(theta) / cn(j)
+         cc = sqrt((1.0_r8, 0.0_r8) - cs*cs)
+         r = abs(cp(j))
+         s_val = abs(cp(j-1))
+         e2 = (s_val-r) * abs(cep(j))**2 + (1.0_r8/r-1.0_r8/s_val) * abs(cem(j))**2
+         dp = e2 * real(cn(j)*cc) / cos(theta)
+         cxp = cep(j) * conjg(cem(j))
+         x = 2.0_r8 * aimag(cn(j)*cc/cos(theta)) * &
+             (aimag(cxp*cp(j-1)/abs(cp(j-1))) - aimag(cxp*cp(j)/abs(cp(j))))
+         dp = dp - x
+         cp(j) = cmplx(dp, 0.0_r8, kind=r8)
+      END DO
+
+      r = abs(cem(1))**2 * real(cn(1))
+      cp(1) = cmplx(r, 0.0_r8, kind=r8)
+
+   END SUBROUTINE wilheit_hpld
+
+!-----------------------------------------------------------------------
+   SUBROUTINE wilheit_vpld(n, cn, del, cp)
+!-----------------------------------------------------------------------
+      IMPLICIT NONE
+      integer, intent(in)     :: n
+      complex(r8), intent(in) :: cn(n)
+      real(r8), intent(in)    :: del(n)
+      complex(r8), intent(out):: cp(n)
+
+      integer     :: i, j, ii, nl_w, nmax, ll
+      real(r8)    :: r, s_val, arg, e2, dp, x
+      complex(r8) :: cs, cc, carg, csj, ccj, csjp1, ccjp1, ca, cb, cd, cr_c, cx, cxp
+      complex(r8) :: cep(n), cem(n)
+
+      s_val = sin(theta)
+      cp(1) = (1.0_r8, 0.0_r8)
+      nl_w = n - 1
+      nmax = 1
+
+      DO i = 2, nl_w
+         nmax = i + 1
+         cs = cn(1) * s_val / cn(i)
+         cc = sqrt((1.0_r8, 0.0_r8) - cs*cs)
+         arg = del(i) * k
+         carg = 2.0_r8 * arg * cn(i) * cc * (0.0_r8, 1.0_r8)
+         cp(i) = exp(carg) * cp(i-1)
+         IF (abs(cp(i)) < 0.0001_r8) EXIT
+      END DO
+
+      cep(nmax) = (1.0_r8, 0.0_r8)
+      cem(nmax) = (0.0_r8, 0.0_r8)
+
+      DO ii = 2, nmax
+         j = nmax - ii + 1
+         csj = cn(1) * s_val / cn(j)
+         ccj = sqrt((1.0_r8, 0.0_r8) - csj*csj)
+         csjp1 = cn(1) * s_val / cn(j+1)
+         ccjp1 = sqrt((1.0_r8, 0.0_r8) - csjp1*csjp1)
+         cd = 2.0_r8 * cn(j) * ccj
+         ca = cn(j)*ccjp1 + cn(j+1)*ccj
+         cb = cn(j)*ccjp1 - cn(j+1)*ccj
+         cep(j) = ca*cep(j+1)/cd + cb*cem(j+1)/(cd*cp(j))
+         cr_c = cn(j+1) / cn(j)
+         cem(j) = cr_c*cem(j+1) + (cep(j)-cep(j+1)*cr_c)*cp(j)
+      END DO
+
+      cx = cep(1)
+      DO j = 1, nmax
+         cep(j) = cep(j) / cx
+         cem(j) = cem(j) / cx
+      END DO
+
+      DO j = nmax, n
+         cp(j) = (0.0_r8, 1.0_r8) / (1.E15_r8)
+      END DO
+
+      ll = nmax - 1
+      DO ii = 1, ll
+         j = nmax - ii + 1
+         cs = sin(theta) / cn(j)
+         cc = sqrt((1.0_r8, 0.0_r8) - cs*cs)
+         r = abs(cp(j))
+         s_val = abs(cp(j-1))
+         e2 = (s_val-r) * abs(cep(j))**2 + (1.0_r8/r-1.0_r8/s_val) * abs(cem(j))**2
+         dp = e2 * real(cn(j)*cc) / cos(theta)
+         cxp = cep(j) * conjg(cem(j))
+         x = 2.0_r8 * aimag(cn(j)*cc/cos(theta)) * &
+             (aimag(cxp*cp(j-1)/abs(cp(j-1))) - aimag(cxp*cp(j)/abs(cp(j))))
+         dp = dp - x
+         cp(j) = cmplx(dp, 0.0_r8, kind=r8)
+      END DO
+
+      r = abs(cem(1))**2 * real(cn(1))
+      cp(1) = cmplx(r, 0.0_r8, kind=r8)
+
+   END SUBROUTINE wilheit_vpld
+
+!-----------------------------------------------------------------------
+   SUBROUTINE eff_soil_temp_Wigneron(wc_surf, t_surf, t_deep, t_eff)
+!-----------------------------------------------------------------------
+      IMPLICIT NONE
 ! ------------------------ Dummy Argument ------------------------------
       real(r8), intent(in)  :: wc_surf        ! soil moisture at surface (m3/m3)
       real(r8), intent(in)  :: t_surf         ! soil temperature (C) at surface
       real(r8), intent(in)  :: t_deep         ! soil temperature (C) at deep layer
       real(r8), intent(out) :: t_eff(2)       ! effective temperature for H and V polarizations, [K]
-
 !----------------------- Local Variables -------------------------------
-      real(r8) :: C             ! parameter depending mainly on frequency
-                                ! and soil moisture to describe the impact of
-                                ! surface temperature on the effective temperature;
-                                ! soil moisture increase, C large, teff close to tsurf
-                                ! soil moisture decrease, C small, tdeep impact teff more
-      real(r8) :: w0 = 0.30     ! parameter
-      real(r8) :: bw = 0.30     ! parameter
+      real(r8) :: C
+      real(r8) :: w0 = 0.30
+      real(r8) :: bw = 0.30
 !-----------------------------------------------------------------------
 
       IF (wc_surf < 0.0) THEN
@@ -538,7 +1106,50 @@ CONTAINS
       ENDIF
       t_eff(:) = t_deep + (t_surf - t_deep)*C + tfrz
 
-   END SUBROUTINE eff_soil_temp
+   END SUBROUTINE eff_soil_temp_Wigneron
+
+!-----------------------------------------------------------------------
+   SUBROUTINE eff_soil_temp_Lv(nl_soil, dz_soi, t_soi, eps_prof, t_eff)
+!-----------------------------------------------------------------------
+      IMPLICIT NONE
+
+!------------------------ Dummy Argument ------------------------------
+      integer, intent(in)     :: nl_soil
+      real(r8), intent(in)    :: dz_soi(:)
+      real(r8), intent(in)    :: t_soi(:)
+      complex(r8), intent(in) :: eps_prof(:)
+      real(r8), intent(out)   :: t_eff(2)
+
+!----------------------- Local Variables -------------------------------
+      integer                 :: i
+      real(r8)                :: B_i
+      real(r8)                :: eps_r
+      real(r8)                :: eps_i
+      complex(r8)             :: eps
+      real(r8)                :: prod_term
+!-----------------------------------------------------------------------
+
+      t_eff(1)  = 0.0_r8
+      prod_term = 1.0_r8
+
+      DO i = 1, nl_soil
+         eps = eps_prof(i)
+         eps_r = real(eps)
+         eps_i = abs(aimag(eps))
+
+         B_i = dz_soi(i) * (4.0_r8 * pi / lam) * (eps_i / (2.0_r8 * sqrt(eps_r)))
+
+         IF (i < nl_soil) THEN
+            t_eff(1) = t_eff(1) + t_soi(i) * (1.0_r8 - exp(-B_i)) * prod_term
+            prod_term = prod_term * exp(-B_i)
+         ELSE
+            t_eff(1) = t_eff(1) + t_soi(i) * prod_term
+         END IF
+      END DO
+
+      t_eff(2) = t_eff(1)
+
+   END SUBROUTINE eff_soil_temp_Lv
 
 !-----------------------------------------------------------------------
 
@@ -552,8 +1163,6 @@ CONTAINS
 !   [1] Matzler, C. (2006). Thermal Microwave Radiation: Applications
 !       for Remote Sensing p456-461
 !-----------------------------------------------------------------------
-      USE MOD_Const_Physical
-      USE MOD_Precision
       IMPLICIT NONE
 
 !------------------------ Dummy Argument ------------------------------
@@ -616,8 +1225,6 @@ CONTAINS
 !       frequencies, IEEE Transactions on  Antennas and Propagation,
 !       Vol. AP-25, No. 1, 104-111.
 !-----------------------------------------------------------------------
-      USE MOD_Const_Physical
-      USE MOD_Precision
       IMPLICIT NONE
 
 !------------------------ Dummy Argument ------------------------------
@@ -665,7 +1272,7 @@ CONTAINS
 
          ! diel constant of sea water [1] eq.21
          eps_w = eps_w_inf + (eps_w0 - eps_w_inf)/(1 - jj*omega*tau_w) + jj*sigma/(omega*eps_0)
-      ELSE
+      ELSEIF (type == 2) THEN
          ! calculate soil conductivity
          sigma = -1.645 + 1.939*BD_all - 0.02256*wf_sand + 0.01594*wf_clay
          IF (sigma < 0.) THEN
@@ -696,8 +1303,6 @@ CONTAINS
 !   complex dielectric permittivity of soils as a function of water
 !   content. IEEE Trans. Geosci. Rem. Sens., GE-18, No. 4, 288-295.
 !-----------------------------------------------------------------------
-      USE MOD_Precision
-      USE MOD_Const_Physical
       IMPLICIT NONE
 
 ! ------------------------ Dummy Argument ------------------------------
@@ -752,6 +1357,60 @@ CONTAINS
 
 !-----------------------------------------------------------------------
 
+   SUBROUTINE diel_soil_D85(ew, swc, ice_c, wf_sand, wf_clay, BD_all, eps)
+
+!-----------------------------------------------------------------------
+! DESCRIPTION:
+!   Calculate the dielectric constant of a wet and frozen soil.
+!   Extended from Dobson (1985) to the Four-Phase Model by Zhang-Zhao (2010).
+!
+! REFERENCES:
+!   [1] Dobson et al., 1985: Microwave Dielectric behavior of wet soil
+!   [2] Zhang, L., Zhao, T., Jiang, L., and Zhao, S. (2010). Estimate of
+!       Phase Transition Water Content in Freeze-Thaw Process Using
+!       Microwave Radiometer, IEEE Trans. Geosci. Rem. Sens., 48(12).
+!-----------------------------------------------------------------------
+      IMPLICIT NONE
+
+!------------------------ Dummy Argument ------------------------------
+      complex(r8), intent(in)  :: ew                     ! dielectric constant of liquid water
+      real(r8), intent(in)     :: swc                    ! liquid soil moisture (m3/m3)
+      real(r8), intent(in)     :: ice_c                  ! ice water content (m3/m3)
+      real(r8), intent(in)     :: wf_sand                ! gravimetric sand percent fraction(%)
+      real(r8), intent(in)     :: wf_clay                ! gravimetric clay percent fraction(%)
+      real(r8), intent(in)     :: BD_all                 ! soil bulk density (g/cm3)
+      complex(r8), intent(out) :: eps
+
+!----------------------- Local Variables -------------------------------
+      real(r8) :: alphas = 0.65_r8
+      real(r8) :: beta, eaa, eps_s, epsi, epsr, wc, vice
+
+      real(r8), parameter :: eps_ice_r = 3.15_r8
+      real(r8), parameter :: eps_ice_i = 0.001_r8
+!-----------------------------------------------------------------------
+
+      wc    = max(swc, 0.001_r8)
+      vice  = max(ice_c, 0.0_r8)
+
+      eps_s = (1.01_r8 + 0.44_r8 * rho_soil)**2.0_r8 - 0.062_r8
+
+      beta  = (127.48_r8 - 0.519_r8 * wf_sand - 0.152_r8 * wf_clay) / 100.0_r8
+      eaa   = 1.0_r8 + (BD_all / rho_soil) * (eps_s ** alphas - 1.0_r8) &
+      &      + (wc ** beta) * (real(ew) ** alphas) - wc &
+      &      + vice * (eps_ice_r ** alphas) - vice
+      epsr  = eaa ** (1.0_r8/alphas)
+
+      beta  = (133.797_r8 - 0.603_r8 * wf_sand - 0.166_r8 * wf_clay) / 100.0_r8
+      eaa   = (wc ** beta) * (abs(aimag(ew)) ** alphas) &
+      &      + vice * (eps_ice_i ** alphas)
+      epsi  = eaa ** (1.0_r8/alphas)
+
+      eps   = cmplx(epsr, epsi, kind=r8)
+
+   END SUBROUTINE diel_soil_D85
+
+!-----------------------------------------------------------------------
+
    SUBROUTINE diel_soil_M04(wc, wf_clay, eps)
 
 !-----------------------------------------------------------------------
@@ -767,8 +1426,6 @@ CONTAINS
 !       Dielectric Model for Moist Soils. IEEE Trans. Geosc. Rem. Sens.,
 !       vol 47 (7), 2059-2070. 2009.
 !-----------------------------------------------------------------------
-      USE MOD_Precision
-      USE MOD_Const_Physical
       IMPLICIT NONE
 
 ! ------------------------ Dummy Argument ------------------------------
@@ -848,8 +1505,6 @@ CONTAINS
 !   [2] Mironov et al, Physically and Mineralogically Based Spectroscopic Dielectric
 !       Model for Moist Soils. IEEE Trans. Geosc. Rem. Sens., vol 47 (7), 2059-2070. 2009.
 !-----------------------------------------------------------------------
-      USE MOD_Precision
-      USE MOD_Const_Physical
       IMPLICIT NONE
 
 ! ------------------------ Dummy Argument ------------------------------
@@ -868,19 +1523,19 @@ CONTAINS
 !  Initializing the GRMDM spectroscopic parameters with clay (fraction)
 !------------------------------------------------------------------------
       ! RI & NAC of dry soils
-      nd = 1.634 - 0.539 * (wf_clay/100) + 0.2748 * (wf_clay/100) ** 2   ! [1](11)
-      kd = 0.03952 - 0.04038 * (wf_clay/100)                             ! [1](12)
+      nd = 1.634 - 0.539e-2 * wf_clay + 0.2748e-4 * (wf_clay ** 2)   ! [1](11)
+      kd = 0.03952 - 0.04038e-2 * wf_clay                            ! [1](12)
 
       ! maximum bound water fraction
-      mvt = 0.02863 + 0.30673 * (wf_clay/100)                            ! [1](13)
+      mvt = 0.02863 + 0.30673e-2 * wf_clay                           ! [1](13)
 
       ! starting temperature for parameters' fit ([1] p.413)
       ts = 20.
 
       ! eb0 computation
-      e0b  = 79.8 - 85.4 * wf_clay + 32.7 * (wf_clay/100) **2                                                                    ! [1](14)
-      Bb   = 8.67e-19 - 0.00126 * (wf_clay/100) + 0.00184 * (wf_clay/100) ** 2  - 9.77e-10*(wf_clay**3) - 1.39e-15 *(wf_clay**4) ! [1](15)
-      Bsgb = 0.0028  + 0.02094e-2*wf_clay - 0.01229e-4*(wf_clay**2) - 5.03e-22*(wf_clay**3) + 4.163e-24*(wf_clay**4)             ! [1](23)
+      e0b  = 79.8 - 85.4e-2 * wf_clay + 32.7e-4 * (wf_clay **2)      ! [1](14)                                                               ! [1](14)
+      Bb   = 8.67e-19 - 0.00126e-2 * wf_clay + 0.00184e-4 * (wf_clay ** 2)  - 9.77e-10*(wf_clay**3) - 1.39e-15 *(wf_clay**4)   ! [1](15)
+      Bsgb = 0.0028  + 0.02094e-2*wf_clay - 0.01229e-4*(wf_clay**2) - 5.03e-22*(wf_clay**3) + 4.163e-24*(wf_clay**4)           ! [1](23)
       Fb   = log((e0b - 1)/(e0b + 2))                                                        ! [1](8)(ep0->e0p)
       eb0  = (1 + 2*exp(Fb-Bb*(t-ts))) / (1 - exp(Fb-Bb*(t-ts)))                             ! [1](7)(e0p->ep0)
 
@@ -913,7 +1568,7 @@ CONTAINS
       !----------------------
       !  sigmau computation
       !----------------------
-      sigmaut = 0.05_r8 + 1.4_r8*(1.0_r8 - (1.0_r8 - wf_clay*1.e-2_r8)**4.664_r8)                                    ! [1](24)
+      sigmaut = 0.05 + 1.4*(1.0 - (1.0 - wf_clay*1.e-2)**4.664)                                                      ! [1](24)
       sigmau  = sigmaut + Bsgu*(t-ts)                                                                                ! [1](10)
 
       !--------------------------------------------------
@@ -956,59 +1611,6 @@ CONTAINS
 
 !-----------------------------------------------------------------------
 
-   SUBROUTINE diel_soil_D85(ew, swc, wf_sand, wf_clay, BD_all, eps)
-
-!-----------------------------------------------------------------------
-! DESCRIPTION:
-!   Calculate the dielectric constant of a wet soil Developed and validated for 1.4 and 18 GHz.
-
-! REFERENCES:
-!   [1] Dobson et al., 1985: Microwave Dielectric behavior of
-!       wet soil - part II: Dielectric mixing models,
-!       IEEE Trans. Geosc. Rem. Sens., GE-23, No. 1, 35-46.
-
-!   [2] N. R. Peplinski, F. T. Ulaby, and M. C. Dobson,
-!       Dielectric Properties of Soils in the 0.3-1.3-GHz Range,
-!       IEEE Trans. Geosc. Rem. Sens., vol. 33, pp. 803-807, May 1995
-
-!   [3] N. R. Peplinski, F. T. Ulaby, and M. C. Dobson,
-!       Corrections to “Dielectric Properties of Soils in the 0.3-1.3-GHz Range",
-!       IEEE Trans. Geosc. Rem. Sens., vol. 33, p. 1340, November 1995
-
-!-----------------------------------------------------------------------
-      USE MOD_Precision
-      USE MOD_Const_Physical
-      IMPLICIT NONE
-
-! ------------------------ Dummy Argument ------------------------------
-      complex(r8), intent(in)  :: ew                     ! dielectric constant of water
-      real(r8), intent(in)  :: swc                       ! soil moisture
-      real(r8), intent(in)  :: wf_sand                   ! gravimetric sand percent fraction(%)
-      real(r8), intent(in)  :: wf_clay                   ! gravimetric clay percent fraction(%)
-      real(r8), intent(in)  :: BD_all                    ! soil bulk density (g/cm3)
-      complex(r8), intent(out) :: eps
-
-!----------------------- Local Variables -------------------------------
-      real(r8) :: alphas = 0.65_r8
-      real(r8) :: beta, eaa, eps_s, epsi, epsr, wc
-
-!-----------------------------------------------------------------------
-
-      wc    = max(swc, 0.001_r8)
-      eps_s = (1.01_r8 + 0.44_r8 * rho_soil)**2.0_r8 - 0.062_r8                 ! [1](22)
-      beta  = (127.48_r8 - 0.519_r8 * wf_sand - 0.152_r8 * wf_clay) / 100.0_r8  ! [1](30)
-      eaa   = 1.0_r8 + (BD_all / rho_soil) * (eps_s ** alphas - 1.0_r8) &
-      &      + (wc ** beta) * (real(ew) ** alphas) - wc                         ! [1](28)
-      epsr  = eaa ** (1.0_r8/alphas)                                            ! [2](2),[3]
-      beta  = (133.797_r8 - 0.603_r8 * wf_sand - 0.166_r8 * wf_clay) / 100.0_r8 ! [1](31) 1.33797 -> 133.797, [2](5)
-      eaa   = (wc ** beta) * (abs(aimag(ew)) ** alphas)                         ! [2](3)
-      epsi  = eaa ** (1.0_r8/alphas)                                            ! [2](3)
-      eps   = cmplx(epsr, epsi, kind=r8)
-
-   END SUBROUTINE diel_soil_D85
-
-!-----------------------------------------------------------------------
-
    SUBROUTINE smooth_reflectivity(eps, r_s)
 
 !-----------------------------------------------------------------------
@@ -1020,7 +1622,6 @@ CONTAINS
 !       of near-surface soil moisture. Journal of Geophysical Research,
 !       Vol. 82, No. 20, 3108-3118.
 !-----------------------------------------------------------------------
-      USE MOD_Precision
       IMPLICIT NONE
 
 !------------------------ Dummy Argument ------------------------------
@@ -1056,8 +1657,6 @@ CONTAINS
 !       A review of recent results and application to the L-band SMOS & SMAP soil moisture retrieval algorithms.
 !       Remote Sensing of Environment, 192, 238-262.
 !-----------------------------------------------------------------------
-      USE MOD_Precision
-      USE MOD_DA_Const
       IMPLICIT NONE
 
 !------------------------ Dummy Argument ------------------------------
@@ -1085,19 +1684,19 @@ CONTAINS
          END IF
 
          ! calculate rough surface reflectivity (default settings used in [2])
-         IF (DEF_DA_RTM_rough == 0) THEN
+         IF (DEF_DA_OPERATOR_RTM_ROUGH == 0) THEN
             hr(:) = (2.0*kcm*rgh_surf)**2.0
             nrh(:) = 0.0
             nrv(:) = 0.0
-         ELSE IF (DEF_DA_RTM_rough == 1) THEN
+         ELSE IF (DEF_DA_OPERATOR_RTM_ROUGH == 1) THEN
             hr(:) = hr_SMOS
             nrh(:) = 2.0
             nrv(:) = 0.0
-         ELSE IF (DEF_DA_RTM_rough == 2) THEN
+         ELSE IF (DEF_DA_OPERATOR_RTM_ROUGH == 2) THEN
             hr(:) = hr_SMAP
             nrh(:) = 2.0
             nrv(:) = 2.0
-         ELSE IF (DEF_DA_RTM_rough == 3) THEN
+         ELSE IF (DEF_DA_OPERATOR_RTM_ROUGH == 3) THEN
             hr(:) = hr_P16
             nrh(:) = -1.0
             nrv(:) = -1.0
@@ -1123,9 +1722,6 @@ CONTAINS
 !      Theory compared with satellite measurements.
 !      IEEE Transactions on Geoscience and Remote Sensing, 46, 361–375.
 !-----------------------------------------------------------------------
-
-      USE MOD_Precision
-      USE MOD_Const_Physical
       IMPLICIT NONE
 
 !------------------------ Dummy Argument ------------------------------
@@ -1171,7 +1767,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------
 
-   SUBROUTINE veg(patchclass, lai, htop, snowdp, tleaf, tb_veg, gamma_p)
+   SUBROUTINE veg_wigneron(patchclass, lai, htop, snowdp, tleaf, tb_veg, gamma_p)
 
 !-----------------------------------------------------------------------
 ! DESCRIPTION:
@@ -1183,8 +1779,6 @@ CONTAINS
 !       data sets over crop fields" Remote Sensing of Environment. Vol. 107, pp. 639-655k
 !
 !-----------------------------------------------------------------------
-      USE MOD_Precision
-      USE MOD_Const_Physical
       IMPLICIT NONE
 
 !------------------------ Dummy Argument ------------------------------
@@ -1219,7 +1813,85 @@ CONTAINS
          tb_veg(i) = (1.-w_CMEM(patchclass))*(1.-gamma_p(i))*tleaf
       END DO
 
-   END SUBROUTINE veg
+   END SUBROUTINE veg_wigneron
+
+!-----------------------------------------------------------------------
+   SUBROUTINE veg_jackson(patchclass, lai, htop, snowdp, tleaf, tb_veg, gamma_p)
+!-----------------------------------------------------------------------
+! DESCRIPTION:
+!   Calculate the brightness temperature on the top of vegetation
+!   using Jackson & Schmugge (1991) scheme.
+!   tau is related to VWC and is independent of polarization.
+!-----------------------------------------------------------------------
+      IMPLICIT NONE
+
+!------------------------ Dummy Argument ------------------------------
+      integer, intent(in)   :: patchclass     ! land cover class
+      real(r8), intent(in)  :: lai            ! leaf area index
+      real(r8), intent(in)  :: tleaf          ! leaf temperature (K)
+      real(r8), intent(out) :: tb_veg(2)      ! brightness temperature of veg for H- and V-
+      real(r8), intent(out) :: gamma_p(2)     ! vegetation opacity for H- and V-
+      real(r8), intent(in)  :: htop, snowdp
+
+!----------------------- Local Variables -------------------------------
+      real(r8) :: tau_nadir    ! vegetation opacity at nadir (b * VWC)
+      integer  :: i
+!-----------------------------------------------------------------------
+      IF (htop < snowdp) THEN
+         tau_nadir = b1(patchclass)*lai + b2(patchclass)
+      ELSE
+         tau_nadir = b3(patchclass)
+      END IF
+
+      DO i = 1, 2
+         gamma_p(i) = exp(-tau_nadir / cos(theta))
+         tb_veg(i)  = (1.0_r8 - w_CMEM(patchclass)) * (1.0_r8 - gamma_p(i)) * tleaf
+      END DO
+
+   END SUBROUTINE veg_jackson
+
+!-----------------------------------------------------------------------
+   SUBROUTINE veg_kirdyashev(patchclass, lai, htop, snowdp, tleaf, tb_veg, gamma_p)
+!-----------------------------------------------------------------------
+! DESCRIPTION:
+!   Calculate vegetation opacity using Kirdyashev et al. (1979) scheme.
+!   Relies on Wave number (k), Veg Water Content (VWC), and Dielectric
+!   constant of pure water inside vegetation.
+!-----------------------------------------------------------------------
+      IMPLICIT NONE
+
+!------------------------ Dummy Argument ------------------------------
+      integer, intent(in)   :: patchclass     ! land cover class
+      real(r8), intent(in)  :: lai            ! leaf area index
+      real(r8), intent(in)  :: tleaf          ! leaf temperature (K)
+      real(r8), intent(out) :: tb_veg(2)      ! brightness temperature of veg for H- and V-
+      real(r8), intent(out) :: gamma_p(2)     ! vegetation opacity for H- and V-
+      real(r8), intent(in)  :: htop, snowdp
+
+!----------------------- Local Variables -------------------------------
+      real(r8)    :: vwc               ! Vegetation Water Content (kg/m2)
+      real(r8)    :: a_geo(2)          ! Vegetation structure coefficient
+      complex(r8) :: eps_vw            ! Dielectric constant of vegetation water
+      real(r8)    :: eps_vw_i          ! Imaginary part of eps_vw
+      real(r8)    :: tau_veg(2)        ! slant optical depth
+      integer     :: i
+!-----------------------------------------------------------------------
+      vwc = lai * 0.5_r8
+      a_geo(1) = 2.0_r8 / 3.0_r8
+      a_geo(2) = 2.0_r8 / 3.0_r8
+
+      CALL diel_water(0, 0.0_r8, tleaf - tfrz, 0.0_r8, 0.0_r8, 0.0_r8, 0.0_r8, eps_vw)
+      eps_vw_i = abs(aimag(eps_vw))
+
+      tau_veg(1) = a_geo(1) * k * (vwc / denh2o) * eps_vw_i
+      tau_veg(2) = a_geo(2) * k * (vwc / denh2o) * eps_vw_i
+
+      DO i = 1, 2
+         gamma_p(i) = exp(-tau_veg(i) / cos(theta))
+         tb_veg(i)  = (1.0_r8 - w_CMEM(patchclass)) * (1.0_r8 - gamma_p(i)) * tleaf
+      END DO
+
+   END SUBROUTINE veg_kirdyashev
 
 !-----------------------------------------------------------------------
 
@@ -1242,8 +1914,6 @@ CONTAINS
 !
 !   [4] Microwave remote sensing : active and passive
 !-----------------------------------------------------------------------
-      USE MOD_Precision
-      USE MOD_Const_Physical
       IMPLICIT NONE
 
 !------------------------ Dummy Argument ------------------------------
@@ -1375,7 +2045,7 @@ CONTAINS
                   (z0*cos(theta) + z_s*cos(theta_s)))**2
             END IF
 
-            ! calculate snow grain size (mm) (Anderson 1976, eq.5.1) TODO
+            ! calculate snow grain size (mm) (Anderson 1976, eq.5.1)
             d = min(1000*(1.6e-4 + 1.1e-13*((rho_snow*1000.0)**4)), 3.0)
 
             ! extinction coefficient of dry snow
@@ -1427,5 +2097,5 @@ CONTAINS
 
    END SUBROUTINE snow
 !-----------------------------------------------------------------------
-END MODULE MOD_DA_RTM
+END MODULE MOD_DA_Operator_RTM
 #endif
