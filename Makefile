@@ -127,9 +127,9 @@ OBJS_BASIC =    \
 				 MOD_Urban_Vars_1DFluxes.o      \
 				 MOD_Urban_Vars_TimeVariables.o \
 				 MOD_Urban_Vars_TimeInvariants.o\
+				 MOD_DA_Vars_TimeVariables.o    \
 				 MOD_DA_Vars_1DFluxes.o         \
 				 MOD_Vars_TimeInvariants.o      \
-				 MOD_DA_Vars_TimeVariables.o    \
 				 MOD_Vars_TimeVariables.o       \
 				 MOD_Vars_1DPFTFluxes.o         \
 				 MOD_Vars_1DFluxes.o            \
@@ -285,13 +285,19 @@ OBJS_MAIN = \
 				MOD_UserSpecifiedForcing.o                \
 				MOD_ForcingDownscaling.o                  \
 				MOD_Forcing.o                             \
-				MOD_DA_TWS.o                              \
-				MOD_DA_Const.o                            \
-				MOD_DA_RTM.o                              \
+				MOD_DA_Assim_TWS.o                        \
+				MOD_DA_Operator_Const.o                   \
+				MOD_DA_Operator_RTM.o                     \
 				MOD_DA_EnKF.o                             \
-				MOD_DA_SM.o                               \
-				MOD_DA_Ensemble.o                         \
+				MOD_DA_Ens.o                              \
+				MOD_DA_Obs_BasicType.o                    \
+				MOD_DA_Obs_PM.o                          \
+				MOD_DA_Obs_SM.o                           \
+				MOD_DA_Obs_ST.o                           \
+				MOD_DA_Assim_SM.o                         \
+				MOD_DA_Assim_ST.o                         \
 				MOD_DA_Main.o                             \
+				MOD_DA_Hist.o                             \
 				MOD_Opt_Baseflow.o                        \
 				MOD_ParameterOptimization.o               \
 				MOD_AssimStomataConductance.o             \
@@ -368,6 +374,12 @@ MOD_Urban_Thermal.o: MOD_Urban_Flux.o
 MOD_Grid_RiverLakeSediment.o: MOD_Grid_RiverLakeNetwork.o MOD_Vector_ReadWrite.o
 MOD_Grid_RiverLakeTimeVars.o: MOD_Grid_RiverLakeSediment.o
 MOD_Grid_RiverLakeFlow.o: MOD_Grid_RiverLakeHist.o
+MOD_Grid_RiverLakeHist.o: MOD_HistGridded.o MOD_HistVector.o
+MOD_HistGridded.o: MOD_HistWriteBack.o MOD_Vars_1DAccFluxes.o
+MOD_HistVector.o: MOD_Vars_1DAccFluxes.o
+MOD_Vars_1DAccFluxes.o: MOD_FrictionVelocity.o MOD_TurbulenceLEddy.o
+MOD_DA_Main.o: MOD_Grid_RiverLakeFlow.o
+MOD_DA_Hist.o: MOD_Grid_RiverLakeHist.o
 
 OBJS_MAIN_T = $(addprefix .bld/,${OBJS_MAIN})
 
@@ -460,4 +472,3 @@ clean :
 	rm -f run/mksrfdata.x run/mkinidata.x run/colm.x
 	rm -f run/hist_concatenate.x run/srfdata_concatenate.x run/post_vector2grid.x
 	rm -f CaMa/src/*.o CaMa/src/*.mod CaMa/src/*.a
-

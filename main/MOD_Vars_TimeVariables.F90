@@ -1650,7 +1650,7 @@ ENDIF
 #endif
 
 #ifdef DataAssimilation
-      IF (DEF_DA_ENS_NUM > 1) CALL check_DATimeVariables
+      CALL check_DATimeVariables
 #endif
 
 #ifdef USEMPI
