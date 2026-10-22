@@ -29,10 +29,14 @@ MODULE MOD_Hist
 #ifdef CatchLateralFlow
    USE MOD_Catch_Hist
 #endif
+#ifdef DataAssimilation
+   USE MOD_DA_Vars_Hist, only: hist_DA_history_out
+#endif
 #ifdef GridRiverLakeFlow
    USE MOD_Grid_RiverLakeHist
 #ifdef DataAssimilation
-   USE MOD_DA_Hist, only: hist_DA_riverlake_out
+   USE MOD_DA_Vars_Hist, only: hist_DA_riverlake_init, hist_DA_riverlake_out, &
+      hist_DA_riverlake_final
 #endif
 #endif
 #ifdef EXTERNAL_LAKE
@@ -88,6 +92,9 @@ CONTAINS
 
 #ifdef GridRiverLakeFlow
       CALL hist_grid_riverlake_init (HistForm)
+#ifdef DataAssimilation
+      CALL hist_DA_riverlake_init ()
+#endif
 #endif
 
    END SUBROUTINE hist_init
@@ -109,6 +116,9 @@ CONTAINS
 
 #ifdef GridRiverLakeFlow
       CALL hist_grid_riverlake_final ()
+#ifdef DataAssimilation
+      CALL hist_DA_riverlake_final ()
+#endif
 #endif
 
    END SUBROUTINE hist_final
@@ -195,14 +205,6 @@ CONTAINS
    logical,  allocatable ::  filter_urb (:)
 #endif
 
-#ifdef DataAssimilation
-   integer :: np
-   logical,  allocatable ::  filter_hx (:,:)
-   real(r8), allocatable ::  a_wliq_soisno_o_5cm (:)
-   real(r8), allocatable ::  a_wliq_soisno_a_5cm (:)
-   real(r8), allocatable ::  a_hx_f_std (:,:)
-   real(r8), allocatable ::  a_hx_a_std (:,:)
-#endif
 
       IF (itstamp <= ptstamp) THEN
          CALL FLUSH_acc_fluxes ()
@@ -4165,181 +4167,6 @@ ENDIF
             itime_in_file, 'soilsnow', maxsnl+1, nl_soil-maxsnl, &
             sumarea, filter, 'ice lens in soil layers', 'kg/m2')
 
-
-#ifdef DataAssimilation
-         ! 0-5 cm surface liquid soil moisture [m3/m3]
-         allocate (a_wliq_soisno_o_5cm (numpatch))
-         allocate (a_wliq_soisno_a_5cm (numpatch))
-         a_wliq_soisno_o_5cm = spval
-         a_wliq_soisno_a_5cm = spval
-
-         IF (p_is_worker .and. numpatch > 0) THEN
-            a_wliq_soisno_o_5cm = (a_wliq_soisno_ol(1,:) + a_wliq_soisno_ol(2,:) + &
-               a_wliq_soisno_ol(3,:)*(0.05 - 0.0451)/(0.0906 - 0.0451)) / (0.05*denh2o)
-            a_wliq_soisno_a_5cm = (a_wliq_soisno_a(1,:) + a_wliq_soisno_a(2,:) + &
-               a_wliq_soisno_a(3,:)*(0.05 - 0.0451)/(0.0906 - 0.0451)) / (0.05*denh2o)
-         ENDIF
-
-         CALL write_history_variable_2d(DEF_hist_vars%DA_wliq_soisno_o_5cm, &
-            a_wliq_soisno_o_5cm, file_hist, 'f_wliq_soisno_o_5cm', itime_in_file, &
-            sumarea, filter, 'Open-loop volumetric liquid water content in 0-5 cm', 'm3/m3')
-         CALL write_history_variable_2d(DEF_hist_vars%DA_wliq_soisno_a_5cm, &
-            a_wliq_soisno_a_5cm, file_hist, 'f_wliq_soisno_a_5cm', itime_in_file, &
-            sumarea, filter, 'Analysis volumetric liquid water content in 0-5 cm', 'm3/m3')
-
-         deallocate (a_wliq_soisno_o_5cm, a_wliq_soisno_a_5cm)
-
-         CALL write_history_variable_3d(DEF_hist_vars%DA_wliq_soisno_ol, &
-            a_wliq_soisno_ol, file_hist, 'f_wliq_soisno_ol', itime_in_file, &
-            'soilsnow', maxsnl + 1, nl_soil - maxsnl, sumarea, filter, &
-            'Open-loop liquid water in soil and snow layers', 'kg/m2')
-         CALL write_history_variable_3d(DEF_hist_vars%DA_wliq_soisno_f, &
-            a_wliq_soisno_f, file_hist, 'f_wliq_soisno_f', itime_in_file, &
-            'soilsnow', maxsnl + 1, nl_soil - maxsnl, sumarea, filter, &
-            'Forecast ensemble-mean liquid water in soil and snow layers', 'kg/m2')
-         CALL write_history_variable_3d(DEF_hist_vars%DA_wliq_soisno_a, &
-            a_wliq_soisno_a, file_hist, 'f_wliq_soisno_a', itime_in_file, &
-            'soilsnow', maxsnl + 1, nl_soil - maxsnl, sumarea, filter, &
-            'Analysis ensemble-mean liquid water in soil and snow layers', 'kg/m2')
-
-         CALL write_history_variable_3d(DEF_hist_vars%DA_t_soisno_ol, &
-            a_t_soisno_ol, file_hist, 'f_t_soisno_ol', itime_in_file, &
-            'soilsnow', maxsnl + 1, nl_soil - maxsnl, sumarea, filter, &
-            'Open-loop temperature in soil and snow layers', 'K')
-         CALL write_history_variable_3d(DEF_hist_vars%DA_t_soisno_f, &
-            a_t_soisno_f, file_hist, 'f_t_soisno_f', itime_in_file, &
-            'soilsnow', maxsnl + 1, nl_soil - maxsnl, sumarea, filter, &
-            'Forecast ensemble-mean temperature in soil and snow layers', 'K')
-         CALL write_history_variable_3d(DEF_hist_vars%DA_t_soisno_a, &
-            a_t_soisno_a, file_hist, 'f_t_soisno_a', itime_in_file, &
-            'soilsnow', maxsnl + 1, nl_soil - maxsnl, sumarea, filter, &
-            'Analysis ensemble-mean temperature in soil and snow layers', 'K')
-
-         ! ensemble soil moisture & temperature in soil layers [kg/m2]
-         CALL write_history_variable_4d(DEF_hist_vars%DA_wliq_soisno_ens, &
-            a_wliq_soisno_ens, file_hist, 'f_wliq_soisno_ens', itime_in_file, 'soilsnow', maxsnl + 1, nl_soil - maxsnl, &
-            'ens', 1, DEF_DA_ENS_NUM, sumarea, filter, 'ensemble liquid water in soil layers', 'kg/m2')
-
-         ! --------------------------------------------------------------------
-         ! brightness temperature (excluding land ice, land water bodies and ocean patches)
-         ! [soil => 0; urban and built-up => 1; wetland => 2; land ice => 3;
-         !  land water bodies => 4; ocean => 99]
-         ! --------------------------------------------------------------------
-
-         IF (HistForm == 'Gridded') THEN
-            IF (p_is_io) THEN
-               CALL allocate_block_data(ghist, sumarea)
-            END IF
-         END IF
-
-         IF (p_is_worker) THEN
-            IF (numpatch > 0) THEN
-
-               filter(:) = patchtype <= 2
-
-               IF (DEF_forcing%has_missing_value) THEN
-                  filter = filter .and. forcmask_pch
-               END IF
-
-               filter = filter .and. patchmask
-            END IF
-         END IF
-
-         IF (HistForm == 'Gridded') THEN
-            CALL mp2g_hist%get_sumarea(sumarea, filter)
-         END IF
-
-         ! Generic DA observation-space diagnostics. The source dimension follows
-         ! the order of DEF_DA_OBS_* entries whose TARGET is 'SM'.
-         IF (nsource > 0) THEN
-            allocate(filter_hx(nsource,numpatch))
-            allocate(a_hx_f_std(nsource,numpatch))
-            allocate(a_hx_a_std(nsource,numpatch))
-            a_hx_f_std = spval
-            a_hx_a_std = spval
-
-            ! Ensemble spread of H(x), on the raw accumulators: the writers'
-            ! in-place /nac scales spread and mean alike.
-            IF (DEF_DA_ENS_NUM > 1 .and. p_is_worker) THEN
-               DO np = 1, numpatch
-                  DO i = 1, nsource
-                     IF (a_hx_f(i,np) /= spval) a_hx_f_std(i,np) = &
-                        sqrt(sum((a_hx_f_ens(i,:,np) - a_hx_f(i,np))**2) &
-                           / real(DEF_DA_ENS_NUM - 1))
-                     IF (a_hx_a(i,np) /= spval) a_hx_a_std(i,np) = &
-                        sqrt(sum((a_hx_a_ens(i,:,np) - a_hx_a(i,np))**2) &
-                           / real(DEF_DA_ENS_NUM - 1))
-                  ENDDO
-               ENDDO
-            ENDIF
-
-            IF (p_is_worker) THEN
-               DO i = 1, nsource
-                  filter_hx(i,:) = filter .and. a_hx_ol(i,:) /= spval
-               ENDDO
-            ENDIF
-            CALL write_history_variable_3d(DEF_hist_vars%hx_ol, &
-               a_hx_ol, file_hist, 'f_hx_ol', itime_in_file, &
-               'source', 1, nsource, sumarea, filter, &
-               'Open-loop H(x) by DA observation source', 'source-dependent', &
-               filter_3d = filter_hx)
-
-            IF (p_is_worker) THEN
-               DO i = 1, nsource
-                  filter_hx(i,:) = filter .and. a_hx_f(i,:) /= spval
-               ENDDO
-            ENDIF
-            CALL write_history_variable_3d(DEF_hist_vars%hx_f, &
-               a_hx_f, file_hist, 'f_hx_f', itime_in_file, &
-               'source', 1, nsource, sumarea, filter, &
-               'Prior H(x) by DA observation source', 'source-dependent', &
-               filter_3d = filter_hx)
-
-            IF (DEF_DA_ENS_NUM > 1) THEN
-               CALL write_history_variable_3d(DEF_hist_vars%hx_f_std, &
-                  a_hx_f_std, file_hist, 'f_hx_f_std', itime_in_file, &
-                  'source', 1, nsource, sumarea, filter, &
-                  'Prior ensemble spread of H(x) by DA observation source', &
-                  'source-dependent', filter_3d = filter_hx)
-            ENDIF
-
-            IF (p_is_worker) THEN
-               DO i = 1, nsource
-                  filter_hx(i,:) = filter .and. a_hx_a(i,:) /= spval
-               ENDDO
-            ENDIF
-            CALL write_history_variable_3d(DEF_hist_vars%hx_a, &
-               a_hx_a, file_hist, 'f_hx_a', itime_in_file, &
-               'source', 1, nsource, sumarea, filter, &
-               'Analysis H(x) by DA observation source', 'source-dependent', &
-               filter_3d = filter_hx)
-
-            IF (DEF_DA_ENS_NUM > 1) THEN
-               CALL write_history_variable_3d(DEF_hist_vars%hx_a_std, &
-                  a_hx_a_std, file_hist, 'f_hx_a_std', itime_in_file, &
-                  'source', 1, nsource, sumarea, filter, &
-                  'Analysis ensemble spread of H(x) by DA observation source', &
-                  'source-dependent', filter_3d = filter_hx)
-            ENDIF
-
-            deallocate(filter_hx)
-            deallocate(a_hx_f_std, a_hx_a_std)
-
-            IF (DEF_DA_ENS_NUM > 1) THEN
-               CALL write_history_variable_4d(DEF_hist_vars%hx_f_ens, &
-                  a_hx_f_ens, file_hist, 'f_hx_f_ens', itime_in_file, &
-                  'source', 1, nsource, 'ens', 1, DEF_DA_ENS_NUM, &
-                  sumarea, filter, 'Prior ensemble H(x) by DA observation source', &
-                  'source-dependent')
-               CALL write_history_variable_4d(DEF_hist_vars%hx_a_ens, &
-                  a_hx_a_ens, file_hist, 'f_hx_a_ens', itime_in_file, &
-                  'source', 1, nsource, 'ens', 1, DEF_DA_ENS_NUM, &
-                  sumarea, filter, 'Analysis ensemble H(x) by DA observation source', &
-                  'source-dependent')
-            ENDIF
-         ENDIF
-#endif
-
          ! --------------------------------------------------------------------
          ! additional diagnostic variables for output (vegetated land only <=2)
          ! [soil => 0; urban and built-up => 1; wetland => 2; land ice => 3;
@@ -4746,43 +4573,14 @@ ENDIF
                'flooded area', 'km^2', nac_one)
          ENDIF
 
+#endif
+
 #ifdef DataAssimilation
-         IF (DEF_DA_ENS_NUM > 1) THEN
-            CALL write_history_variable_2d ( DEF_hist_vars%riv_height, a_wdsrf_ucat_mean_pch,  &
-               file_hist, 'f_wdpth_ucat_regrid_mean', itime_in_file, sumarea_ucat, filter_ucat, &
-               'regridded deepest water depth in river and flood plain from the ensemble-mean state', &
-               'm', nac_one)
-
-            CALL write_history_variable_2d ( DEF_hist_vars%riv_veloct, a_veloc_riv_mean_pch,   &
-               file_hist, 'f_veloc_riv_regrid_mean', itime_in_file, sumarea_ucat, filter_ucat,  &
-               'regridded water velocity in river from the ensemble-mean state',               &
-               'm/s', nac_one)
-
-            CALL write_history_variable_2d ( DEF_hist_vars%discharge, a_discharge_mean_pch, &
-               file_hist, 'f_discharge_mean', itime_in_file, sumarea_one, filter_ucat,       &
-               'regridded discharge in river and flood plain from the ensemble-mean state',  &
-               'm^3/s', nac_one, input_mode = 'total')
-
-            CALL write_history_variable_2d ( DEF_hist_vars%discharge, a_dis_rmth_mean_pch,   &
-               file_hist, 'f_discharge_rivermouth_regrid_mean', itime_in_file, sumarea_one,   &
-               filter_ucat,                                                                   &
-               'regridded river mouth discharge into ocean from the ensemble-mean state',     &
-               'm^3/s', nac_one, input_mode = 'total')
-
-            CALL write_history_variable_2d ( DEF_hist_vars%floodfrc, a_floodfrc_mean_pch,      &
-               file_hist, 'f_floodfrc_mean', itime_in_file, sumarea_inpm, filter_inpm,          &
-               'flooded area fraction from the ensemble-mean state', '100%', nac_one)
-
-            IF (trim(HistForm) == 'Gridded') THEN
-               CALL write_history_variable_2d ( DEF_hist_vars%floodarea, a_floodfrc_mean_pch,  &
-                  file_hist, 'f_floodarea_mean', itime_in_file, sumarea_one, filter_inpm,       &
-                  'flooded area from the ensemble-mean state', 'km^2', nac_one)
-            ENDIF
-         ENDIF
+         CALL hist_DA_history_out (file_hist, HistForm, itime_in_file, &
+            sumarea, filter, sumarea_one, nac_one)
 #endif
 
          IF (allocated(nac_one   )) deallocate (nac_one   )
-#endif
 
          IF (allocated(filter    )) deallocate (filter    )
          IF (allocated(filter_dt )) deallocate (filter_dt )
@@ -4919,7 +4717,7 @@ ENDIF
 
    SUBROUTINE write_history_variable_3d ( is_hist, &
          acc_vec, file_hist, varname, itime_in_file, dim1name, lb1, ndim1, &
-         sumarea, filter, longname, units, filter_3d)
+         sumarea, filter, longname, units)
 
    IMPLICIT NONE
 
@@ -4934,7 +4732,6 @@ ENDIF
 
    type(block_data_real8_2d), intent(in) :: sumarea
    logical, intent(in) :: filter(:)
-   logical, intent(in), optional :: filter_3d(:,:)
    character (len=*), intent(in) :: longname
    character (len=*), intent(in) :: units
 
@@ -4946,15 +4743,9 @@ ENDIF
 
       select CASE (HistForm)
       CASE ('Gridded')
-         IF (present(filter_3d)) THEN
-            CALL flux_map_and_write_3d ( &
-               acc_vec, file_hist, varname, itime_in_file, dim1name, lb1, ndim1, &
-               sumarea, filter, longname, units, filter_3d)
-         ELSE
-            CALL flux_map_and_write_3d ( &
-               acc_vec, file_hist, varname, itime_in_file, dim1name, lb1, ndim1, &
-               sumarea, filter, longname, units)
-         ENDIF
+         CALL flux_map_and_write_3d ( &
+            acc_vec, file_hist, varname, itime_in_file, dim1name, lb1, ndim1, &
+            sumarea, filter, longname, units)
 #if (defined UNSTRUCTURED || defined CATCHMENT)
       CASE ('Vector')
          CALL aggregate_to_vector_and_write_3d ( &

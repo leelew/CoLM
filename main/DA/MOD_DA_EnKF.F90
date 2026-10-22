@@ -12,6 +12,7 @@ MODULE MOD_DA_EnKF
 !-----------------------------------------------------------------------------
     USE MOD_Precision
     USE MOD_SPMD_Task
+    USE MOD_DA_Log
     IMPLICIT NONE
     SAVE
 
@@ -70,6 +71,7 @@ CONTAINS
     real(r8) :: trans_pert(num_ens, num_ens)        ! perturbation transform matrix (k x k)
     real(r8) :: I0(num_ens, num_ens)                ! identity matrix (k x k)
     real(r8) :: one_div_ens(num_ens)                ! 1/num_ens
+    character(len=256) :: logmsg                    ! log message buffer
     integer  :: i, j
 
 !-----------------------------------------------------------------------------
@@ -101,10 +103,12 @@ CONTAINS
         CALL dsyev('V', 'U', num_ens, pa_inv, num_ens, eigval, work, lwork, err)
 
         IF (err < 0) THEN
-            WRITE(*,*) 'LETKF error: DSYEV argument ', -err, ' had an illegal value.'
+            WRITE (logmsg,'(A,I0,A)') 'LETKF error: DSYEV argument ', -err, ' had an illegal value.'
+            CALL DA_log_error (logmsg)
             CALL CoLM_stop()
         ELSE IF (err > 0) THEN
-            WRITE(*,*) 'LETKF error: DSYEV failed to converge, INFO = ', err
+            WRITE (logmsg,'(A,I0)') 'LETKF error: DSYEV failed to converge, INFO = ', err
+            CALL DA_log_error (logmsg)
             CALL CoLM_stop()
         END IF
 

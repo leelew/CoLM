@@ -400,7 +400,7 @@ PROGRAM CoLM
 
 #ifdef DataAssimilation
       ! initialize data assimilation
-      CALL init_DA ()
+      CALL init_DA (sdate)
 #endif
 
       ! ======================================================================

@@ -17,10 +17,12 @@ MODULE MOD_DA_Ens
    USE MOD_Precision
    USE MOD_Namelist
    USE MOD_Vars_TimeVariables
+   USE MOD_DA_Vars_1DFluxes
    USE MOD_DA_Vars_TimeVariables
    USE MOD_Vars_1DForcing
    USE MOD_LandPatch
    USE MOD_SPMD_Task
+   USE MOD_DA_Log
 #ifdef GridRiverLakeFlow
    USE MOD_Vars_Global,            only: spval
    USE MOD_Grid_RiverLakeTimeVars, only: wdsrf_ucat, veloc_riv, volresv
@@ -30,10 +32,8 @@ MODULE MOD_DA_Ens
 
    ! public functions
    PUBLIC :: ensemble
-   PUBLIC :: model_to_ens_member
-   PUBLIC :: model_to_ens_mean
-   PUBLIC :: ens_mean_to_model
-   PUBLIC :: ens_member_to_model
+   PUBLIC :: model_to_ens
+   PUBLIC :: ens_to_model
 
    ! local parameters
    ! forcing [parameters used here is consistent with SMAP L4 (Table 4 in [1])]
@@ -101,11 +101,6 @@ CONTAINS
 
       IF (DEF_DA_ENS_NUM == 1) RETURN   ! single member: open-loop only, nothing to perturb
 
-      IF (mod(DEF_DA_ENS_NUM, 2) /= 0) THEN
-         print *, 'Error: DEF_DA_ENS_NUM must be even for Box-Muller ensemble sampling.'
-         CALL CoLM_stop()
-      ENDIF
-
       ! initialize persistent variables
       IF (.not. initialized) THEN
          CALL random_seed()
@@ -144,7 +139,7 @@ CONTAINS
          ENDDO
       ENDDO
       IF (info /= 0) THEN
-         print *, 'Error: Cholesky decomposition failed'
+         CALL DA_log_error ('Error: Cholesky decomposition failed')
          CALL CoLM_stop()
       ENDIF
 
@@ -278,11 +273,10 @@ CONTAINS
 
 !-----------------------------------------------------------------------
 
-   SUBROUTINE model_to_ens_member(iens)
+   SUBROUTINE model_to_ens(iens)
 
 !-----------------------------------------------------------------------
       USE MOD_Vars_1DFluxes
-      USE MOD_DA_Vars_1DFluxes
       IMPLICIT NONE
 
 !------------------------ Dummy Arguments ------------------------------
@@ -369,105 +363,14 @@ CONTAINS
       ENDIF
 #endif
 
-   END SUBROUTINE model_to_ens_member
+   END SUBROUTINE model_to_ens
 
 !-----------------------------------------------------------------------
 
-   SUBROUTINE model_to_ens_mean()
-
-!-----------------------------------------------------------------------
-      IMPLICIT NONE
-
-!-----------------------------------------------------------------------
-      IF (.not. p_is_worker) RETURN
-
-#ifdef GridRiverLakeFlow
-      IF (allocated(wdsrf_ucat_mean)) THEN
-         wdsrf_ucat_mean = wdsrf_ucat
-         veloc_riv_mean  = veloc_riv
-      ENDIF
-      IF (DEF_Reservoir_Method > 0) THEN
-         IF (allocated(volresv_mean)) volresv_mean = volresv
-      ENDIF
-#endif
-
-   END SUBROUTINE model_to_ens_mean
-
-!-----------------------------------------------------------------------
-
-   SUBROUTINE ens_mean_to_model()
+   SUBROUTINE ens_to_model(iens)
 
 !-----------------------------------------------------------------------
       USE MOD_Vars_1DFluxes
-      USE MOD_DA_Vars_1DFluxes
-      IMPLICIT NONE
-
-!-----------------------------------------------------------------------
-
-      IF (.not. p_is_worker) RETURN
-
-      z_sno        = sum(z_sno_ens        (  :,1:DEF_DA_ENS_NUM,:), dim=2) / real(DEF_DA_ENS_NUM, r8)
-      dz_sno       = sum(dz_sno_ens       (  :,1:DEF_DA_ENS_NUM,:), dim=2) / real(DEF_DA_ENS_NUM, r8)
-      t_soisno     = sum(t_soisno_ens     (  :,1:DEF_DA_ENS_NUM,:), dim=2) / real(DEF_DA_ENS_NUM, r8)
-      wliq_soisno  = sum(wliq_soisno_ens  (  :,1:DEF_DA_ENS_NUM,:), dim=2) / real(DEF_DA_ENS_NUM, r8)
-      wice_soisno  = sum(wice_soisno_ens  (  :,1:DEF_DA_ENS_NUM,:), dim=2) / real(DEF_DA_ENS_NUM, r8)
-      smp          = sum(smp_ens          (  :,1:DEF_DA_ENS_NUM,:), dim=2) / real(DEF_DA_ENS_NUM, r8)
-      hk           = sum(hk_ens           (  :,1:DEF_DA_ENS_NUM,:), dim=2) / real(DEF_DA_ENS_NUM, r8)
-      t_grnd       = sum(t_grnd_ens       (    1:DEF_DA_ENS_NUM,:), dim=1) / real(DEF_DA_ENS_NUM, r8)
-      tleaf        = sum(tleaf_ens        (    1:DEF_DA_ENS_NUM,:), dim=1) / real(DEF_DA_ENS_NUM, r8)
-      ldew         = sum(ldew_ens         (    1:DEF_DA_ENS_NUM,:), dim=1) / real(DEF_DA_ENS_NUM, r8)
-      ldew_rain    = sum(ldew_rain_ens    (    1:DEF_DA_ENS_NUM,:), dim=1) / real(DEF_DA_ENS_NUM, r8)
-      ldew_snow    = sum(ldew_snow_ens    (    1:DEF_DA_ENS_NUM,:), dim=1) / real(DEF_DA_ENS_NUM, r8)
-      fwet_snow    = sum(fwet_snow_ens    (    1:DEF_DA_ENS_NUM,:), dim=1) / real(DEF_DA_ENS_NUM, r8)
-      sag          = sum(sag_ens          (    1:DEF_DA_ENS_NUM,:), dim=1) / real(DEF_DA_ENS_NUM, r8)
-      scv          = sum(scv_ens          (    1:DEF_DA_ENS_NUM,:), dim=1) / real(DEF_DA_ENS_NUM, r8)
-      snowdp       = sum(snowdp_ens       (    1:DEF_DA_ENS_NUM,:), dim=1) / real(DEF_DA_ENS_NUM, r8)
-      fveg         = sum(fveg_ens         (    1:DEF_DA_ENS_NUM,:), dim=1) / real(DEF_DA_ENS_NUM, r8)
-      fsno         = sum(fsno_ens         (    1:DEF_DA_ENS_NUM,:), dim=1) / real(DEF_DA_ENS_NUM, r8)
-      sigf         = sum(sigf_ens         (    1:DEF_DA_ENS_NUM,:), dim=1) / real(DEF_DA_ENS_NUM, r8)
-      green        = sum(green_ens        (    1:DEF_DA_ENS_NUM,:), dim=1) / real(DEF_DA_ENS_NUM, r8)
-      tlai         = sum(tlai_ens         (    1:DEF_DA_ENS_NUM,:), dim=1) / real(DEF_DA_ENS_NUM, r8)
-      lai          = sum(lai_ens          (    1:DEF_DA_ENS_NUM,:), dim=1) / real(DEF_DA_ENS_NUM, r8)
-      tsai         = sum(tsai_ens         (    1:DEF_DA_ENS_NUM,:), dim=1) / real(DEF_DA_ENS_NUM, r8)
-      sai          = sum(sai_ens          (    1:DEF_DA_ENS_NUM,:), dim=1) / real(DEF_DA_ENS_NUM, r8)
-      alb          = sum(alb_ens          (:,:,1:DEF_DA_ENS_NUM,:), dim=3) / real(DEF_DA_ENS_NUM, r8)
-      ssun         = sum(ssun_ens         (:,:,1:DEF_DA_ENS_NUM,:), dim=3) / real(DEF_DA_ENS_NUM, r8)
-      ssha         = sum(ssha_ens         (:,:,1:DEF_DA_ENS_NUM,:), dim=3) / real(DEF_DA_ENS_NUM, r8)
-      ssoi         = sum(ssoi_ens         (:,:,1:DEF_DA_ENS_NUM,:), dim=3) / real(DEF_DA_ENS_NUM, r8)
-      ssno         = sum(ssno_ens         (:,:,1:DEF_DA_ENS_NUM,:), dim=3) / real(DEF_DA_ENS_NUM, r8)
-      thermk       = sum(thermk_ens       (    1:DEF_DA_ENS_NUM,:), dim=1) / real(DEF_DA_ENS_NUM, r8)
-      extkb        = sum(extkb_ens        (    1:DEF_DA_ENS_NUM,:), dim=1) / real(DEF_DA_ENS_NUM, r8)
-      extkd        = sum(extkd_ens        (    1:DEF_DA_ENS_NUM,:), dim=1) / real(DEF_DA_ENS_NUM, r8)
-      zwt          = sum(zwt_ens          (    1:DEF_DA_ENS_NUM,:), dim=1) / real(DEF_DA_ENS_NUM, r8)
-      wdsrf        = sum(wdsrf_ens        (    1:DEF_DA_ENS_NUM,:), dim=1) / real(DEF_DA_ENS_NUM, r8)
-      wa           = sum(wa_ens           (    1:DEF_DA_ENS_NUM,:), dim=1) / real(DEF_DA_ENS_NUM, r8)
-      wetwat       = sum(wetwat_ens       (    1:DEF_DA_ENS_NUM,:), dim=1) / real(DEF_DA_ENS_NUM, r8)
-      t_lake       = sum(t_lake_ens       (  :,1:DEF_DA_ENS_NUM,:), dim=2) / real(DEF_DA_ENS_NUM, r8)
-      lake_icefrac = sum(lake_icefrac_ens (  :,1:DEF_DA_ENS_NUM,:), dim=2) / real(DEF_DA_ENS_NUM, r8)
-      savedtke1    = sum(savedtke1_ens    (    1:DEF_DA_ENS_NUM,:), dim=1) / real(DEF_DA_ENS_NUM, r8)
-      rnof         = sum(rnof_ens         (    1:DEF_DA_ENS_NUM,:), dim=1) / real(DEF_DA_ENS_NUM, r8)
-
-#ifdef GridRiverLakeFlow
-      IF (allocated(wdsrf_ucat_mean)) THEN
-         WHERE (wdsrf_ucat_mean /= spval) wdsrf_ucat = wdsrf_ucat_mean
-         WHERE (veloc_riv_mean  /= spval) veloc_riv  = veloc_riv_mean
-      ENDIF
-      IF (DEF_Reservoir_Method > 0) THEN
-         IF (allocated(volresv_mean)) THEN
-            WHERE (volresv_mean /= spval) volresv = volresv_mean
-         ENDIF
-      ENDIF
-#endif
-
-   END SUBROUTINE ens_mean_to_model
-
-!-----------------------------------------------------------------------
-
-   SUBROUTINE ens_member_to_model(iens)
-
-!-----------------------------------------------------------------------
-      USE MOD_Vars_1DFluxes
-      USE MOD_DA_Vars_1DFluxes
       IMPLICIT NONE
 
 !------------------------ Dummy Arguments ------------------------------
@@ -556,7 +459,7 @@ CONTAINS
       ENDIF
 #endif
 
-   END SUBROUTINE ens_member_to_model
+   END SUBROUTINE ens_to_model
 
 !-----------------------------------------------------------------------
 END MODULE MOD_DA_Ens

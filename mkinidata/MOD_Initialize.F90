@@ -1572,11 +1572,11 @@ ENDIF
 #ifdef DataAssimilation
       IF (p_is_worker) THEN
          IF (numucat > 0) THEN
-            wdsrf_ucat_mean = wdsrf_ucat
-            veloc_riv_mean  = veloc_riv
+            wdsrf_ucat_a     = wdsrf_ucat
+            veloc_riv_a      = veloc_riv
          ENDIF
          IF (DEF_Reservoir_Method > 0) THEN
-            IF (numresv > 0) volresv_mean = volresv
+            IF (numresv > 0) volresv_a = volresv
          ENDIF
       ENDIF
 #endif

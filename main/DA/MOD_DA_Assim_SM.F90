@@ -21,9 +21,9 @@ MODULE MOD_DA_Assim_SM
 
    type(SM_type) :: sm
 
-   PUBLIC :: init_Assim_SM
-   PUBLIC :: run_Assim_SM
-   PUBLIC :: end_Assim_SM
+   PUBLIC :: init_assim_SM
+   PUBLIC :: run_assim_SM
+   PUBLIC :: end_assim_SM
 
 !-----------------------------------------------------------------------------
 
@@ -31,12 +31,12 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE init_Assim_SM ()
+   SUBROUTINE init_assim_SM ()
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
 
-      integer :: is, i, nsensor, nstream
+      integer :: is, i, nsensor
       type(SM_config_type), allocatable :: configs(:)
 
 !-----------------------------------------------------------------------------
@@ -50,17 +50,14 @@ CONTAINS
 
       allocate(configs(nsensor))
       is = 0
-      nstream = 0
       DO i = 1, size(DEF_DA_OBS_TARGET)
-         IF (trim(DEF_DA_OBS_TARGET(i)) == 'SM' .or. &
-             trim(DEF_DA_OBS_TARGET(i)) == 'ST') nstream = nstream + 1
          IF (trim(DEF_DA_OBS_TARGET(i)) == 'SM') THEN
             is = is + 1
             configs(is)%source_name = DEF_DA_OBS_SOURCE(i)
             configs(is)%sensor_name = DEF_DA_OBS_SENSOR(i)
             configs(is)%var_name    = DEF_DA_OBS_VAR(i)
             configs(is)%fghz        = DEF_DA_OBS_FGHZ(i)
-            configs(is)%istream     = nstream
+            configs(is)%istream     = i
          ENDIF
       ENDDO
 
@@ -68,11 +65,11 @@ CONTAINS
 
       deallocate(configs)
 
-   END SUBROUTINE init_Assim_SM
+   END SUBROUTINE init_assim_SM
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE run_Assim_SM (idate, deltim)
+   SUBROUTINE run_assim_SM (idate, deltim)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -169,11 +166,11 @@ CONTAINS
       ENDIF
       CALL sm%clear()
 
-   END SUBROUTINE run_Assim_SM
+   END SUBROUTINE run_assim_SM
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE end_Assim_SM()
+   SUBROUTINE end_assim_SM()
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -187,7 +184,7 @@ CONTAINS
       sm%use_pm = .false.
       sm%use_gnos = .false.
 
-   END SUBROUTINE end_Assim_SM
+   END SUBROUTINE end_assim_SM
 
 !-----------------------------------------------------------------------------
 END MODULE MOD_DA_Assim_SM

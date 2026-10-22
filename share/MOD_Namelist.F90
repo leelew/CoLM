@@ -474,6 +474,10 @@ MODULE MOD_Namelist
 ! DEF_DA_OBS_DIR
 !    Root directory of all observation files used by data assimilation.
 !
+! DEF_DA_LOG_FILE
+!    DA log file name, relative to the run directory by default. The log is
+!    always written; important messages are also echoed to standard output.
+!
 ! DEF_DA_OBS_SOURCE(:)
 !    Observation source type for each configured observation stream.
 !    Supported examples: 'PM', 'GNOS', 'AM', 'situ', 'GRACE', 'SR'
@@ -536,6 +540,7 @@ MODULE MOD_Namelist
 !    temperature assimilation.
 !---------------------------------------------------------------------------------
    character(len=256) :: DEF_DA_OBS_DIR            = ''
+   character(len=256) :: DEF_DA_LOG_FILE           = 'DA.log'
    character(len=16)  :: DEF_DA_OBS_SOURCE(10)     = ''
    character(len=16)  :: DEF_DA_OBS_SENSOR(10)     = ''
    character(len=16)  :: DEF_DA_OBS_VAR(10)        = ''
@@ -992,18 +997,14 @@ MODULE MOD_Namelist
       logical :: DA_wliq_soisno_f                 = .false.
       logical :: DA_wliq_soisno_a                 = .false.
       logical :: DA_wliq_soisno_ens               = .false.
-      logical :: DA_wliq_soisno_o_5cm             = .false.
-      logical :: DA_wliq_soisno_a_5cm             = .false.
       logical :: DA_t_soisno_ol                   = .false.
       logical :: DA_t_soisno_f                    = .false.
       logical :: DA_t_soisno_a                    = .false.
-      logical :: hx_ol                            = .false.
-      logical :: hx_f                             = .false.
-      logical :: hx_a                             = .false.
-      logical :: hx_f_ens                         = .false.
-      logical :: hx_a_ens                         = .false.
-      logical :: hx_f_std                         = .false.
-      logical :: hx_a_std                         = .false.
+      logical :: DA_hx_ol                         = .false.
+      logical :: DA_hx_f                          = .false.
+      logical :: DA_hx_a                          = .false.
+      logical :: DA_hx_f_ens                      = .false.
+      logical :: DA_hx_a_ens                      = .false.
 
       logical :: litr1c_vr                        = .true.
       logical :: litr2c_vr                        = .true.
@@ -1293,6 +1294,7 @@ CONTAINS
       DEF_ReservoirPara_file,                 &
 
       DEF_DA_OBS_DIR,                         &
+      DEF_DA_LOG_FILE,                        &
       DEF_DA_OBS_SOURCE,                      &
       DEF_DA_OBS_SENSOR,                      &
       DEF_DA_OBS_VAR,                         &
@@ -1384,6 +1386,15 @@ CONTAINS
             write(*,*) 'Warning: timestep should be less than or equal to 3600 seconds.'
             CALL CoLM_Stop ()
          ENDIF
+
+#ifdef DataAssimilation
+         IF (DEF_DA_ENS_NUM > 1 .and. mod(DEF_DA_ENS_NUM, 2) /= 0) THEN
+            write(*,*) '                  *****                  '
+            write(*,'(A,I0,A)') 'ERROR: DEF_DA_ENS_NUM = ', DEF_DA_ENS_NUM, &
+               ' must be even for Box-Muller ensemble sampling.'
+            CALL CoLM_Stop ()
+         ENDIF
+#endif
 
 ! ===============================================================
 ! ----- Macros&Namelist conflicts and dependency management -----
@@ -1882,6 +1893,7 @@ CONTAINS
       CALL mpi_bcast (DEF_ReservoirPara_file                 ,256 ,mpi_character ,p_address_master ,p_comm_glb ,p_err)
 
       CALL mpi_bcast (DEF_DA_OBS_DIR                         ,256 ,mpi_character ,p_address_master ,p_comm_glb ,p_err)
+      CALL mpi_bcast (DEF_DA_LOG_FILE                        ,256 ,mpi_character ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_OBS_SOURCE                      ,160,mpi_character ,p_address_master ,p_comm_glb  ,p_err)
       CALL mpi_bcast (DEF_DA_OBS_SENSOR                      ,160,mpi_character ,p_address_master ,p_comm_glb  ,p_err)
       CALL mpi_bcast (DEF_DA_OBS_VAR                         ,160,mpi_character ,p_address_master ,p_comm_glb  ,p_err)
@@ -2462,18 +2474,14 @@ CONTAINS
       CALL sync_hist_vars_one (DEF_hist_vars%DA_wliq_soisno_f          , set_defaults)
       CALL sync_hist_vars_one (DEF_hist_vars%DA_wliq_soisno_a          , set_defaults)
       CALL sync_hist_vars_one (DEF_hist_vars%DA_wliq_soisno_ens        , set_defaults)
-      CALL sync_hist_vars_one (DEF_hist_vars%DA_wliq_soisno_o_5cm      , set_defaults)
-      CALL sync_hist_vars_one (DEF_hist_vars%DA_wliq_soisno_a_5cm      , set_defaults)
       CALL sync_hist_vars_one (DEF_hist_vars%DA_t_soisno_ol            , set_defaults)
       CALL sync_hist_vars_one (DEF_hist_vars%DA_t_soisno_f             , set_defaults)
       CALL sync_hist_vars_one (DEF_hist_vars%DA_t_soisno_a             , set_defaults)
-      CALL sync_hist_vars_one (DEF_hist_vars%hx_ol                     , set_defaults)
-      CALL sync_hist_vars_one (DEF_hist_vars%hx_f                      , set_defaults)
-      CALL sync_hist_vars_one (DEF_hist_vars%hx_a                      , set_defaults)
-      CALL sync_hist_vars_one (DEF_hist_vars%hx_f_ens                  , set_defaults)
-      CALL sync_hist_vars_one (DEF_hist_vars%hx_a_ens                  , set_defaults)
-      CALL sync_hist_vars_one (DEF_hist_vars%hx_f_std                  , set_defaults)
-      CALL sync_hist_vars_one (DEF_hist_vars%hx_a_std                  , set_defaults)
+      CALL sync_hist_vars_one (DEF_hist_vars%DA_hx_ol                  , set_defaults)
+      CALL sync_hist_vars_one (DEF_hist_vars%DA_hx_f                   , set_defaults)
+      CALL sync_hist_vars_one (DEF_hist_vars%DA_hx_a                   , set_defaults)
+      CALL sync_hist_vars_one (DEF_hist_vars%DA_hx_f_ens               , set_defaults)
+      CALL sync_hist_vars_one (DEF_hist_vars%DA_hx_a_ens               , set_defaults)
 #endif
 
       CALL sync_hist_vars_one (DEF_hist_vars%t_soisno    , set_defaults)

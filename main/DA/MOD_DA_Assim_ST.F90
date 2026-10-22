@@ -28,9 +28,9 @@ MODULE MOD_DA_Assim_ST
 
    type(ST_type) :: st
 
-   PUBLIC :: init_Assim_ST
-   PUBLIC :: run_Assim_ST
-   PUBLIC :: end_Assim_ST
+   PUBLIC :: init_assim_ST
+   PUBLIC :: run_assim_ST
+   PUBLIC :: end_assim_ST
 
 !-----------------------------------------------------------------------------
 
@@ -38,36 +38,33 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE init_Assim_ST ()
+   SUBROUTINE init_assim_ST ()
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
 
-      integer :: is, i, nstream
+      integer :: is, i, nsensor
       type(ST_config_type), allocatable :: configs(:)
 
 !-----------------------------------------------------------------------------
-      nstream = 0
+      nsensor = 0
       DO i = 1, size(DEF_DA_OBS_TARGET)
          IF (trim(DEF_DA_OBS_TARGET(i)) == 'ST') THEN
-            nstream = nstream + 1
+            nsensor = nsensor + 1
          ENDIF
       ENDDO
-      IF (nstream == 0) RETURN
+      IF (nsensor == 0) RETURN
 
-      allocate(configs(nstream))
+      allocate(configs(nsensor))
       is = 0
-      nstream = 0
       DO i = 1, size(DEF_DA_OBS_TARGET)
-         IF (trim(DEF_DA_OBS_TARGET(i)) == 'SM' .or. &
-             trim(DEF_DA_OBS_TARGET(i)) == 'ST') nstream = nstream + 1
          IF (trim(DEF_DA_OBS_TARGET(i)) == 'ST') THEN
             is = is + 1
             configs(is)%source_name = DEF_DA_OBS_SOURCE(i)
             configs(is)%sensor_name = DEF_DA_OBS_SENSOR(i)
             configs(is)%var_name    = DEF_DA_OBS_VAR(i)
             configs(is)%fghz        = DEF_DA_OBS_FGHZ(i)
-            configs(is)%istream     = nstream
+            configs(is)%istream     = i
          ENDIF
       ENDDO
 
@@ -75,11 +72,11 @@ CONTAINS
 
       deallocate(configs)
 
-   END SUBROUTINE init_Assim_ST
+   END SUBROUTINE init_assim_ST
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE run_Assim_ST (idate, deltim)
+   SUBROUTINE run_assim_ST (idate, deltim)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -152,11 +149,11 @@ CONTAINS
       ENDIF
       CALL st%clear()
 
-   END SUBROUTINE run_Assim_ST
+   END SUBROUTINE run_assim_ST
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE end_Assim_ST()
+   SUBROUTINE end_assim_ST()
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -170,7 +167,7 @@ CONTAINS
       st%pm%nsensor = 0
       st%use_pm = .false.
 
-   END SUBROUTINE end_Assim_ST
+   END SUBROUTINE end_assim_ST
 
 !-----------------------------------------------------------------------------
 END MODULE MOD_DA_Assim_ST

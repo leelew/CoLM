@@ -63,7 +63,7 @@
 #undef GridRiverLakeFlow
 #endif
 
-#define GridRiverLakeSediment
+#undef GridRiverLakeSediment
 #if (!defined GridRiverLakeFlow)
 #undef GridRiverLakeSediment
 #endif
@@ -88,7 +88,7 @@
 #undef LULCC
 
 ! 9. If defined, data assimilation is used.
-#define DataAssimilation
+#undef DataAssimilation
 #if (defined DataAssimilation)
 #define LULC_IGBP
 #undef LULC_USGS

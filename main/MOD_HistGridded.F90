@@ -253,6 +253,8 @@ CONTAINS
 
    type(block_data_real8_2d), intent(in) :: sumarea
    logical, intent(in) :: filter(:)
+   ! Optional per-slice masks: slice i1 is normalized by its own valid-patch
+   ! area, not by the area selected by the common filter.
    logical, intent(in), optional :: filter_3d(:,:)
    character (len=*), intent(in) :: longname
    character (len=*), intent(in) :: units

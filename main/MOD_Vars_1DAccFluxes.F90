@@ -4,8 +4,7 @@ MODULE MOD_Vars_1DAccFluxes
 
    USE MOD_Precision
 #ifdef DataAssimilation
-   USE MOD_DA_Vars_TimeVariables
-   USE MOD_DA_Vars_1DFluxes
+   USE MOD_DA_Vars_1DAccFluxes
    USE MOD_Namelist
 #endif
 #ifdef EXTERNAL_LAKE
@@ -111,21 +110,6 @@ MODULE MOD_Vars_1DAccFluxes
 
    real(r8), allocatable :: a_o3uptakesun(:)
    real(r8), allocatable :: a_o3uptakesha(:)
-
-#ifdef DataAssimilation
-   real(r8), allocatable :: a_hx_ol          (:,:)
-   real(r8), allocatable :: a_hx_f_ens       (:,:,:)
-   real(r8), allocatable :: a_hx_a_ens       (:,:,:)
-   real(r8), allocatable :: a_hx_f           (:,:)
-   real(r8), allocatable :: a_hx_a           (:,:)
-   real(r8), allocatable :: a_wliq_soisno_ol (:,:)
-   real(r8), allocatable :: a_wliq_soisno_f  (:,:)
-   real(r8), allocatable :: a_wliq_soisno_a  (:,:)
-   real(r8), allocatable :: a_wliq_soisno_ens(:,:,:)
-   real(r8), allocatable :: a_t_soisno_ol    (:,:)
-   real(r8), allocatable :: a_t_soisno_f     (:,:)
-   real(r8), allocatable :: a_t_soisno_a     (:,:)
-#endif
 
 #ifdef URBAN_MODEL
    real(r8), allocatable :: a_t_room    (:) !temperature of inner building [K]
@@ -503,15 +487,7 @@ CONTAINS
    IMPLICIT NONE
 
 #ifdef DataAssimilation
-   integer :: i
-#endif
-
-#ifdef DataAssimilation
-      nsource = 0
-      DO i = 1, size(DEF_DA_OBS_TARGET)
-         IF (trim(DEF_DA_OBS_TARGET(i)) == 'SM' .or. &
-             trim(DEF_DA_OBS_TARGET(i)) == 'ST') nsource = nsource + 1
-      ENDDO
+      CALL allocate_1D_DAAccFluxes ()
 #endif
 
       IF (p_is_worker) THEN
@@ -613,23 +589,6 @@ CONTAINS
 
             allocate (a_o3uptakesun(numpatch))
             allocate (a_o3uptakesha(numpatch))
-
-#ifdef DataAssimilation
-            IF (nsource > 0) THEN
-               allocate (a_hx_ol   (nsource,               numpatch))
-               allocate (a_hx_f_ens(nsource,DEF_DA_ENS_NUM,numpatch))
-               allocate (a_hx_a_ens(nsource,DEF_DA_ENS_NUM,numpatch))
-               allocate (a_hx_f    (nsource,               numpatch))
-               allocate (a_hx_a    (nsource,               numpatch))
-            ENDIF
-            allocate (a_wliq_soisno_ol (maxsnl+1:nl_soil,numpatch))
-            allocate (a_wliq_soisno_f  (maxsnl+1:nl_soil,numpatch))
-            allocate (a_wliq_soisno_a  (maxsnl+1:nl_soil,numpatch))
-            allocate (a_wliq_soisno_ens(maxsnl+1:nl_soil,DEF_DA_ENS_NUM,numpatch))
-            allocate (a_t_soisno_ol   (maxsnl+1:nl_soil,numpatch))
-            allocate (a_t_soisno_f    (maxsnl+1:nl_soil,numpatch))
-            allocate (a_t_soisno_a    (maxsnl+1:nl_soil,numpatch))
-#endif
 
 #ifdef URBAN_MODEL
             IF (numurban > 0) THEN
@@ -1115,18 +1074,7 @@ CONTAINS
             deallocate (a_o3uptakesha)
 
 #ifdef DataAssimilation
-            IF (allocated(a_hx_ol))    deallocate (a_hx_ol   )
-            IF (allocated(a_hx_f_ens)) deallocate (a_hx_f_ens)
-            IF (allocated(a_hx_a_ens)) deallocate (a_hx_a_ens)
-            IF (allocated(a_hx_f))     deallocate (a_hx_f    )
-            IF (allocated(a_hx_a))     deallocate (a_hx_a    )
-            deallocate (a_wliq_soisno_ol )
-            deallocate (a_wliq_soisno_f  )
-            deallocate (a_wliq_soisno_a  )
-            deallocate (a_wliq_soisno_ens)
-            deallocate (a_t_soisno_ol    )
-            deallocate (a_t_soisno_f     )
-            deallocate (a_t_soisno_a     )
+            CALL deallocate_1D_DAAccFluxes ()
 #endif
 
 #ifdef URBAN_MODEL
@@ -1614,18 +1562,7 @@ CONTAINS
             a_o3uptakesha(:) = spval
 
 #ifdef DataAssimilation
-            IF (allocated(a_hx_ol))    a_hx_ol   (:,:)   = spval
-            IF (allocated(a_hx_f_ens)) a_hx_f_ens(:,:,:) = spval
-            IF (allocated(a_hx_a_ens)) a_hx_a_ens(:,:,:) = spval
-            IF (allocated(a_hx_f))     a_hx_f    (:,:)   = spval
-            IF (allocated(a_hx_a))     a_hx_a    (:,:)   = spval
-            a_wliq_soisno_ol (:,:)   = spval
-            a_wliq_soisno_f  (:,:)   = spval
-            a_wliq_soisno_a  (:,:)   = spval
-            a_wliq_soisno_ens(:,:,:) = spval
-            a_t_soisno_ol    (:,:)   = spval
-            a_t_soisno_f     (:,:)   = spval
-            a_t_soisno_a     (:,:)   = spval
+            CALL flush_1D_DAAccFluxes ()
 #endif
 
 #ifdef URBAN_MODEL
@@ -2230,20 +2167,7 @@ CONTAINS
             ENDIF
 
 #ifdef DataAssimilation
-            IF (allocated(hx_f_ens) .and. allocated(a_hx_f_ens)) THEN
-               CALL acc2d (hx_ol   , a_hx_ol   )
-               CALL acc3d (hx_f_ens, a_hx_f_ens)
-               CALL acc3d (hx_a_ens, a_hx_a_ens)
-               CALL acc2d (hx_f    , a_hx_f    )
-               CALL acc2d (hx_a    , a_hx_a    )
-            ENDIF
-            CALL acc2d (wliq_soisno_ol, a_wliq_soisno_ol)
-            CALL acc2d (wliq_soisno_f , a_wliq_soisno_f )
-            CALL acc2d (wliq_soisno_a , a_wliq_soisno_a )
-            CALL acc3d (wliq_soisno_ens(:,1:DEF_DA_ENS_NUM,:), a_wliq_soisno_ens)
-            CALL acc2d (t_soisno_ol   , a_t_soisno_ol   )
-            CALL acc2d (t_soisno_f    , a_t_soisno_f    )
-            CALL acc2d (t_soisno_a    , a_t_soisno_a    )
+            CALL accumulate_1D_DAAccFluxes ()
 #endif
 
 #ifdef URBAN_MODEL

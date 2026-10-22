@@ -242,9 +242,7 @@ CONTAINS
             CASE ('SM')
                ! retrieved soil moisture: 0-5 cm layer mean of the top three layers
                DO iens = 0, DEF_DA_ENS_NUM
-                  IF (wliq_soisno_ens(1,iens,np) == spval .or. &
-                      wliq_soisno_ens(2,iens,np) == spval .or. &
-                      wliq_soisno_ens(3,iens,np) == spval) CYCLE
+                  IF (wliq_soisno_ens(1,iens,np) == spval) CYCLE
                   this%hx_pset(iens,np) = (wliq_soisno_ens(1,iens,np) + &
                      wliq_soisno_ens(2,iens,np) + &
                      wliq_soisno_ens(3,iens,np)*(0.05 - 0.0451)/(0.0906 - 0.0451)) / &

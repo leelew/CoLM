@@ -71,6 +71,7 @@ MODULE MOD_DA_Obs_BasicType
     USE MOD_Vars_Global, ONLY: spval
     USE MOD_SpatialMapping
     USE MOD_TimeManager
+    USE MOD_DA_Log
     IMPLICIT NONE
 
     type :: grid_obs_type
@@ -186,9 +187,7 @@ CONTAINS
         integer,  allocatable :: ii(:)         ! raw obs ii index read from file
         integer,  allocatable :: jj(:)         ! raw obs jj index read from file
         logical,  allocatable :: valid(:)      ! full-length mask for obs inside time window and domain
-        integer :: nbad_r                      ! debug count of invalid observation error variances
-        integer :: nbad_idx                    ! debug count of invalid grid indices in selected obs
-        integer :: nbad_theta                  ! debug count of invalid incidence angles in selected obs
+        character(len=512) :: logmsg           ! log message buffer
 
 !-----------------------------------------------------------------------------
 
@@ -209,8 +208,6 @@ CONTAINS
         obs_file_name = trim(DEF_DA_OBS_DIR)//'/'//trim(this%sensor_name)//'/'//trim(this%var_name)//'_'// &
             trim(yearstr)//'_'//trim(monthstr)//'_'//trim(daystr)//'_'//trim(hourstr)//'.nc'
         inquire (file=trim(obs_file_name), exist=exists_file)
-        IF (p_is_master) WRITE(*,'(A,A,A,L1)') '[CoLM-DA-DEBUG] obs file=', &
-            trim(obs_file_name), ' exists=', exists_file
 
         IF (exists_file) THEN
             CALL ncio_read_bcast_serial(obs_file_name, 'latitude', lat)
@@ -230,8 +227,6 @@ CONTAINS
                     lon  >= DEF_domain%edgew  .and. &
                     lon  <= DEF_domain%edgee
             this%nobs = count(valid)
-            IF (p_is_master) WRITE(*,'(A,A,A,I0,A,I0)') '[CoLM-DA-DEBUG] obs read sensor=', &
-                trim(this%sensor_name), ' raw_nobs=', size(time), ' selected_nobs=', this%nobs
 
             IF (this%nobs > 0) THEN
                 allocate (this%lat(this%nobs))
@@ -251,14 +246,6 @@ CONTAINS
                 this%theta  = pack(theta, valid)
                 this%ii     = pack(ii   , valid)
                 this%jj     = pack(jj   , valid)
-
-                nbad_r = count(this%r <= 0.0_r8 .or. this%r == spval)
-                nbad_idx = count(this%ii <= 0 .or. this%jj <= 0)
-                nbad_theta = count(this%theta == spval)
-                IF (p_is_master) WRITE(*,'(A,I0,A,ES12.4,A,ES12.4,A,I0,A,I0,A,I0)') &
-                    '[CoLM-DA-DEBUG] obs selected stats nobs=', this%nobs, &
-                    ' minR=', minval(this%r), ' maxR=', maxval(this%r), &
-                    ' badR=', nbad_r, ' badIdx=', nbad_idx, ' badTheta=', nbad_theta
             ENDIF
 
             IF (allocated(valid)) deallocate(valid)
@@ -271,6 +258,10 @@ CONTAINS
             IF (allocated(ii   )) deallocate(ii   )
             IF (allocated(jj   )) deallocate(jj   )
         ENDIF
+
+        write (logmsg,'(A,A,A,L1,A,I0)') 'obs file=', trim(obs_file_name), &
+            ' exists=', exists_file, ' selected_nobs=', this%nobs
+        CALL DA_log (logmsg)
 
     END SUBROUTINE grid_obs_read
 
