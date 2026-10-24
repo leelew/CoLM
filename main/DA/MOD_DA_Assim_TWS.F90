@@ -1,7 +1,7 @@
 #include <define.h>
 
 #ifdef DataAssimilation
-MODULE MOD_DA_TWS
+MODULE MOD_DA_Assim_TWS
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
 !    Data assimilation of terrestrial water storge from GRACE satellite
@@ -66,7 +66,7 @@ CONTAINS
    SUBROUTINE init_DA_GRACE ()
 
    USE MOD_Spmd_Task
-   USE MOD_Namelist, only : DEF_DA_obsdir
+   USE MOD_Namelist, only : DEF_DA_OBS_DIR
    USE MOD_Grid
    USE MOD_NetCDFSerial
    USE MOD_Mesh,     only : numelm
@@ -79,14 +79,16 @@ CONTAINS
    USE MOD_Vars_TimeInvariants, only : patchtype
    USE MOD_Forcing, only : forcmask_pch
    USE MOD_RangeCheck
+   USE MOD_DA_Log
    IMPLICIT NONE
 
    ! Local Variables
 
    real(r8), allocatable :: time_real8(:)
    integer :: itime
+   character(len=64) :: logmsg
 
-      file_grace = trim(DEF_DA_obsdir) &
+      file_grace = trim(DEF_DA_OBS_DIR) &
          // '/GRACE_JPL/GRCTellus.JPL.200204_202207.GLO.RL06M.MSCNv02CRI.nc'
 
       CALL ncio_read_bcast_serial (file_grace, 'time', time_real8)
@@ -99,12 +101,11 @@ CONTAINS
          CALL retrieve_yymm_from_days (time_real8(itime), obsyear(itime), obsmonth(itime))
       ENDDO
 
-      IF (p_is_master) THEN
-         write(*,*) 'Assimilate GRACE data at'
-         DO itime = 1, nobstime
-            write(*,*) obsyear(itime), obsmonth(itime)
-         ENDDO
-      ENDIF
+      CALL DA_log ('Assimilate GRACE data at:')
+      DO itime = 1, nobstime
+         write (logmsg,'(I4.4,"-",I2.2)') obsyear(itime), obsmonth(itime)
+         CALL DA_log (logmsg)
+      ENDDO
 
       CALL ncio_read_bcast_serial (file_grace, 'lon', longrace)
       CALL ncio_read_bcast_serial (file_grace, 'lat', latgrace)
@@ -183,6 +184,7 @@ CONTAINS
    USE MOD_Vars_TimeVariables,  only : wat, wa, wdsrf, zwt
    USE MOD_RangeCheck
    USE MOD_UserDefFun
+   USE MOD_DA_Log
    IMPLICIT NONE
 
    integer,  intent(in) :: idate(3)
@@ -205,10 +207,8 @@ CONTAINS
 
       is_obs_time = any((obsyear == idate(1)) .and. (obsmonth == month))
 
-      IF (p_is_master) THEN
-         IF (is_obs_time) THEN
-            write(*,*) 'GRACE at this time.'
-         ENDIF
+      IF (is_obs_time) THEN
+         CALL DA_log ('GRACE observation found at this time.')
       ENDIF
 
       IF (p_is_worker) THEN
@@ -436,5 +436,5 @@ CONTAINS
 
    END SUBROUTINE retrieve_yymm_from_days
 
-END MODULE MOD_DA_TWS
+END MODULE MOD_DA_Assim_TWS
 #endif
