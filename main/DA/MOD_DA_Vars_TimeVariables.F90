@@ -32,7 +32,6 @@ MODULE MOD_DA_Vars_TimeVariables
    USE MOD_SPMD_Task
    USE MOD_LandPatch, only: numpatch, landpatch
    USE MOD_NetCDFVector
-   USE MOD_DA_Log
 #ifdef GridRiverLakeFlow
    USE MOD_DataType
    USE MOD_NetCDFSerial
@@ -48,6 +47,8 @@ MODULE MOD_DA_Vars_TimeVariables
 
    PUBLIC :: allocate_DATimeVariables
    PUBLIC :: deallocate_DATimeVariables
+   PUBLIC :: allocate_1D_DAFluxes
+   PUBLIC :: deallocate_1D_DAFluxes
    PUBLIC :: READ_DATimeVariables
    PUBLIC :: WRITE_DATimeVariables
 #ifdef RangeCheck
@@ -128,6 +129,15 @@ MODULE MOD_DA_Vars_TimeVariables
    real(r8), allocatable :: t_soisno_a     (:,:)    ! ensemble-mean posterior temperature in layers  [K]
 
 !=============================================================================
+! surface flux variables
+!=============================================================================
+   real(r8), allocatable :: fsena_ens  (:,:) ! sensible heat from canopy height to atmosphere [W/m2]
+   real(r8), allocatable :: lfevpa_ens (:,:) ! latent heat flux from canopy height to atmosphere [W/m2]
+   real(r8), allocatable :: fevpa_ens  (:,:) ! evapotranspiration from canopy to atmosphere [mm/s]
+   real(r8), allocatable :: rsur_ens   (:,:) ! surface runoff (mm h2o/s)
+   real(r8), allocatable :: rnof_ens   (:,:) ! total runoff (mm h2o/s)
+
+!=============================================================================
 ! land-atmosphere coupling variables
 !=============================================================================
    real(r8), allocatable :: trad_ens  (:,:)  ! radiative temperature of surface [K]
@@ -169,8 +179,7 @@ CONTAINS
 !-----------------------------------------------------------------------------
       nsource = 0
       DO i = 1, size(DEF_DA_OBS_TARGET)
-         IF (trim(DEF_DA_OBS_TARGET(i)) == 'SM' .or. &
-             trim(DEF_DA_OBS_TARGET(i)) == 'ST') THEN
+         IF (len_trim(DEF_DA_OBS_TARGET(i)) > 0) THEN
             nsource = nsource + 1
          ENDIF
       ENDDO
@@ -365,6 +374,46 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
+   SUBROUTINE allocate_1D_DAFluxes ()
+
+!-----------------------------------------------------------------------------
+      IMPLICIT NONE
+
+!-----------------------------------------------------------------------------
+      IF (p_is_worker) THEN
+         IF (numpatch > 0) THEN
+            allocate ( fsena_ens  (0:DEF_DA_ENS_NUM, numpatch) )  ; fsena_ens  (:,:) = spval
+            allocate ( lfevpa_ens (0:DEF_DA_ENS_NUM, numpatch) )  ; lfevpa_ens (:,:) = spval
+            allocate ( fevpa_ens  (0:DEF_DA_ENS_NUM, numpatch) )  ; fevpa_ens  (:,:) = spval
+            allocate ( rsur_ens   (0:DEF_DA_ENS_NUM, numpatch) )  ; rsur_ens   (:,:) = spval
+            allocate ( rnof_ens   (0:DEF_DA_ENS_NUM, numpatch) )  ; rnof_ens   (:,:) = spval
+         ENDIF
+      ENDIF
+
+   END SUBROUTINE allocate_1D_DAFluxes
+
+!-----------------------------------------------------------------------------
+
+   SUBROUTINE deallocate_1D_DAFluxes()
+
+!-----------------------------------------------------------------------------
+      IMPLICIT NONE
+
+!-----------------------------------------------------------------------------
+      IF (p_is_worker) THEN
+         IF (numpatch > 0) THEN
+            deallocate ( fsena_ens  )
+            deallocate ( lfevpa_ens )
+            deallocate ( fevpa_ens  )
+            deallocate ( rsur_ens   )
+            deallocate ( rnof_ens   )
+         ENDIF
+      ENDIF
+
+   END SUBROUTINE deallocate_1D_DAFluxes
+
+!-----------------------------------------------------------------------------
+
    SUBROUTINE WRITE_DATimeVariables (idate, lc_year, site, dir_restart)
 
 !-----------------------------------------------------------------------------
@@ -493,13 +542,12 @@ CONTAINS
       logical            :: fexists               ! ensemble river states present in restart file
 
 !-----------------------------------------------------------------------------
-      CALL DA_log_set_date (idate)
 
 #ifdef USEMPI
       CALL mpi_barrier(p_comm_glb, p_err)
 #endif
 
-      CALL DA_log ('Loading DA Time Variables ...')
+      IF (p_is_master) WRITE (*,'(A)') '[CoLM-DA] Loading DA Time Variables ...'
 
       write (cyear, '(i4.4)') lc_year
       write (cdate, '(i4.4,"-",i3.3,"-",i5.5)') idate(1), idate(2), idate(3)
@@ -576,7 +624,7 @@ CONTAINS
       CALL check_DATimeVariables
 #endif
 
-      CALL DA_log ('Loading DA Time Variables done.')
+      IF (p_is_master) WRITE (*,'(A)') '[CoLM-DA] Loading DA Time Variables done.'
 
    END SUBROUTINE READ_DATimeVariables
 
@@ -591,7 +639,7 @@ CONTAINS
 #ifdef USEMPI
       CALL mpi_barrier(p_comm_glb, p_err)
 #endif
-      CALL DA_log ('Checking DA Time Variables ...')
+      IF (p_is_master) WRITE (*,'(A)') '[CoLM-DA] Checking DA Time Variables ...'
 
       CALL check_vector_data ('z_sno       [m]    ', z_sno_ens       )
       CALL check_vector_data ('dz_sno      [m]    ', dz_sno_ens      )

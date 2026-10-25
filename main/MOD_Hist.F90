@@ -34,10 +34,6 @@ MODULE MOD_Hist
 #endif
 #ifdef GridRiverLakeFlow
    USE MOD_Grid_RiverLakeHist
-#ifdef DataAssimilation
-   USE MOD_DA_Vars_Hist, only: hist_DA_riverlake_init, hist_DA_riverlake_out, &
-      hist_DA_riverlake_final
-#endif
 #endif
 #ifdef EXTERNAL_LAKE
    USE MOD_Lake_Hist
@@ -92,9 +88,6 @@ CONTAINS
 
 #ifdef GridRiverLakeFlow
       CALL hist_grid_riverlake_init (HistForm)
-#ifdef DataAssimilation
-      CALL hist_DA_riverlake_init ()
-#endif
 #endif
 
    END SUBROUTINE hist_init
@@ -116,9 +109,6 @@ CONTAINS
 
 #ifdef GridRiverLakeFlow
       CALL hist_grid_riverlake_final ()
-#ifdef DataAssimilation
-      CALL hist_DA_riverlake_final ()
-#endif
 #endif
 
    END SUBROUTINE hist_final
@@ -4529,10 +4519,6 @@ ENDIF
          CALL hist_grid_riverlake_out (file_hist, HistForm, idate, &
             itime_in_file, trim(file_hist)/=trim(file_last))
 
-#ifdef DataAssimilation
-         CALL hist_DA_riverlake_out (file_hist, idate)
-#endif
-
          IF (p_is_worker) THEN
             IF (numpatch > 0) THEN
                allocate (nac_one (numpatch))
@@ -4576,8 +4562,8 @@ ENDIF
 #endif
 
 #ifdef DataAssimilation
-         CALL hist_DA_history_out (file_hist, HistForm, itime_in_file, &
-            sumarea, filter, sumarea_one, nac_one)
+         CALL hist_DA_history_out (file_hist, HistForm, itime_in_file, idate, &
+            sumarea, filter)
 #endif
 
          IF (allocated(nac_one   )) deallocate (nac_one   )

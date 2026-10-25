@@ -12,7 +12,6 @@ MODULE MOD_DA_EnKF
 !-----------------------------------------------------------------------------
     USE MOD_Precision
     USE MOD_SPMD_Task
-    USE MOD_DA_Log
     IMPLICIT NONE
     SAVE
 
@@ -101,16 +100,6 @@ CONTAINS
         lwork = 4 * num_ens
         allocate( work(lwork) )
         CALL dsyev('V', 'U', num_ens, pa_inv, num_ens, eigval, work, lwork, err)
-
-        IF (err < 0) THEN
-            WRITE (logmsg,'(A,I0,A)') 'LETKF error: DSYEV argument ', -err, ' had an illegal value.'
-            CALL DA_log_error (logmsg)
-            CALL CoLM_stop()
-        ELSE IF (err > 0) THEN
-            WRITE (logmsg,'(A,I0)') 'LETKF error: DSYEV failed to converge, INFO = ', err
-            CALL DA_log_error (logmsg)
-            CALL CoLM_stop()
-        END IF
 
         eigvec = pa_inv !(kxk)
 

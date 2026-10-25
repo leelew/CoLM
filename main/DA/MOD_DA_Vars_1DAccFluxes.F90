@@ -15,6 +15,9 @@ MODULE MOD_DA_Vars_1DAccFluxes
    USE MOD_LandPatch
    USE MOD_Namelist, only: DEF_DA_ENS_NUM, DEF_DA_OBS_TARGET
    USE MOD_DA_Vars_TimeVariables
+#ifdef GridRiverLakeFlow
+   USE MOD_Grid_RiverLakeNetwork, only: numucat
+#endif
    IMPLICIT NONE
    SAVE
 
@@ -36,6 +39,13 @@ MODULE MOD_DA_Vars_1DAccFluxes
    real(r8), allocatable :: a_t_soisno_f     (:,:  ) ! ensemble-mean prior temperature in layers      [K]
    real(r8), allocatable :: a_t_soisno_a     (:,:  ) ! ensemble-mean posterior temperature in layers  [K]
 
+#ifdef GridRiverLakeFlow
+   real(r8), allocatable :: a_discharge_ol   (:) ! open-loop discharge sum                          [m^3/s*s]
+   real(r8), allocatable :: acctime_ucat_ol  (:) ! open-loop averaging time                         [s]
+   real(r8), allocatable :: a_discharge_a    (:) ! analysis discharge sum                           [m^3/s*s]
+   real(r8), allocatable :: acctime_ucat_a   (:) ! analysis averaging time                          [s]
+#endif
+
 !-----------------------------------------------------------------------------
 
 CONTAINS
@@ -52,8 +62,7 @@ CONTAINS
 !-----------------------------------------------------------------------------
       nsource = 0
       DO i = 1, size(DEF_DA_OBS_TARGET)
-         IF (trim(DEF_DA_OBS_TARGET(i)) == 'SM' .or. &
-             trim(DEF_DA_OBS_TARGET(i)) == 'ST') nsource = nsource + 1
+         IF (len_trim(DEF_DA_OBS_TARGET(i)) > 0) nsource = nsource + 1
       ENDDO
 
       IF (p_is_worker) THEN
@@ -73,6 +82,14 @@ CONTAINS
             allocate (a_t_soisno_f     (maxsnl+1:nl_soil,numpatch))
             allocate (a_t_soisno_a     (maxsnl+1:nl_soil,numpatch))
          ENDIF
+#ifdef GridRiverLakeFlow
+         IF (numucat > 0) THEN
+            allocate (a_discharge_ol (numucat))
+            allocate (acctime_ucat_ol(numucat))
+            allocate (a_discharge_a  (numucat))
+            allocate (acctime_ucat_a (numucat))
+         ENDIF
+#endif
       ENDIF
 
    END SUBROUTINE allocate_1D_DAAccFluxes
@@ -100,6 +117,12 @@ CONTAINS
             deallocate (a_t_soisno_f     )
             deallocate (a_t_soisno_a     )
          ENDIF
+#ifdef GridRiverLakeFlow
+         IF (allocated(a_discharge_ol )) deallocate (a_discharge_ol )
+         IF (allocated(acctime_ucat_ol)) deallocate (acctime_ucat_ol)
+         IF (allocated(a_discharge_a  )) deallocate (a_discharge_a  )
+         IF (allocated(acctime_ucat_a )) deallocate (acctime_ucat_a )
+#endif
       ENDIF
 
    END SUBROUTINE deallocate_1D_DAAccFluxes
@@ -127,6 +150,12 @@ CONTAINS
             a_t_soisno_f     (:,:)   = spval
             a_t_soisno_a     (:,:)   = spval
          ENDIF
+#ifdef GridRiverLakeFlow
+         IF (allocated(a_discharge_ol )) a_discharge_ol  (:) = spval
+         IF (allocated(acctime_ucat_ol)) acctime_ucat_ol (:) = spval
+         IF (allocated(a_discharge_a  )) a_discharge_a   (:) = 0.
+         IF (allocated(acctime_ucat_a )) acctime_ucat_a  (:) = 0.
+#endif
       ENDIF
 
    END SUBROUTINE flush_1D_DAAccFluxes

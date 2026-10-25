@@ -71,7 +71,6 @@ MODULE MOD_DA_Obs_BasicType
     USE MOD_Vars_Global, ONLY: spval
     USE MOD_SpatialMapping
     USE MOD_TimeManager
-    USE MOD_DA_Log
     IMPLICIT NONE
 
     type :: grid_obs_type
@@ -261,7 +260,7 @@ CONTAINS
 
         write (logmsg,'(A,A,A,L1,A,I0)') 'obs file=', trim(obs_file_name), &
             ' exists=', exists_file, ' selected_nobs=', this%nobs
-        CALL DA_log (logmsg)
+        IF (p_is_master) WRITE (*,'(A)') '[CoLM-DA] '//trim(logmsg)
 
     END SUBROUTINE grid_obs_read
 

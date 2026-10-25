@@ -19,7 +19,7 @@ MODULE MOD_Vars_1DFluxes
    USE MOD_Urban_Vars_1DFluxes
 #endif
 #ifdef DataAssimilation
-   USE MOD_DA_Vars_1DFluxes
+   USE MOD_DA_Vars_TimeVariables
 #endif
    IMPLICIT NONE
    SAVE

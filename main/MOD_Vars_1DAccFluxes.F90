@@ -973,6 +973,10 @@ CONTAINS
    IMPLICIT NONE
 
       IF (p_is_worker) THEN
+#ifdef DataAssimilation
+         CALL deallocate_1D_DAAccFluxes ()
+#endif
+
          IF (numpatch > 0) THEN
 
             deallocate (a_us     )
@@ -1072,10 +1076,6 @@ CONTAINS
 
             deallocate (a_o3uptakesun)
             deallocate (a_o3uptakesha)
-
-#ifdef DataAssimilation
-            CALL deallocate_1D_DAAccFluxes ()
-#endif
 
 #ifdef URBAN_MODEL
             IF (numurban > 0) THEN

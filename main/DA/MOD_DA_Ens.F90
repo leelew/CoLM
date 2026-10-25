@@ -17,12 +17,10 @@ MODULE MOD_DA_Ens
    USE MOD_Precision
    USE MOD_Namelist
    USE MOD_Vars_TimeVariables
-   USE MOD_DA_Vars_1DFluxes
    USE MOD_DA_Vars_TimeVariables
    USE MOD_Vars_1DForcing
    USE MOD_LandPatch
    USE MOD_SPMD_Task
-   USE MOD_DA_Log
 #ifdef GridRiverLakeFlow
    USE MOD_Vars_Global,            only: spval
    USE MOD_Grid_RiverLakeTimeVars, only: wdsrf_ucat, veloc_riv, volresv
@@ -138,10 +136,6 @@ CONTAINS
             L(i,j) = 0.0_r8
          ENDDO
       ENDDO
-      IF (info /= 0) THEN
-         CALL DA_log_error ('Error: Cholesky decomposition failed')
-         CALL CoLM_stop()
-      ENDIF
 
       ! Generate ensemble samples for forcing variables
       DO np = 1, numpatch

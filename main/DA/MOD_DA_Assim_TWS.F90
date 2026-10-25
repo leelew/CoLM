@@ -79,7 +79,6 @@ CONTAINS
    USE MOD_Vars_TimeInvariants, only : patchtype
    USE MOD_Forcing, only : forcmask_pch
    USE MOD_RangeCheck
-   USE MOD_DA_Log
    IMPLICIT NONE
 
    ! Local Variables
@@ -101,11 +100,13 @@ CONTAINS
          CALL retrieve_yymm_from_days (time_real8(itime), obsyear(itime), obsmonth(itime))
       ENDDO
 
-      CALL DA_log ('Assimilate GRACE data at:')
-      DO itime = 1, nobstime
-         write (logmsg,'(I4.4,"-",I2.2)') obsyear(itime), obsmonth(itime)
-         CALL DA_log (logmsg)
-      ENDDO
+      IF (p_is_master) THEN
+         WRITE (*,'(A)') '[CoLM-DA] Assimilate GRACE data at:'
+         DO itime = 1, nobstime
+            write (logmsg,'(I4.4,"-",I2.2)') obsyear(itime), obsmonth(itime)
+            WRITE (*,'(A)') '[CoLM-DA] '//trim(logmsg)
+         ENDDO
+      ENDIF
 
       CALL ncio_read_bcast_serial (file_grace, 'lon', longrace)
       CALL ncio_read_bcast_serial (file_grace, 'lat', latgrace)
@@ -184,7 +185,6 @@ CONTAINS
    USE MOD_Vars_TimeVariables,  only : wat, wa, wdsrf, zwt
    USE MOD_RangeCheck
    USE MOD_UserDefFun
-   USE MOD_DA_Log
    IMPLICIT NONE
 
    integer,  intent(in) :: idate(3)
@@ -201,14 +201,12 @@ CONTAINS
    type(block_data_real8_2d) :: f_grace_lwe ! unit: cm
    type(block_data_real8_2d) :: f_grace_err ! unit: cm
 
-   character(len=256) :: sid, logfile
-
       CALL julian2monthday (idate(1), idate(2), month, mday)
 
       is_obs_time = any((obsyear == idate(1)) .and. (obsmonth == month))
 
       IF (is_obs_time) THEN
-         CALL DA_log ('GRACE observation found at this time.')
+         IF (p_is_master) WRITE (*,'(A)') '[CoLM-DA] GRACE observation found at this time.'
       ENDIF
 
       IF (p_is_worker) THEN

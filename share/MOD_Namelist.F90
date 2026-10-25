@@ -474,10 +474,6 @@ MODULE MOD_Namelist
 ! DEF_DA_OBS_DIR
 !    Root directory of all observation files used by data assimilation.
 !
-! DEF_DA_LOG_FILE
-!    DA log file name, relative to the run directory by default. The log is
-!    always written; important messages are also echoed to standard output.
-!
 ! DEF_DA_OBS_SOURCE(:)
 !    Observation source type for each configured observation stream.
 !    Supported examples: 'PM', 'GNOS', 'AM', 'situ', 'GRACE', 'SR'
@@ -540,7 +536,6 @@ MODULE MOD_Namelist
 !    temperature assimilation.
 !---------------------------------------------------------------------------------
    character(len=256) :: DEF_DA_OBS_DIR            = ''
-   character(len=256) :: DEF_DA_LOG_FILE           = 'DA.log'
    character(len=16)  :: DEF_DA_OBS_SOURCE(10)     = ''
    character(len=16)  :: DEF_DA_OBS_SENSOR(10)     = ''
    character(len=16)  :: DEF_DA_OBS_VAR(10)        = ''
@@ -1005,6 +1000,7 @@ MODULE MOD_Namelist
       logical :: DA_hx_a                          = .false.
       logical :: DA_hx_f_ens                      = .false.
       logical :: DA_hx_a_ens                      = .false.
+      logical :: DA_discharge                     = .false.
 
       logical :: litr1c_vr                        = .true.
       logical :: litr2c_vr                        = .true.
@@ -1294,7 +1290,6 @@ CONTAINS
       DEF_ReservoirPara_file,                 &
 
       DEF_DA_OBS_DIR,                         &
-      DEF_DA_LOG_FILE,                        &
       DEF_DA_OBS_SOURCE,                      &
       DEF_DA_OBS_SENSOR,                      &
       DEF_DA_OBS_VAR,                         &
@@ -1893,7 +1888,6 @@ CONTAINS
       CALL mpi_bcast (DEF_ReservoirPara_file                 ,256 ,mpi_character ,p_address_master ,p_comm_glb ,p_err)
 
       CALL mpi_bcast (DEF_DA_OBS_DIR                         ,256 ,mpi_character ,p_address_master ,p_comm_glb ,p_err)
-      CALL mpi_bcast (DEF_DA_LOG_FILE                        ,256 ,mpi_character ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_OBS_SOURCE                      ,160,mpi_character ,p_address_master ,p_comm_glb  ,p_err)
       CALL mpi_bcast (DEF_DA_OBS_SENSOR                      ,160,mpi_character ,p_address_master ,p_comm_glb  ,p_err)
       CALL mpi_bcast (DEF_DA_OBS_VAR                         ,160,mpi_character ,p_address_master ,p_comm_glb  ,p_err)
@@ -2482,6 +2476,7 @@ CONTAINS
       CALL sync_hist_vars_one (DEF_hist_vars%DA_hx_a                   , set_defaults)
       CALL sync_hist_vars_one (DEF_hist_vars%DA_hx_f_ens               , set_defaults)
       CALL sync_hist_vars_one (DEF_hist_vars%DA_hx_a_ens               , set_defaults)
+      CALL sync_hist_vars_one (DEF_hist_vars%DA_discharge              , set_defaults)
 #endif
 
       CALL sync_hist_vars_one (DEF_hist_vars%t_soisno    , set_defaults)
