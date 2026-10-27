@@ -400,7 +400,7 @@ PROGRAM CoLM
 
 #ifdef DataAssimilation
       ! initialize data assimilation
-      CALL init_DA ()
+      CALL init_DA (sdate)
 #endif
 
       ! ======================================================================
@@ -515,7 +515,7 @@ PROGRAM CoLM
          CALL CheckEquilibrium (idate, deltim, i_spinupcycle, is_spinup, dir_hist, casename)
 
 #ifdef DataAssimilation
-         CALL run_DA (idate, deltim, dolai, doalb, dosst, oroflag)
+         CALL run_DA (idate, deltim, dolai, doalb, dosst, oroflag, is_spinup)
 #endif
 
          ! Write out the model histroy file

@@ -4,8 +4,7 @@ MODULE MOD_Vars_1DAccFluxes
 
    USE MOD_Precision
 #ifdef DataAssimilation
-   USE MOD_DA_Vars_TimeVariables
-   USE MOD_DA_Vars_1DFluxes
+   USE MOD_DA_Vars_1DAccFluxes
    USE MOD_Namelist
 #endif
 #ifdef EXTERNAL_LAKE
@@ -111,17 +110,6 @@ MODULE MOD_Vars_1DAccFluxes
 
    real(r8), allocatable :: a_o3uptakesun(:)
    real(r8), allocatable :: a_o3uptakesha(:)
-
-#ifdef DataAssimilation
-   real(r8), allocatable :: a_h2osoi_ens     (:,:,:)
-   real(r8), allocatable :: a_t_brt_smap_ens (:,:,:)
-   real(r8), allocatable :: a_t_brt_fy3d_ens (:,:,:)
-   real(r8), allocatable :: a_t_brt_smap       (:,:)
-   real(r8), allocatable :: a_t_brt_fy3d       (:,:)
-   real(r8), allocatable :: a_wliq_soisno_ens(:,:,:)
-   real(r8), allocatable :: a_wice_soisno_ens(:,:,:)
-   real(r8), allocatable :: a_t_soisno_ens   (:,:,:)
-#endif
 
 #ifdef URBAN_MODEL
    real(r8), allocatable :: a_t_room    (:) !temperature of inner building [K]
@@ -498,6 +486,10 @@ CONTAINS
    USE MOD_Vars_Global
    IMPLICIT NONE
 
+#ifdef DataAssimilation
+      CALL allocate_1D_DAAccFluxes ()
+#endif
+
       IF (p_is_worker) THEN
          IF (numpatch > 0) THEN
 
@@ -597,17 +589,6 @@ CONTAINS
 
             allocate (a_o3uptakesun(numpatch))
             allocate (a_o3uptakesha(numpatch))
-
-#ifdef DataAssimilation
-            allocate (a_h2osoi_ens            (1:nl_soil,DEF_DA_ENS_NUM,numpatch))
-            allocate (a_t_brt_smap_ens                (2,DEF_DA_ENS_NUM,numpatch))
-            allocate (a_t_brt_fy3d_ens                (2,DEF_DA_ENS_NUM,numpatch))
-            allocate (a_t_brt_smap                                   (2,numpatch))
-            allocate (a_t_brt_fy3d                                   (2,numpatch))
-            allocate (a_wliq_soisno_ens(maxsnl+1:nl_soil,DEF_DA_ENS_NUM,numpatch))
-            allocate (a_wice_soisno_ens(maxsnl+1:nl_soil,DEF_DA_ENS_NUM,numpatch))
-            allocate (a_t_soisno_ens   (maxsnl+1:nl_soil,DEF_DA_ENS_NUM,numpatch))
-#endif
 
 #ifdef URBAN_MODEL
             IF (numurban > 0) THEN
@@ -992,6 +973,10 @@ CONTAINS
    IMPLICIT NONE
 
       IF (p_is_worker) THEN
+#ifdef DataAssimilation
+         CALL deallocate_1D_DAAccFluxes ()
+#endif
+
          IF (numpatch > 0) THEN
 
             deallocate (a_us     )
@@ -1091,17 +1076,6 @@ CONTAINS
 
             deallocate (a_o3uptakesun)
             deallocate (a_o3uptakesha)
-
-#ifdef DataAssimilation
-            deallocate (a_h2osoi_ens     )
-            deallocate (a_t_brt_smap_ens )
-            deallocate (a_t_brt_fy3d_ens )
-            deallocate (a_t_brt_fy3d     )
-            deallocate (a_t_brt_smap     )
-            deallocate (a_wliq_soisno_ens)
-            deallocate (a_wice_soisno_ens)
-            deallocate (a_t_soisno_ens   )
-#endif
 
 #ifdef URBAN_MODEL
             IF (numurban > 0) THEN
@@ -1588,14 +1562,7 @@ CONTAINS
             a_o3uptakesha(:) = spval
 
 #ifdef DataAssimilation
-            a_h2osoi_ens     (:,:,:) = spval
-            a_t_brt_smap_ens (:,:,:) = spval
-            a_t_brt_fy3d_ens (:,:,:) = spval
-            a_t_brt_fy3d       (:,:) = spval
-            a_t_brt_smap       (:,:) = spval
-            a_wliq_soisno_ens(:,:,:) = spval
-            a_wice_soisno_ens(:,:,:) = spval
-            a_t_soisno_ens   (:,:,:) = spval
+            CALL flush_1D_DAAccFluxes ()
 #endif
 
 #ifdef URBAN_MODEL
@@ -2200,14 +2167,7 @@ CONTAINS
             ENDIF
 
 #ifdef DataAssimilation
-            CALL acc3d (h2osoi_ens     , a_h2osoi_ens     )
-            CALL acc3d (t_brt_smap_ens , a_t_brt_smap_ens )
-            CALL acc2d (t_brt_smap     , a_t_brt_smap     )
-            CALL acc3d (t_brt_fy3d_ens , a_t_brt_fy3d_ens )
-            CALL acc2d (t_brt_fy3d     , a_t_brt_fy3d     )
-            CALL acc3d (wliq_soisno_ens, a_wliq_soisno_ens)
-            CALL acc3d (wice_soisno_ens, a_wice_soisno_ens)
-            CALL acc3d (t_soisno_ens   , a_t_soisno_ens   )
+            CALL accumulate_1D_DAAccFluxes ()
 #endif
 
 #ifdef URBAN_MODEL

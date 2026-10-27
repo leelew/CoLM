@@ -1,7 +1,7 @@
 #include <define.h>
 
 #ifdef DataAssimilation
-MODULE MOD_DA_TWS
+MODULE MOD_DA_Assim_TWS
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
 !    Data assimilation of terrestrial water storge from GRACE satellite
@@ -66,7 +66,7 @@ CONTAINS
    SUBROUTINE init_DA_GRACE ()
 
    USE MOD_Spmd_Task
-   USE MOD_Namelist, only : DEF_DA_obsdir
+   USE MOD_Namelist, only : DEF_DA_OBS_DIR
    USE MOD_Grid
    USE MOD_NetCDFSerial
    USE MOD_Mesh,     only : numelm
@@ -85,8 +85,9 @@ CONTAINS
 
    real(r8), allocatable :: time_real8(:)
    integer :: itime
+   character(len=64) :: logmsg
 
-      file_grace = trim(DEF_DA_obsdir) &
+      file_grace = trim(DEF_DA_OBS_DIR) &
          // '/GRACE_JPL/GRCTellus.JPL.200204_202207.GLO.RL06M.MSCNv02CRI.nc'
 
       CALL ncio_read_bcast_serial (file_grace, 'time', time_real8)
@@ -100,9 +101,10 @@ CONTAINS
       ENDDO
 
       IF (p_is_master) THEN
-         write(*,*) 'Assimilate GRACE data at'
+         WRITE (*,'(A)') '[CoLM-DA] Assimilate GRACE data at:'
          DO itime = 1, nobstime
-            write(*,*) obsyear(itime), obsmonth(itime)
+            write (logmsg,'(I4.4,"-",I2.2)') obsyear(itime), obsmonth(itime)
+            WRITE (*,'(A)') '[CoLM-DA] '//trim(logmsg)
          ENDDO
       ENDIF
 
@@ -199,16 +201,12 @@ CONTAINS
    type(block_data_real8_2d) :: f_grace_lwe ! unit: cm
    type(block_data_real8_2d) :: f_grace_err ! unit: cm
 
-   character(len=256) :: sid, logfile
-
       CALL julian2monthday (idate(1), idate(2), month, mday)
 
       is_obs_time = any((obsyear == idate(1)) .and. (obsmonth == month))
 
-      IF (p_is_master) THEN
-         IF (is_obs_time) THEN
-            write(*,*) 'GRACE at this time.'
-         ENDIF
+      IF (is_obs_time) THEN
+         IF (p_is_master) WRITE (*,'(A)') '[CoLM-DA] GRACE observation found at this time.'
       ENDIF
 
       IF (p_is_worker) THEN
@@ -436,5 +434,5 @@ CONTAINS
 
    END SUBROUTINE retrieve_yymm_from_days
 
-END MODULE MOD_DA_TWS
+END MODULE MOD_DA_Assim_TWS
 #endif

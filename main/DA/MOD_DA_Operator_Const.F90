@@ -1,14 +1,14 @@
 #include <define.h>
 
 #ifdef DataAssimilation
-MODULE MOD_DA_Const
+MODULE MOD_DA_Operator_Const
 !-----------------------------------------------------------------------
 ! DESCRIPTION:
 ! 1. Define constants (do not rely on satellite parameters) used in RTM.
 ! 2. Define parameters (IGBP) used in RTM.
 !
 ! REFERENCES:
-!   [1] L-band Microwave Emission of the Biosphere (L-MEB) Model:  Description 
+!   [1] L-band Microwave Emission of the Biosphere (L-MEB) Model:  Description
 !       and calibration against experimental data sets over crop fields.
 !
 !   [2] Wigneron, J. P., Jackson, T. J., O'neill, P., De Lannoy, G., de Rosnay, P., Walker,
@@ -29,10 +29,9 @@ MODULE MOD_DA_Const
    ! Constant variables
    real(r8), parameter :: C = 2.998e8           ! speed of light (m/s)
    real(r8), parameter :: mu0 = 4.*pi*1e-7      ! vacuum permeability (H/m)
-   real(r8), parameter :: eps0 = 8.854e-12      ! vacuum permittivity (Klein and Swift 1977) [Farads/meter]
-   real(r8), parameter :: z0 = sqrt(mu0/eps0)   ! impendace of free space (Ohm)
-   real(r8), parameter :: eps_w_inf = 4.9       ! dielectric constant at infinite frequency (Stogryn 1971),
    real(r8), parameter :: eps_0 = 8.854e-12     ! dielectric constant of free space (Klein and Swift 1977) [Farads/meter]
+   real(r8), parameter :: z0 = sqrt(mu0/eps_0)  ! impedance of free space (Ohm)
+   real(r8), parameter :: eps_w_inf = 4.9       ! dielectric constant at infinite frequency (Stogryn 1971),
    real(r8), parameter :: rho_soil = 2.66       ! soil specific density (g/cm3)
    real(r8), parameter :: f0w = 9.              ! relaxation frequency of liquid water (GHz)
    real(r8), parameter :: rgh_surf = 2.2        ! soil surface roughness (cm)
@@ -130,14 +129,14 @@ MODULE MOD_DA_Const
           0.030, 0.050, 0.040, 0.020, 0.030, &
           0.000, 0.040, 0.000, 0.020, 0.000, &
           0.000, 0.000/)
-   
+
    real(r8), parameter, dimension(N_land_classification) :: w_SMAPL4 &
       = (/0.120, 0.080, 0.120, 0.100, 0.120, &
           0.140, 0.110, 0.130, 0.120, 0.070, &
           0.000, 0.120, 0.000, 0.150, 0.000, &
-          0.000, 0.000/)  
+          0.000, 0.000/)
 #endif
 
-END MODULE MOD_DA_Const
+END MODULE MOD_DA_Operator_Const
 !-----------------------------------------------------------------------------
 #endif
