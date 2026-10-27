@@ -144,6 +144,10 @@ MODULE MOD_DA_Vars_TimeVariables
    real(r8), allocatable :: tref_ens  (:,:)  ! 2 m height air temperature       [kelvin]
    real(r8), allocatable :: qref_ens  (:,:)  ! 2 m height air specific humidity
    real(r8), allocatable :: rhref_ens (:,:)  ! 2 m height air relative humidity
+   real(r8), allocatable :: tref_f    (:)    ! ensemble-mean prior 2 m air temperature       [K]
+   real(r8), allocatable :: tref_a    (:)    ! ensemble-mean posterior 2 m air temperature   [K]
+   real(r8), allocatable :: qref_f    (:)    ! ensemble-mean prior 2 m air specific humidity [kg/kg]
+   real(r8), allocatable :: qref_a    (:)    ! ensemble-mean posterior 2 m specific humidity [kg/kg]
    real(r8), allocatable :: ustar_ens (:,:)  ! u* in similarity theory          [m/s]
    real(r8), allocatable :: qstar_ens (:,:)  ! q* in similarity theory          [kg/kg]
    real(r8), allocatable :: tstar_ens (:,:)  ! t* in similarity theory          [K]
@@ -244,6 +248,10 @@ CONTAINS
             allocate (tref_ens                        (0:DEF_DA_ENS_NUM,numpatch)); tref_ens          (:,:) = spval
             allocate (qref_ens                        (0:DEF_DA_ENS_NUM,numpatch)); qref_ens          (:,:) = spval
             allocate (rhref_ens                       (0:DEF_DA_ENS_NUM,numpatch)); rhref_ens         (:,:) = spval
+            allocate (tref_f                          (numpatch)); tref_f            (:) = spval
+            allocate (tref_a                          (numpatch)); tref_a            (:) = spval
+            allocate (qref_f                          (numpatch)); qref_f            (:) = spval
+            allocate (qref_a                          (numpatch)); qref_a            (:) = spval
             allocate (ustar_ens                       (0:DEF_DA_ENS_NUM,numpatch)); ustar_ens         (:,:) = spval
             allocate (qstar_ens                       (0:DEF_DA_ENS_NUM,numpatch)); qstar_ens         (:,:) = spval
             allocate (tstar_ens                       (0:DEF_DA_ENS_NUM,numpatch)); tstar_ens         (:,:) = spval
@@ -343,6 +351,10 @@ CONTAINS
             deallocate (tref_ens                         )
             deallocate (qref_ens                         )
             deallocate (rhref_ens                        )
+            deallocate (tref_f                           )
+            deallocate (tref_a                           )
+            deallocate (qref_f                           )
+            deallocate (qref_a                           )
             deallocate (ustar_ens                        )
             deallocate (qstar_ens                        )
             deallocate (tstar_ens                        )

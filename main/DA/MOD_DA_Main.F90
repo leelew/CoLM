@@ -16,6 +16,7 @@ MODULE MOD_DA_Main
    USE MOD_LandPatch
    USE MOD_DA_Assim_SM
    USE MOD_DA_Assim_ST
+   USE MOD_DA_Assim_2MTQ
    USE MOD_DA_Ens
    USE MOD_Vars_1DFluxes, only: rnof
 #ifdef GridRiverLakeFlow
@@ -31,6 +32,7 @@ MODULE MOD_DA_Main
 
    logical :: use_assim_sm = .false.
    logical :: use_assim_st = .false.
+   logical :: use_assim_2mtq = .false.
 
 !-----------------------------------------------------------------------------
 
@@ -64,11 +66,19 @@ CONTAINS
             EXIT
          ENDIF
       ENDDO
+      use_assim_2mtq = .false.
+      DO i = 1, size(DEF_DA_OBS_TARGET)
+         IF (trim(DEF_DA_OBS_TARGET(i)) == '2MTQ') THEN
+            use_assim_2mtq = .true.
+            EXIT
+         ENDIF
+      ENDDO
 
       IF (p_is_master) THEN
          WRITE (*,'(A)') '[CoLM-DA] Initialize data assimilation.'
          IF (use_assim_sm) WRITE (*,'(A)') '[CoLM-DA] Start surface soil moisture (SM) data assimilation.'
          IF (use_assim_st) WRITE (*,'(A)') '[CoLM-DA] Start soil temperature (ST) data assimilation.'
+         IF (use_assim_2mtq) WRITE (*,'(A)') '[CoLM-DA] Start SYNOP 2 m temperature/humidity (2MTQ) data assimilation.'
 
          n = 0
          WRITE (*,'(A)') '[CoLM-DA] Assimilation observation sources:'
@@ -98,6 +108,7 @@ CONTAINS
 
       IF (use_assim_sm) CALL init_assim_SM ()
       IF (use_assim_st) CALL init_assim_ST ()
+      IF (use_assim_2mtq) CALL init_assim_2MTQ ()
 
    END SUBROUTINE init_DA
 
@@ -146,6 +157,9 @@ CONTAINS
       ENDIF
       IF (use_assim_st) THEN
          CALL run_assim_ST (idate, deltim)
+      ENDIF
+      IF (use_assim_2mtq) THEN
+         CALL run_assim_2MTQ (idate, deltim)
       ENDIF
 
    END SUBROUTINE run_DA
@@ -217,6 +231,8 @@ CONTAINS
       use_assim_sm = .false.
       IF (use_assim_st) CALL end_assim_ST ()
       use_assim_st = .false.
+      IF (use_assim_2mtq) CALL end_assim_2MTQ ()
+      use_assim_2mtq = .false.
 
    END SUBROUTINE end_DA
 

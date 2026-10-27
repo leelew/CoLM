@@ -290,12 +290,15 @@ OBJS_MAIN = \
 				MOD_DA_Operator_RTM.o                     \
 				MOD_DA_EnKF.o                             \
 				MOD_DA_Ens.o                              \
-				MOD_DA_Obs_BasicType.o                    \
+				MOD_DA_Grid_Type.o                        \
+				MOD_DA_Site_Type.o                        \
+				MOD_DA_Obs_SYNOP.o                        \
 				MOD_DA_Obs_PM.o                           \
 				MOD_DA_Obs_SM.o                           \
 				MOD_DA_Obs_ST.o                           \
 				MOD_DA_Assim_SM.o                         \
 				MOD_DA_Assim_ST.o                         \
+				MOD_DA_Assim_2MTQ.o                       \
 				MOD_Opt_Baseflow.o                        \
 				MOD_ParameterOptimization.o               \
 				MOD_AssimStomataConductance.o             \

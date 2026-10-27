@@ -36,7 +36,7 @@ MODULE MOD_DA_Obs_PM
    USE MOD_Precision
    USE MOD_Const_Physical, ONLY: denh2o
    USE MOD_DataType
-   USE MOD_DA_Obs_BasicType
+   USE MOD_DA_Grid_Type
    USE MOD_DA_Operator_RTM
    USE MOD_DA_Vars_TimeVariables
    USE MOD_Vars_TimeInvariants
