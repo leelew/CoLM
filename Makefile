@@ -74,22 +74,28 @@ ${OBJS_SHARED} : %.o : %.F90 ${HEADER}
 OBJS_SHARED_T = $(addprefix .bld/,${OBJS_SHARED})
 
 OBJS_MKSRFDATA = \
-				  Aggregation_PercentagesPFT.o      \
-				  Aggregation_LAI.o                 \
-				  Aggregation_SoilHyperAlbedo.o     \
-				  Aggregation_SoilBrightness.o      \
-				  Aggregation_LakeDepth.o           \
-				  Aggregation_ForestHeight.o        \
-				  Aggregation_SoilParameters.o      \
-				  Aggregation_DBedrock.o            \
-				  Aggregation_Topography.o          \
-				  Aggregation_TopoWetness.o         \
-				  Aggregation_TopographyFactors.o   \
+				  Aggregation_PercentagesPFT.o           \
+				  Aggregation_LAI.o                      \
+				  Aggregation_SoilHyperAlbedo.o          \
+				  Aggregation_SoilBrightness.o           \
+				  Aggregation_LakeDepth.o                \
+				  Aggregation_ForestHeight.o             \
+				  Aggregation_CanopyStructure.o          \
+				  Aggregation_SoilParameters.o           \
+				  Aggregation_DBedrock.o                 \
+				  Aggregation_Topography.o               \
+				  Aggregation_TopoWetness.o              \
+				  Aggregation_TopographyFactors.o        \
 				  Aggregation_TopographyFactors_Simple.o \
-				  Aggregation_Urban.o               \
-				  Aggregation_SoilTexture.o         \
-				  MOD_Lulcc_TransferTrace.o         \
+				  Aggregation_Urban.o                    \
+				  Aggregation_SoilTexture.o              \
+				  MOD_Lulcc_TransferTrace.o              \
+				  MOD_UnitCatchmentSubset.o              \
+				  MOD_UnitCatchmentRegional.o            \
 				  MKSRFDATA.o
+
+MOD_UnitCatchmentRegional.o: MOD_UnitCatchmentSubset.o
+MKSRFDATA.o: MOD_UnitCatchmentRegional.o
 
 $(OBJS_MKSRFDATA) : %.o : %.F90 ${HEADER} ${OBJS_SHARED}
 	${FF} -c ${FOPTS} $(INCLUDE_DIR) -o .bld/$@ $< ${MOD_CMD}.bld
@@ -108,72 +114,79 @@ mksrfdata.x : mkdir_build ${HEADER} ${OBJS_SHARED} ${OBJS_MKSRFDATA}
 # ----- End of Target 1 mksrfdata ----
 
 OBJS_BASIC =    \
-				 MOD_Vector_ReadWrite.o         \
-				 MOD_dataSpec_PDB.o             \
-				 MOD_tav_abs.o                  \
-				 MOD_prospect_DB.o              \
-				 MOD_Catch_BasinNetwork.o       \
-				 MOD_Catch_Vars_TimeVariables.o \
-				 MOD_Catch_Vars_1DFluxes.o      \
-				 MOD_Grid_RiverLakeNetwork.o    \
-				 MOD_Grid_Reservoir.o           \
+				 MOD_Vector_ReadWrite.o          \
+				 MOD_dataSpec_PDB.o              \
+				 MOD_tav_abs.o                   \
+				 MOD_prospect_DB.o               \
+				 MOD_Catch_BasinNetwork.o        \
+				 MOD_Catch_Vars_TimeVariables.o  \
+				 MOD_Catch_Vars_1DFluxes.o       \
+				 MOD_Grid_RiverLakePush.o        \
+				 MOD_Grid_RiverLakeVectorIO.o    \
+				 MOD_Grid_RiverLakeNetwork.o     \
+				 MOD_Grid_Reservoir.o            \
+				 MOD_Grid_RiverLakeLevee.o       \
+				 MOD_Grid_RiverLakeBifurcation.o \
+				 MOD_Grid_RiverLakeHistState.o   \
+				 MOD_Grid_RiverLakeHistShard.o   \
+				 MOD_Grid_RiverLakeHistRoute.o   \
 				 MOD_Grid_RiverLakeSediment.o   \
-				 MOD_Grid_RiverLakeTimeVars.o   \
-				 MOD_BGC_Vars_1DFluxes.o        \
-				 MOD_BGC_Vars_1DPFTFluxes.o     \
-				 MOD_BGC_Vars_PFTimeVariables.o \
-				 MOD_BGC_Vars_TimeInvariants.o  \
-				 MOD_BGC_Vars_TimeVariables.o   \
-				 MOD_Urban_Vars_1DFluxes.o      \
-				 MOD_Urban_Vars_TimeVariables.o \
-				 MOD_Urban_Vars_TimeInvariants.o\
-				 MOD_DA_Vars_TimeVariables.o    \
-				 MOD_DA_Vars_1DAccFluxes.o      \
-				 MOD_Vars_TimeInvariants.o      \
-				 MOD_Vars_TimeVariables.o       \
-				 MOD_Vars_1DPFTFluxes.o         \
-				 MOD_Vars_1DFluxes.o            \
-				 MOD_Vars_1DForcing.o           \
-				 MOD_Hydro_SoilFunction.o       \
-				 MOD_Hydro_SoilWater.o          \
-				 MOD_Eroot.o                    \
-				 MOD_Qsadv.o                    \
-				 MOD_LAIEmpirical.o             \
-				 MOD_LAIReadin.o                \
-				 MOD_CropReadin.o               \
-				 MOD_NitrifData.o               \
-				 MOD_NdepData.o                 \
-				 MOD_FireData.o                 \
-				 MOD_OrbCoszen.o                \
-				 MOD_OrbCosazi.o                \
-				 MOD_HighRes_Parameters.o		\
-				 MOD_3DCanopyRadiation.o        \
-				 MOD_Aerosol.o                  \
-				 MOD_SnowSnicar.o               \
-				 MOD_Albedo.o                   \
-				 MOD_SnowSnicar_HiRes.o			\
-				 MOD_Albedo_HiRes.o				\
-				 MOD_SnowFraction.o             \
-				 MOD_Urban_LAIReadin.o          \
-				 MOD_Urban_Shortwave.o          \
-				 MOD_Urban_Albedo.o             \
-				 MOD_MonthlyinSituCO2MaunaLoa.o \
-				 MOD_PercentagesPFTReadin.o     \
-				 MOD_LakeDepthReadin.o          \
-				 MOD_DBedrockReadin.o           \
-				 MOD_SoilColorRefl.o            \
-				 MOD_SoilParametersReadin.o     \
-				 MOD_SoilTextureReadin.o        \
-				 MOD_HtopReadin.o               \
-				 MOD_UrbanReadin.o              \
-				 MOD_BGC_CNSummary.o            \
-				 MOD_IniTimeVariable.o          \
-				 MOD_UrbanIniTimeVariable.o     \
-				 MOD_ElementNeighbour.o         \
-				 MOD_Catch_HillslopeNetwork.o   \
-				 MOD_Catch_RiverLakeNetwork.o   \
-				 MOD_Catch_Reservoir.o          \
-				 MOD_VicParaReadin.o            \
+				 MOD_Grid_RiverLakeTimeVars.o    \
+				 MOD_BGC_Vars_1DFluxes.o         \
+				 MOD_BGC_Vars_1DPFTFluxes.o      \
+				 MOD_BGC_Vars_PFTimeVariables.o  \
+				 MOD_BGC_Vars_TimeInvariants.o   \
+				 MOD_BGC_Vars_TimeVariables.o    \
+				 MOD_Urban_Vars_1DFluxes.o       \
+				 MOD_Urban_Vars_TimeVariables.o  \
+				 MOD_Urban_Vars_TimeInvariants.o \
+				 MOD_Vars_TimeInvariants.o       \
+				 MOD_DA_Vars_TimeVariables.o     \
+				 MOD_DA_Vars_1DAccFluxes.o       \
+				 MOD_Vars_TimeVariables.o        \
+				 MOD_Vars_1DPFTFluxes.o          \
+				 MOD_Vars_1DFluxes.o             \
+				 MOD_Vars_1DForcing.o            \
+				 MOD_Hydro_SoilFunction.o        \
+				 MOD_Hydro_SoilWater.o           \
+				 MOD_Eroot.o                     \
+				 MOD_Qsadv.o                     \
+				 MOD_LAIEmpirical.o              \
+				 MOD_LAIReadin.o                 \
+				 MOD_CropReadin.o                \
+				 MOD_NitrifData.o                \
+				 MOD_NdepData.o                  \
+				 MOD_FireData.o                  \
+				 MOD_OrbCoszen.o                 \
+				 MOD_OrbCosazi.o                 \
+				 MOD_HighRes_Parameters.o        \
+				 MOD_3DCanopyRadiation.o         \
+				 MOD_Aerosol.o                   \
+				 MOD_SnowSnicar.o                \
+				 MOD_Albedo.o                    \
+				 MOD_SnowSnicar_HiRes.o          \
+				 MOD_Albedo_HiRes.o              \
+				 MOD_SnowFraction.o              \
+				 MOD_Urban_LAIReadin.o           \
+				 MOD_Urban_Shortwave.o           \
+				 MOD_Urban_Albedo.o              \
+				 MOD_MonthlyinSituCO2MaunaLoa.o  \
+				 MOD_PercentagesPFTReadin.o      \
+				 MOD_LakeDepthReadin.o           \
+				 MOD_DBedrockReadin.o            \
+				 MOD_SoilColorRefl.o             \
+				 MOD_SoilParametersReadin.o      \
+				 MOD_SoilTextureReadin.o         \
+				 MOD_HtopReadin.o                \
+				 MOD_UrbanReadin.o               \
+				 MOD_BGC_CNSummary.o             \
+				 MOD_IniTimeVariable.o           \
+				 MOD_UrbanIniTimeVariable.o      \
+				 MOD_ElementNeighbour.o          \
+				 MOD_Catch_HillslopeNetwork.o    \
+				 MOD_Catch_RiverLakeNetwork.o    \
+				 MOD_Catch_Reservoir.o           \
+				 MOD_VicParaReadin.o             \
 				 MOD_Initialize.o
 
 
@@ -216,6 +229,7 @@ OBJECTS_CAMA=\
 				  yos_cmf_prog.o          \
 				  yos_cmf_diag.o          \
 				  cmf_utils_mod.o         \
+				  cmf_coupling_budget_mod.o \
 				  cmf_calc_outflw_mod.o   \
 				  cmf_calc_pthout_mod.o   \
 				  cmf_calc_fldstg_mod.o   \
@@ -238,6 +252,8 @@ OBJECTS_CAMA=\
 				  cmf_ctrl_nmlist_mod.o   \
 				  cmf_drv_control_mod.o   \
 				  cmf_drv_advance_mod.o
+
+cmf_coupling_budget_mod.o: parkind1.o
 
 $(OBJECTS_CAMA) : %.o : %.F90 ${HEADER}
 	$(FCMP)  -c ${FFLAGS} $(MODS) ${CFLAGS} $(INCLUDE_DIR) -o .bld/$@ $< ${MOD_CMD}.bld
@@ -325,9 +341,10 @@ OBJS_MAIN = \
 				MOD_RainSnowTemp.o                        \
 				MOD_SoilSurfaceResistance.o               \
 				MOD_NewSnow.o                             \
+				MOD_CaMa_Vars.o                           \
+				MOD_CaMa_colmCaMa.o                       \
 				MOD_Thermal.o                             \
 				MOD_Vars_1DAccFluxes.o                    \
-				MOD_CaMa_Vars.o                           \
 				MOD_Irrigation.o                          \
 				MOD_BGC_driver.o                          \
 				MOD_HistWriteBack.o                       \
@@ -339,7 +356,6 @@ OBJS_MAIN = \
 				MOD_Hist.o                                \
 				MOD_CheckEquilibrium.o                    \
 				MOD_LightningData.o                       \
-				MOD_CaMa_colmCaMa.o                       \
 				MOD_Catch_LateralFlow.o                   \
 				MOD_Grid_RiverLakeFlow.o                  \
 				MOD_DA_Main.o                             \
@@ -371,8 +387,14 @@ $(OBJS_MAIN) : %.o : %.F90 ${HEADER} ${OBJS_SHARED} ${OBJS_BASIC}
 	${FF} -c ${FOPTS} $(INCLUDE_DIR) -o .bld/$@ $< ${MOD_CMD}.bld
 
 MOD_Urban_Thermal.o: MOD_Urban_Flux.o
-MOD_Grid_RiverLakeSediment.o: MOD_Grid_RiverLakeNetwork.o MOD_Vector_ReadWrite.o
-MOD_Grid_RiverLakeTimeVars.o: MOD_Grid_RiverLakeSediment.o
+MOD_LeafTemperature.o MOD_LeafTemperaturePC.o: MOD_LeafInterception.o
+MOD_Grid_RiverLakeNetwork.o: MOD_Grid_RiverLakePush.o
+MOD_Grid_RiverLakeBifurcation.o MOD_Grid_RiverLakeHistRoute.o MOD_Grid_RiverLakeTimeVars.o: MOD_Grid_RiverLakeVectorIO.o
+MOD_Grid_RiverLakeLevee.o: MOD_Grid_RiverLakeNetwork.o MOD_Vector_ReadWrite.o
+MOD_Grid_RiverLakeBifurcation.o: MOD_Grid_Reservoir.o MOD_Grid_RiverLakeLevee.o
+MOD_Grid_RiverLakeHistRoute.o: MOD_Grid_RiverLakeHistShard.o MOD_Grid_Reservoir.o
+MOD_Grid_RiverLakeTimeVars.o: MOD_Grid_RiverLakeBifurcation.o MOD_Grid_RiverLakeLevee.o
+MOD_Vars_TimeVariables.o: MOD_Grid_RiverLakeTimeVars.o
 MOD_Grid_RiverLakeFlow.o: MOD_Grid_RiverLakeHist.o
 
 OBJS_MAIN_T = $(addprefix .bld/,${OBJS_MAIN})
@@ -408,9 +430,11 @@ endif
 OBJS_POST1 = MOD_Concatenate.o HistConcatenate.o
 OBJS_POST2 = MOD_Vector2Grid.o POST_Vector2Grid.o
 OBJS_POST3 = SrfDataConcatenate.o
+OBJS_POST4 = RiverHistConcatenate.o
 OBJS_POST1_T = $(addprefix .bld/,${OBJS_POST1})
 OBJS_POST2_T = $(addprefix .bld/,${OBJS_POST2})
 OBJS_POST3_T = $(addprefix .bld/,${OBJS_POST3})
+OBJS_POST4_T = $(addprefix .bld/,${OBJS_POST4})
 
 $(OBJS_POST1):%.o:%.F90 ${HEADER}
 	${FF} -c ${FOPTS} $(INCLUDE_DIR) -o .bld/$@ $< ${MOD_CMD}.bld
@@ -419,6 +443,9 @@ $(OBJS_POST2):%.o:%.F90 ${HEADER}
 	${FF} -c ${FOPTS} $(INCLUDE_DIR) -o .bld/$@ $< ${MOD_CMD}.bld
 
 $(OBJS_POST3):%.o:%.F90 ${HEADER}
+	${FF} -c ${FOPTS} $(INCLUDE_DIR) -o .bld/$@ $< ${MOD_CMD}.bld
+
+$(OBJS_POST4):%.o:%.F90 ${HEADER} ${OBJS_SHARED}
 	${FF} -c ${FOPTS} $(INCLUDE_DIR) -o .bld/$@ $< ${MOD_CMD}.bld
 
 hist_concatenate.x : ${HEADER} ${OBJS_SHARED} ${OBJS_POST1}
@@ -430,6 +457,9 @@ post_vector2grid.x : ${HEADER} ${OBJS_SHARED} ${OBJS_POST2}
 srfdata_concatenate.x : ${HEADER} ${OBJS_SHARED} ${OBJS_POST3}
 	${FF} ${FOPTS} ${OBJS_SHARED_T} ${OBJS_POST3_T} -o run/$@ ${LDFLAGS}
 
+river_hist_concatenate.x : ${HEADER} ${OBJS_SHARED} ${OBJS_POST4}
+	${FF} ${FOPTS} ${OBJS_SHARED_T} ${OBJS_POST4_T} -o run/$@ ${LDFLAGS}
+
 # ------ Target 4: postprocess --------
 DEF = $(shell grep -i CATCHMENT include/define.h)
 vector2grid = $(word 1, ${DEF})
@@ -440,10 +470,10 @@ endif
 
 .PHONY: postprocess.x
 ifneq (${vector2grid},\#define)
-postprocess.x : mkdir_build hist_concatenate.x srfdata_concatenate.x
+postprocess.x : mkdir_build hist_concatenate.x river_hist_concatenate.x srfdata_concatenate.x
 	@echo '<<<<<<<<<<<<<<<<<<<<<<<<< making CoLM postprocessing completed!'
 else
-postprocess.x : mkdir_build hist_concatenate.x srfdata_concatenate.x post_vector2grid.x
+postprocess.x : mkdir_build hist_concatenate.x river_hist_concatenate.x srfdata_concatenate.x post_vector2grid.x
 	@echo '<<<<<<<<<<<<<<<<<<<<<<<<< making CoLM postprocessing completed!'
 endif
 # --- End of Target 4 postprocess ------
@@ -464,5 +494,5 @@ clean :
 	rm -rf .bld
 	rm -rf lib libcolm.a
 	rm -f run/mksrfdata.x run/mkinidata.x run/colm.x
-	rm -f run/hist_concatenate.x run/srfdata_concatenate.x run/post_vector2grid.x
+	rm -f run/hist_concatenate.x run/river_hist_concatenate.x run/srfdata_concatenate.x run/post_vector2grid.x
 	rm -f CaMa/src/*.o CaMa/src/*.mod CaMa/src/*.a

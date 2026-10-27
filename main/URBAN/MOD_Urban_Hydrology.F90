@@ -62,7 +62,7 @@ CONTAINS
         sm_roof        ,sm_gimp        ,sm_gper        ,sm_lake        ,&
         lake_icefrac   ,scv_lake       ,snowdp_lake    ,imelt_lake     ,&
         fioldl         ,w_old                                          ,&
-#if (defined CaMa_Flood)
+#if (defined CaMa_Flood) || (defined GridRiverLakeFlow)
         flddepth       ,fldfrc         ,qinfl_fld                      ,&
 #endif
         forc_us        ,forc_vs                                        ,&
@@ -71,8 +71,6 @@ CONTAINS
         mss_bcpho      ,mss_bcphi      ,mss_ocpho      ,mss_ocphi      ,&
         mss_dst1       ,mss_dst2       ,mss_dst3       ,mss_dst4       ,&
 ! END SNICAR model variables
-!  irrigaiton 
-        qflx_irrig_drip,qflx_irrig_flood,qflx_irrig_paddy              ,&
         ! output
         rsur           ,rnof           ,qinfl          ,zwt            ,&
         wdsrf          ,wa             ,qcharge        ,smp            ,hk)
@@ -158,7 +156,7 @@ CONTAINS
 
    real(r8), intent(inout) :: rootflux(1:nl_soil)
 
-#if (defined CaMa_Flood)
+#if (defined CaMa_Flood) || (defined GridRiverLakeFlow)
    real(r8), intent(inout) :: flddepth  ! inundation water depth [mm]
    real(r8), intent(in)    :: fldfrc    ! inundation water depth [0-1]
    real(r8), intent(out)   :: qinfl_fld ! grid averaged inundation water input from top (mm/s)
@@ -183,13 +181,6 @@ CONTAINS
         mss_dst4  (lbp:0)               ! mass of dust species 4 in snow  (col,lyr) [kg]
 ! Aerosol Fluxes (Jan. 07, 2023)
 ! END SNICAR model variables
-
-!  For irrigation 
-   real(r8), intent(in) :: &
-        qflx_irrig_drip               ,&! drip irrigation rate [mm/s]
-        qflx_irrig_flood              ,&! flood irrigation rate [mm/s]
-        qflx_irrig_paddy                ! paddy irrigation rate [mm/s]
-!  END irrigation
 
    integer, intent(in) :: &
         imelt_lake(maxsnl+1:nl_soil)    ! lake flag for melting or freezing snow and soil layer [-]
@@ -283,15 +274,13 @@ CONTAINS
              0.          ,& ! fsno, not active
              rsur_gper   ,rnof_gper   ,qinfl       ,pondmx      ,ssi         ,&
              wimp        ,smpmin      ,zwt         ,wdsrf       ,wa          ,qcharge     ,&
-#if (defined CaMa_Flood)
+#if (defined CaMa_Flood) || (defined GridRiverLakeFlow)
              flddepth    ,fldfrc      ,qinfl_fld                             ,&
 #endif
 ! SNICAR model variables
              forc_aer                                                        ,&
              mss_bcpho   ,mss_bcphi   ,mss_ocpho   ,mss_ocphi                ,&
-             mss_dst1    ,mss_dst2    ,mss_dst3    ,mss_dst4                 ,&
-!  irrigation variables
-             qflx_irrig_drip   ,qflx_irrig_flood  ,qflx_irrig_paddy            )
+             mss_dst1    ,mss_dst2    ,mss_dst3    ,mss_dst4                  )
 
 !=======================================================================
 ! [2] for roof and impervious road

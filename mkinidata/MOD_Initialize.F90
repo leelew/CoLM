@@ -72,6 +72,7 @@ CONTAINS
 #ifdef GridRiverLakeFlow
    USE MOD_Grid_RiverLakeNetwork
    USE MOD_Grid_Reservoir
+   USE MOD_Grid_RiverLakeLevee, only: levee_init, levsto, levdph
 #endif
 #ifdef CROP
    USE MOD_CropReadin
@@ -262,6 +263,10 @@ CONTAINS
    !BVIC          =   1.0  0.050,    0.080,    0.090,    0.250,    0.150,    0.180,    0.200,    0.220,    0.230,    0.250,    0.280,    0.300
    !re-arranged BVIC for USDA soil texture class:
    real(r8), parameter :: BVIC_USDA(0:12) = (/ 1., 0.300,  0.280, 0.250, 0.230,  0.220, 0.200,  0.180, 0.100,  0.090, 0.150, 0.080,  0.050/)
+#ifdef GridRiverLakeFlow
+   ! Levee-protected storage held across the LULCC re-initialization (see below).
+   real(r8), allocatable :: levsto_lulcc(:), levdph_lulcc(:)
+#endif
 
 
 
@@ -270,10 +275,33 @@ CONTAINS
 #endif
 
 #ifdef GridRiverLakeFlow
+      ! LULCC re-runs the initialization with the network already built: release it first.
+      ! The unit catchments do not change, but the patch-to-grid runoff mapping does.
+      IF (present(lulcc_call)) CALL riverlake_network_final ()
       CALL build_riverlake_network ()
 
       IF (DEF_Reservoir_Method > 0) THEN
+         ! LULCC: the reservoir tables of the previous year are still allocated.
+         IF (present(lulcc_call)) CALL reservoir_final ()
          CALL reservoir_init ()
+      ENDIF
+
+      IF (DEF_USE_LEVEE) THEN
+         ! LULCC: levee_init rebuilds the (unchanged) levee geometry and zeroes the
+         ! protected-side state; levsto/levdph are river state like those kept by
+         ! hold/restore_GridRiverLakeTimeVars_lulcc, so carry them across.
+         IF (present(lulcc_call) .and. allocated(levsto)) THEN
+            levsto_lulcc = levsto
+            levdph_lulcc = levdph
+         ENDIF
+         CALL levee_init ()
+         IF (allocated(levsto_lulcc)) THEN
+            IF (size(levsto_lulcc) == size(levsto)) THEN
+               levsto = levsto_lulcc
+               levdph = levdph_lulcc
+            ENDIF
+            deallocate (levsto_lulcc, levdph_lulcc)
+         ENDIF
       ENDIF
 #endif
 
@@ -379,6 +407,24 @@ ENDIF
          ENDIF
       ENDIF
 #endif
+
+      ! [GridRiverLakeFlow] Only some runoff schemes read these, but all are written
+      ! into the constant restart, so with any other scheme (e.g. DEF_Runoff_SCHEME = 0,
+      ! which grid flood feedback and CaMa flood feedback require) uninitialised memory
+      ! was written there and runs differed between process counts.  Give them a
+      ! defined value first (soil texture 0 = no class).
+      ! Results are unchanged: a scheme that uses them sets them right below
+      ! (soiltext_readin, BVIC) or reads them later, and no other scheme reads them.
+      IF (p_is_worker) THEN
+         IF (numpatch > 0) THEN
+            soiltext(:) = 0
+            BVIC    (:) = BVIC_USDA(0)
+            topoweti(:) = 0.
+            alp_twi (:) = 0.
+            chi_twi (:) = 0.
+            mu_twi  (:) = 0.
+         ENDIF
+      ENDIF
 
 #ifdef CatchLateralFlow
       use_soiltext = .true.
@@ -679,19 +725,28 @@ ENDIF
       soilpsi_off     = -0.8
 
       ! constant for fire module
+      occur_hi_gdp_tree        = 0.33
+      borealat                 = 60._r8
+      non_boreal_peatfire_c    = 0.71e-4_r8
+      nonborpeat_fire_precip_denom = 6.5_r8
+      boreal_peatfire_c        = 0.28e-4_r8
+      borpeat_fire_soilmoist_denom = 0.35_r8
+      prh30                    = 0.6_r8
+      max_rh30_affecting_fuel  = 95._r8
+      ignition_efficiency      = 0.22_r8
       occur_hi_gdp_tree        = 0.39_r8
       lfuel                    = 75._r8
-      ufuel                    = 650._r8
+      ufuel                    = 825._r8
       cropfire_a1              = 0.3_r8
       borealat                 = 40._r8/(4.*atan(1.))
       troplat                  = 23.5_r8/(4.*atan(1.))
-      non_boreal_peatfire_c    = 0.001_r8
-      boreal_peatfire_c        = 4.2e-5_r8
+      non_boreal_peatfire_c    = 0.000071_r8
+      boreal_peatfire_c        = 0.28e-4_r8
       rh_low                   = 30.0_r8
-      rh_hgh                   = 80.0_r8
-      bt_min                   = 0.3_r8
-      bt_max                   = 0.7_r8
-      pot_hmn_ign_counts_alpha = 0.0035_r8
+      rh_hgh                   = 85.0_r8
+      bt_min                   = 0.85_r8
+      bt_max                   = 0.98_r8
+      pot_hmn_ign_counts_alpha = 0.01_r8
       g0_fire                  = 0.05_r8
 
       sf     = 0.1_r8
@@ -1035,12 +1090,18 @@ ENDIF
                         IF(isevg(ivt))THEN
                            leafc_p            (m) = amin1(leafcin_p(m),300._r8)
                            frootc_p           (m) = frootcin_p(m)
-                        ELSE
-                           leafc_p            (m) = amin1(leafcin_p(m),300._r8)
-                           leafc_storage_p    (m) = amin1(leafc_storagein_p(m),600._r8)
-                           frootc_p           (m) = frootcin_p(m)
-                           frootc_storage_p   (m) = frootc_storagein_p(m)
-                        ENDIF
+                         ELSE
+                            leafc_p            (m) = amin1(leafcin_p(m),300._r8)
+                            leafc_storage_p    (m) = amin1(leafc_storagein_p(m),600._r8)
+                            frootc_p           (m) = frootcin_p(m)
+                            frootc_storage_p   (m) = frootc_storagein_p(m)
+                            IF(leafc_storage_p(m) <= 0._r8)THEN
+                               leafc_storage_p(m) = fstor2tran * max(leafc_p(m), 1._r8)
+                            ENDIF
+                            IF(frootc_storage_p(m) <= 0._r8)THEN
+                               frootc_storage_p(m) = fstor2tran * max(frootc_p(m), 1._r8)
+                            ENDIF
+                         ENDIF
                         IF(woody(ivt).eq. 1)THEN
                            deadstemc_p        (m) = deadstemcin_p(m)
                            livestemc_p        (m) = livestemcin_p(m)
