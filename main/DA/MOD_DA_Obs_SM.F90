@@ -19,6 +19,9 @@ MODULE MOD_DA_Obs_SM
 !         H(x);
 !      4. concatenate all enabled source/sensor observations into one vector;
 !      5. prepare localized patch-level y, R, and H(x) arrays for LETKF.
+!    ANA2MTQ uses patch-mean SYNOP analysis products held in TimeVariables.
+!    Its nearby-patch rows are appended in prepare(), not concat(), so
+!    nobs below counts only observations selected by the spatial search.
 !
 !    Source-level parameters, such as PM sensor, variable, and frequency,
 !    are passed to the corresponding source module config type.
@@ -39,9 +42,9 @@ MODULE MOD_DA_Obs_SM
 
    type :: SM_config_type
 
-      character(len=16) :: source_name ! 'PM', 'GNOS', 'AM', 'situ'
+      character(len=16) :: source_name ! 'PM', 'GNOS', 'AM', 'situ', 'ANA2MTQ'
       character(len=32) :: sensor_name ! 'SMAP', 'SMOS', 'CYGNSS', 'FY3D', 'ISMN', etc.
-      character(len=16) :: var_name    ! 'TB_H', 'TB_V', 'SM', 'DDM'
+      character(len=16) :: var_name    ! 'TB_H', 'TB_V', 'SM', 'DDM', '2MTQ'
       real(r8) :: fghz                 ! frequency in GHz
       integer  :: istream              ! index of this stream in the shared hx_* diagnostics
 
@@ -54,6 +57,7 @@ MODULE MOD_DA_Obs_SM
 
       logical :: use_pm = .false.
       logical :: use_gnos = .false.
+      logical :: use_ana2mtq = .false.
 
       ! assimilation parameters
       real(r8) :: dres      ! search radius for observations around a target patch [deg]
@@ -108,9 +112,9 @@ CONTAINS
 !-----------------------------------------------------------------------------
       this%use_pm = .false.
       this%use_gnos = .false.
+      this%use_ana2mtq = .false.
 
       IF (allocated(this%cfgs)) deallocate(this%cfgs)
-      IF (size(configs) == 0) RETURN
 
       allocate(this%cfgs(size(configs)))
       this%cfgs = configs
@@ -145,7 +149,11 @@ CONTAINS
          deallocate(pm_configs)
       ENDIF
 
-      !//TODO: initialize other source types (GNOS, AM, situ)
+      this%use_ana2mtq = any(configs%source_name == 'ANA2MTQ')
+      IF (this%use_ana2mtq) THEN
+         IF (.not. any(DEF_DA_OBS_SOURCE == 'SYNOP' .and. DEF_DA_OBS_TARGET == '2MTQ')) &
+            ERROR STOP 'ANA2MTQ requires a screen level analysis'
+      ENDIF
 
    END SUBROUTINE SM_type_init
 
@@ -336,55 +344,99 @@ CONTAINS
       real(r8), allocatable,  intent(out) :: r_p(:)
 
 !------------------------ Local Variables ------------------------------------
-      integer :: iens, iobs, n
+      integer :: iens, iobs, ip, n, k
       real(r8) :: lat_p, lon_p, dlat, dlon
+      real(r8) :: delta_t, delta_q
       logical,  allocatable :: valid(:)
+      logical,  allocatable :: valid_ana2mtq(:)
       real(r8), allocatable :: lat(:)
       real(r8), allocatable :: lon(:)
       real(r8), allocatable :: dist(:)
 
 !-----------------------------------------------------------------------------
       nobs_p = 0
+      lat_p = patchlatr(np)*180/pi
+      lon_p = patchlonr(np)*180/pi
 
-      ! find the nearest y values around target patch
+      ! Select the existing PM/source observations around the target patch.
       allocate(valid(this%nobs))
       valid = .false.
-      IF (this%nobs > 0) THEN
-         lat_p = patchlatr(np)*180/pi
-         lon_p = patchlonr(np)*180/pi
-         DO iobs = 1, this%nobs
-            dlat = abs(this%lat(iobs) - lat_p)
-            dlon = abs(this%lon(iobs) - lon_p)
-            IF (dlon > 180) dlon = 360 - dlon
+      DO iobs = 1, this%nobs
+         dlat = abs(this%lat(iobs) - lat_p)
+         dlon = abs(this%lon(iobs) - lon_p)
+         IF (dlon > 180) dlon = 360 - dlon
 
-            valid(iobs) = dlat < this%dres .and. dlon < this%dres .and. &
-                          this%y(iobs) /= spval .and. all(this%hx(iobs,:) /= spval)
-         ENDDO
-      ENDIF
+         valid(iobs) = dlat < this%dres .and. dlon < this%dres .and. &
+                       this%y(iobs) /= spval .and. all(this%hx(iobs,:) /= spval)
+      ENDDO
       n = count(valid)
-      IF (n == 0) RETURN
       nobs_p = n
 
-      ! pack the valid y and H(x)
-      allocate(y_p(n))
-      allocate(hx_p(n, DEF_DA_ENS_NUM))
-      y_p = pack(this%y, valid)
-      DO iens = 1, DEF_DA_ENS_NUM
-         hx_p(:,iens) = pack(this%hx(:,iens), valid)
-      ENDDO
+      ! ANA2MTQ observations are located at patch centres. Select T/q as a
+      ! pair; every selected nearby patch contributes two observation rows.
+      allocate(valid_ana2mtq(size(patchlatr)))
+      valid_ana2mtq = .false.
+      IF (this%use_ana2mtq) THEN
+         DO ip = 1, size(patchlatr)
+            dlat = abs(patchlatr(ip)*180/pi - lat_p)
+            dlon = abs(patchlonr(ip)*180/pi - lon_p)
+            IF (dlon > 180) dlon = 360 - dlon
 
-      ! calculate distance between y and patch, then inflate R with the Gaspari-Cohn function
-      allocate(r_p(n))
-      allocate(lat(n))
-      allocate(lon(n))
-      allocate(dist(n))
-      lat = pack(this%lat, valid)
-      lon = pack(this%lon, valid)
+            valid_ana2mtq(ip) = dlat < this%dres .and. dlon < this%dres .and. &
+                                tref_f(ip) /= tref_a(ip) .and. qref_f(ip) /= qref_a(ip) .and. &
+                                tref_a(ip) /= spval .and. qref_a(ip) /= spval .and. &
+                                tref_f(ip) /= spval .and. qref_f(ip) /= spval .and. &
+                                all(tref_ens(1:DEF_DA_ENS_NUM,ip) /= spval) .and. &
+                                all(qref_ens(1:DEF_DA_ENS_NUM,ip) /= spval)
+
+         ENDDO
+
+         nobs_p = nobs_p + 2*count(valid_ana2mtq)
+      ENDIF
+      IF (nobs_p == 0) RETURN
+
+      allocate(y_p(nobs_p))
+      allocate(hx_p(nobs_p, DEF_DA_ENS_NUM))
+      allocate(r_p(nobs_p))
+      allocate(lat(nobs_p))
+      allocate(lon(nobs_p))
+      allocate(dist(nobs_p))
+
+      ! Keep the original source rows first.
+      IF (n > 0) THEN
+         y_p(1:n) = pack(this%y, valid)
+         DO iens = 1, DEF_DA_ENS_NUM
+            hx_p(1:n,iens) = pack(this%hx(:,iens), valid)
+         ENDDO
+         r_p(1:n) = pack(this%r, valid)
+         lat(1:n) = pack(this%lat, valid)
+         lon(1:n) = pack(this%lon, valid)
+      ENDIF
+
+      ! Append paired T/q increments and ensemble values for nearby patches.
+      IF (this%use_ana2mtq) THEN
+         k = n
+         DO ip = 1, size(valid_ana2mtq)
+            IF (.not. valid_ana2mtq(ip)) CYCLE
+            delta_t = tref_a(ip) - tref_f(ip)
+            delta_q = qref_a(ip) - qref_f(ip)
+            y_p(k+1) = delta_t
+            y_p(k+2) = delta_q
+            hx_p(k+1,:) = tref_ens(1:DEF_DA_ENS_NUM,ip) - delta_t
+            hx_p(k+2,:) = qref_ens(1:DEF_DA_ENS_NUM,ip) - delta_q
+            r_p(k+1:k+2) = 0.01_r8
+            lat(k+1:k+2) = patchlatr(ip)*180/pi
+            lon(k+1:k+2) = patchlonr(ip)*180/pi
+            k = k + 2
+         ENDDO
+      ENDIF
+
+      ! Apply the same distance-dependent R inflation to all observations.
       dist = 2.0*6378.1*asin(sqrt( &
          sin((lat*pi/180.0 - patchlatr(np))/2.0)**2 + &
          cos(lat*pi/180.0)*cos(patchlatr(np))* &
          sin((lon*pi/180.0 - patchlonr(np))/2.0)**2))
-      r_p = pack(this%r, valid) / max(exp(-(dist**2)/(2.0*this%locr**2)), 1.0e-6)
+      r_p = r_p / max(exp(-(dist**2)/(2.0*this%locr**2)), 1.0e-6)
 
    END SUBROUTINE SM_type_prepare_on_pset
 

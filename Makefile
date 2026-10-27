@@ -306,10 +306,11 @@ OBJS_MAIN = \
 				MOD_DA_Operator_RTM.o                     \
 				MOD_DA_EnKF.o                             \
 				MOD_DA_Ens.o                              \
-				MOD_DA_Obs_BasicType.o                    \
+				MOD_DA_Obs_GridType.o                    \
 				MOD_DA_Obs_PM.o                           \
 				MOD_DA_Obs_SM.o                           \
 				MOD_DA_Obs_ST.o                           \
+				MOD_DA_Assim_2MTQ.o                       \
 				MOD_DA_Assim_SM.o                         \
 				MOD_DA_Assim_ST.o                         \
 				MOD_Opt_Baseflow.o                        \
@@ -385,6 +386,14 @@ OBJS_MAIN = \
 
 $(OBJS_MAIN) : %.o : %.F90 ${HEADER} ${OBJS_SHARED} ${OBJS_BASIC}
 	${FF} -c ${FOPTS} $(INCLUDE_DIR) -o .bld/$@ $< ${MOD_CMD}.bld
+
+# DA module dependencies (the renamed grid source still defines BasicType).
+MOD_DA_Obs_PM.o: MOD_DA_Obs_GridType.o MOD_DA_Operator_RTM.o
+MOD_DA_Obs_SM.o: MOD_DA_Obs_PM.o
+MOD_DA_Obs_ST.o: MOD_DA_Obs_PM.o
+MOD_DA_Assim_SM.o: MOD_DA_Obs_SM.o MOD_DA_EnKF.o
+MOD_DA_Assim_ST.o: MOD_DA_Obs_ST.o MOD_DA_EnKF.o
+MOD_DA_Main.o: MOD_DA_Assim_2MTQ.o MOD_DA_Assim_SM.o MOD_DA_Assim_ST.o MOD_DA_Ens.o
 
 MOD_Urban_Thermal.o: MOD_Urban_Flux.o
 MOD_LeafTemperature.o MOD_LeafTemperaturePC.o: MOD_LeafInterception.o

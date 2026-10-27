@@ -592,6 +592,8 @@ MODULE MOD_Namelist
 ! DEF_DA_OBS_SOURCE(:)
 !    Observation source type for each configured observation stream.
 !    Supported examples: 'PM', 'GNOS', 'AM', 'situ', 'GRACE', 'SR'
+!    'ANA2MTQ' with VAR='2MTQ', TARGET='SM' uses patch SYNOP analyses;
+!    requires a 'SYNOP' stream with VAR='2MTQ', TARGET='2MTQ'.
 !
 ! DEF_DA_OBS_SENSOR(:)
 !    Sensor or product name for each observation stream. This name is also used
