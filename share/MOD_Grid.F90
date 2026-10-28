@@ -105,6 +105,7 @@ MODULE MOD_Grid
    type :: grid_concat_type
       integer :: ndatablk
       integer :: nxseg, nyseg
+      integer :: ilon0 = 1, ilat0 = 1
       type(segment_type), allocatable :: xsegs(:), ysegs(:)
       type(grid_info_type) :: ginfo
    CONTAINS
@@ -202,6 +203,12 @@ CONTAINS
       IF (trim(gridname) == 'colm_100m') THEN
 
          CALL this%define_by_ndims (432000,216000)
+
+      ENDIF
+
+      IF (trim(gridname) == 'colm_30m') THEN
+
+         CALL this%define_by_ndims (1296000,648000)
 
       ENDIF
 
@@ -548,7 +555,7 @@ CONTAINS
          this%ydsp(jblk) = ilat - 1
 
          DO WHILE (ilat <= this%nlat)
-            IF (this%lat_s(ilat) < edgen) THEN
+            IF (this%lat_s(ilat)-edgen < -1.e-10) THEN
                IF (this%lat_s(ilat) < gblock%lat_n(jblk)) THEN
 
                   this%ycnt(jblk) = this%ycnt(jblk) + 1
@@ -586,7 +593,7 @@ CONTAINS
          this%ydsp(jblk) = ilat - 1
 
          DO WHILE (ilat <= this%nlat)
-            IF (this%lat_n(ilat) > edges) THEN
+            IF (this%lat_n(ilat)-edges > 1.e-10) THEN
                IF (this%lat_n(ilat) > gblock%lat_s(jblk)) THEN
 
                   this%ycnt(jblk) = this%ycnt(jblk) + 1
@@ -781,6 +788,7 @@ CONTAINS
       ilat_l = findloc_ud(grid%yblk /= 0)
       ilat_u = findloc_ud(grid%yblk /= 0, back=.true.)
 
+      this%ilat0 = ilat_l
       this%ginfo%nlat = ilat_u - ilat_l + 1
       IF (allocated(this%ginfo%lat_s)) deallocate(this%ginfo%lat_s)
       IF (allocated(this%ginfo%lat_n)) deallocate(this%ginfo%lat_n)
@@ -850,6 +858,7 @@ CONTAINS
          ENDDO
       ENDIF
 
+      this%ilon0 = ilon_w
       this%ginfo%nlon = ilon_e - ilon_w + 1
       IF (this%ginfo%nlon <= 0) THEN
          this%ginfo%nlon = this%ginfo%nlon + grid%nlon

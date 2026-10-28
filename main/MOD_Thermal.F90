@@ -37,7 +37,8 @@ CONTAINS
                        rss           ,gssun_out     ,gssha_out     ,assimsun_out  ,&
                        etrsun_out    ,assimsha_out  ,etrsha_out    ,&
 !photosynthesis and plant hydraulic variables
-                       effcon        ,vmax25        ,c3c4          ,hksati        ,smp     ,hk   ,&
+                       effcon        ,vmax25        ,c3c4          ,hksati        ,&
+                       smp           ,hk            ,&
                        kmax_sun      ,kmax_sha      ,kmax_xyl      ,kmax_root     ,&
                        psi50_sun     ,psi50_sha     ,psi50_xyl     ,psi50_root    ,&
                        ck            ,vegwp         ,gs0sun        ,gs0sha        ,&
@@ -73,7 +74,11 @@ CONTAINS
                        zol           ,rib           ,ustar         ,qstar         ,&
                        tstar         ,fm            ,fh            ,fq            ,&
                        pg_rain       ,pg_snow       ,t_precip      ,qintr_rain    ,&
-                       qintr_snow    ,snofrz        ,sabg_snow_lyr                 )
+                       qintr_snow    ,snofrz        ,sabg_snow_lyr                 &
+#if (defined CaMa_Flood) || (defined GridRiverLakeFlow)
+                      ,flddepth      ,fldfrc        ,fevpg_fld                    &
+#endif
+                       )
 
 !=======================================================================
 !  this is the main subroutine to execute the calculation
@@ -132,6 +137,19 @@ CONTAINS
    USE MOD_SPMD_Task
    USE MOD_Namelist, only: DEF_USE_PLANTHYDRAULICS, DEF_RSS_SCHEME, DEF_SPLIT_SOILSNOW, &
                            DEF_USE_LCT,DEF_USE_PFT,DEF_USE_PC,DEF_PC_CROP_SPLIT
+#if (defined CaMa_Flood) || (defined GridRiverLakeFlow)
+   USE MOD_CaMa_colmCaMa, only: get_fldevp
+#ifdef CaMa_Flood
+   USE YOS_CMF_INPUT, only: LWEVAP
+#else
+   ! [GridRiverLakeFlow] Grid flood feedback reuses the CaMa flood-feedback code paths
+   ! (all "CaMa_Flood || GridRiverLakeFlow" blocks in this file), with its namelist
+   ! switch in place of CaMa's LWEVAP.  CaMa_Flood builds are unchanged, and with
+   ! DEF_GridRiverLake_FloodFeedback = .false. (default) the blocks do nothing, as
+   ! without them (checked: land restart bit-identical to upstream).
+   USE MOD_Namelist, only: LWEVAP => DEF_GridRiverLake_FloodFeedback
+#endif
+#endif
 
    IMPLICIT NONE
 
@@ -257,10 +275,16 @@ CONTAINS
        zi_soisno(lb-1:nl_soil)    ! interface depth [m]
 
    integer , intent(in) :: &
-       c3c4 ! C3/C4 plant type
+       c3c4                       ! C3/C4 plant type
 
    real(r8), intent(in) :: &
        sabg_snow_lyr(lb:1)        ! snow layer absorption
+
+#if (defined CaMa_Flood) || (defined GridRiverLakeFlow)
+   real(r8), intent(inout) :: flddepth   ! inundation depth [mm]
+   real(r8), intent(in)    :: fldfrc     ! inundation fraction [0-1]
+   real(r8), intent(out)   :: fevpg_fld  ! inundation evaporation [mm/s]
+#endif
 
        ! state variables (2)
    real(r8), intent(inout) :: &
@@ -435,6 +459,15 @@ CONTAINS
 
    real(r8) :: z0m_g,z0h_g,zol_g,obu_g,rib_g,ustar_g,qstar_g,tstar_g
    real(r8) :: fm10m,fm_g,fh_g,fq_g,fh2m,fq2m,um,obu
+#if (defined CaMa_Flood) || (defined GridRiverLakeFlow)
+   logical :: flood_evap_active
+   real(r8) :: fldfrc_eff, fevpg_fld_local, fseng_fld_local
+   real(r8) :: cgrnd_land, cgrndl_land, cgrnds_land
+   real(r8) :: taux_fld, tauy_fld, tref_fld, qref_fld, z0m_fld, zol_fld, rib_fld
+   real(r8) :: ustar_fld, qstar_fld, tstar_fld, fm_fld, fh_fld, fq_fld
+   real(r8) :: fseng_land, fseng_soil_land, fseng_snow_land
+   real(r8) :: fevpg_land, fevpg_soil_land, fevpg_snow_land
+#endif
 
    integer p, ps, pe, pn
 
@@ -490,6 +523,10 @@ CONTAINS
       lfevpa = 0.;  fsenl  = 0.
       fevpl  = 0.;  etr    = 0.
       fseng  = 0.;  fevpg  = 0.
+#if (defined CaMa_Flood) || (defined GridRiverLakeFlow)
+      fevpg_fld = 0._r8
+      flood_evap_active = .FALSE.
+#endif
 
       cgrnds = 0.;  cgrndl = 0.
       cgrnd  = 0.;  tref   = 0.
@@ -606,7 +643,7 @@ ENDIF
 
          !NOTE: If the beta scheme is used, the rss is not soil resistance,
          !but soil beta factor (soil wetness relative to field capacity [0-1]).
-         CALL SoilSurfaceResistance (nl_soil,forc_rhoair,hksati,porsl,psi0, &
+         CALL SoilSurfaceResistance (nl_soil,forc_rhoair,hksati,porsl,psi0,vf_sand, &
 #ifdef Campbell_SOIL_MODEL
                             bsw, &
 #endif
@@ -738,42 +775,42 @@ IF (patchtype == 0) THEN
       ps = patch_pft_s(ipatch)
       pe = patch_pft_e(ipatch)
 
-      allocate ( rootr_p (nl_soil, ps:pe) )
+      allocate ( rootr_p   (nl_soil,ps:pe))
       allocate ( rootflux_p(nl_soil,ps:pe))
-      allocate ( etrc_p           (ps:pe) )
-      allocate ( rstfac_p         (ps:pe) )
-      allocate ( rstfacsun_p      (ps:pe) )
-      allocate ( rstfacsha_p      (ps:pe) )
-      allocate ( gssun_p          (ps:pe) )
-      allocate ( gssha_p          (ps:pe) )
-      allocate ( fsun_p           (ps:pe) )
-      allocate ( sabv_p           (ps:pe) )
-      allocate ( fcover           (ps:pe) )
+      allocate ( etrc_p            (ps:pe))
+      allocate ( rstfac_p          (ps:pe))
+      allocate ( rstfacsun_p       (ps:pe))
+      allocate ( rstfacsha_p       (ps:pe))
+      allocate ( gssun_p           (ps:pe))
+      allocate ( gssha_p           (ps:pe))
+      allocate ( fsun_p            (ps:pe))
+      allocate ( sabv_p            (ps:pe))
+      allocate ( fcover            (ps:pe))
 
-      allocate ( fseng_soil_p     (ps:pe) )
-      allocate ( fseng_snow_p     (ps:pe) )
-      allocate ( fevpg_soil_p     (ps:pe) )
-      allocate ( fevpg_snow_p     (ps:pe) )
-      allocate ( cgrnd_p          (ps:pe) )
-      allocate ( cgrnds_p         (ps:pe) )
-      allocate ( cgrndl_p         (ps:pe) )
-      allocate ( dlrad_p          (ps:pe) )
-      allocate ( ulrad_p          (ps:pe) )
-      allocate ( zol_p            (ps:pe) )
-      allocate ( rib_p            (ps:pe) )
-      allocate ( ustar_p          (ps:pe) )
-      allocate ( qstar_p          (ps:pe) )
-      allocate ( tstar_p          (ps:pe) )
-      allocate ( fm_p             (ps:pe) )
-      allocate ( fh_p             (ps:pe) )
-      allocate ( fq_p             (ps:pe) )
+      allocate ( fseng_soil_p      (ps:pe))
+      allocate ( fseng_snow_p      (ps:pe))
+      allocate ( fevpg_soil_p      (ps:pe))
+      allocate ( fevpg_snow_p      (ps:pe))
+      allocate ( cgrnd_p           (ps:pe))
+      allocate ( cgrnds_p          (ps:pe))
+      allocate ( cgrndl_p          (ps:pe))
+      allocate ( dlrad_p           (ps:pe))
+      allocate ( ulrad_p           (ps:pe))
+      allocate ( zol_p             (ps:pe))
+      allocate ( rib_p             (ps:pe))
+      allocate ( ustar_p           (ps:pe))
+      allocate ( qstar_p           (ps:pe))
+      allocate ( tstar_p           (ps:pe))
+      allocate ( fm_p              (ps:pe))
+      allocate ( fh_p              (ps:pe))
+      allocate ( fq_p              (ps:pe))
 
-      allocate ( hprl_p           (ps:pe) )
-      allocate ( assimsun_p       (ps:pe) )
-      allocate ( etrsun_p         (ps:pe) )
-      allocate ( assimsha_p       (ps:pe) )
-      allocate ( etrsha_p         (ps:pe) )
-      allocate ( dheatl_p         (ps:pe) )
+      allocate ( hprl_p            (ps:pe))
+      allocate ( assimsun_p        (ps:pe))
+      allocate ( etrsun_p          (ps:pe))
+      allocate ( assimsha_p        (ps:pe))
+      allocate ( etrsha_p          (ps:pe))
+      allocate ( dheatl_p          (ps:pe))
 
       sabv_p(ps:pe) = sabvsun_p(ps:pe) + sabvsha_p(ps:pe)
       sabv = sabvsun + sabvsha
@@ -871,7 +908,7 @@ IF (patchtype == 0) THEN
          p = pftclass(i)
 
          ! Dealing with PFTs for PC:
-         ! If defined DEF_PC_CROP_SPLIT, for crop PFTs, use 1D twostream model;
+         ! If defined DEF_PC_CROP_SPLIT, for crop PFTs, use 1D turbulence model;
          ! Otherwise, skip to run PC 3D model.
          IF ( DEF_USE_PC .and. (.not.DEF_PC_CROP_SPLIT .or. p.lt.15) ) THEN
             CYCLE
@@ -881,7 +918,7 @@ IF (patchtype == 0) THEN
 
             CALL LeafTemperature(ipatch,p,deltim  ,csoilc          ,dewmx           ,htvp           ,&
                  lai_p(i)        ,sai_p(i)        ,htop_p(i)       ,hbot_p(i)       ,sqrtdi_p(p)    ,&
-                 effcon_p(p)     ,vmax25_p(p)     ,c3c4_p(p)       ,slti_p(p)       ,hlti_p(p)       ,shti_p(p)      ,&
+                 effcon_p(p)     ,vmax25_p(p)     ,c3c4_p(p)       ,slti_p(p)       ,hlti_p(p)      ,shti_p(p)      ,&
                  hhti_p(p)       ,trda_p(p)       ,trdm_p(p)       ,trop_p(p)       ,g1_p(p)        ,&
                  g0_p(p)         ,gradm_p(p)      ,binter_p(p)     ,extkn_p(p)      ,extkb_p(i)     ,&
                  extkd_p(i)      ,forc_hgt_u      ,forc_hgt_t      ,forc_hgt_q      ,forc_us        ,&
@@ -914,7 +951,8 @@ IF (patchtype == 0) THEN
 !End WUE stomata model parameter
                  forc_hpbl                                                                         ,&
                  qintr_rain_p(i) ,qintr_snow_p(i) ,t_precip        ,hprl_p(i)       ,dheatl_p(i)   ,&
-                 smp             ,hk(1:)          ,hksati(1:)      ,rootflux_p(1:,i)                )
+                 smp             ,hk(1:)          ,hksati(1:)      ,rootflux_p(1:,i)                ,&
+                 ipft_index=i)
          ELSE
 
             CALL GroundFluxes (zlnd,zsno,forc_hgt_u,forc_hgt_t,forc_hgt_q,forc_hpbl, &
@@ -1146,45 +1184,73 @@ END IF
          ENDIF
       ENDIF
 
-      deallocate ( rootflux_p  )
-      deallocate ( etrc_p      )
-      deallocate ( rstfac_p    )
-      deallocate ( rstfacsun_p )
-      deallocate ( rstfacsha_p )
-      deallocate ( gssun_p     )
-      deallocate ( gssha_p     )
-      deallocate ( fsun_p      )
-      deallocate ( sabv_p      )
-      deallocate ( fcover      )
+      deallocate ( rootflux_p   )
+      deallocate ( etrc_p       )
+      deallocate ( rstfac_p     )
+      deallocate ( rstfacsun_p  )
+      deallocate ( rstfacsha_p  )
+      deallocate ( gssun_p      )
+      deallocate ( gssha_p      )
+      deallocate ( fsun_p       )
+      deallocate ( sabv_p       )
+      deallocate ( fcover       )
 
-      deallocate ( fseng_soil_p)
-      deallocate ( fseng_snow_p)
-      deallocate ( fevpg_soil_p)
-      deallocate ( fevpg_snow_p)
-      deallocate ( cgrnd_p     )
-      deallocate ( cgrnds_p    )
-      deallocate ( cgrndl_p    )
-      deallocate ( dlrad_p     )
-      deallocate ( ulrad_p     )
-      deallocate ( zol_p       )
-      deallocate ( rib_p       )
-      deallocate ( ustar_p     )
-      deallocate ( qstar_p     )
-      deallocate ( tstar_p     )
-      deallocate ( fm_p        )
-      deallocate ( fh_p        )
-      deallocate ( fq_p        )
+      deallocate ( fseng_soil_p )
+      deallocate ( fseng_snow_p )
+      deallocate ( fevpg_soil_p )
+      deallocate ( fevpg_snow_p )
+      deallocate ( cgrnd_p      )
+      deallocate ( cgrnds_p     )
+      deallocate ( cgrndl_p     )
+      deallocate ( dlrad_p      )
+      deallocate ( ulrad_p      )
+      deallocate ( zol_p        )
+      deallocate ( rib_p        )
+      deallocate ( ustar_p      )
+      deallocate ( qstar_p      )
+      deallocate ( tstar_p      )
+      deallocate ( fm_p         )
+      deallocate ( fh_p         )
+      deallocate ( fq_p         )
 
-      deallocate ( hprl_p      )
-      deallocate ( assimsun_p  )
-      deallocate ( etrsun_p    )
-      deallocate ( assimsha_p  )
-      deallocate ( etrsha_p    )
-      deallocate ( dheatl_p    )
+      deallocate ( hprl_p       )
+      deallocate ( assimsun_p   )
+      deallocate ( etrsun_p     )
+      deallocate ( assimsha_p   )
+      deallocate ( etrsha_p     )
+      deallocate ( dheatl_p     )
 
 ENDIF
 #endif
 
+#if (defined CaMa_Flood) || (defined GridRiverLakeFlow)
+      ! CaMa: inundation evaporation is part of the ground energy balance
+      IF (LWEVAP .and. patchtype == 0 .and. &
+          flddepth > 0._r8 .and. fldfrc > EPSILON(1._r8)) THEN
+         fldfrc_eff = MIN(1._r8, MAX(0._r8, fldfrc))
+         flood_evap_active = fldfrc_eff > 0._r8
+         fseng_land = fseng; fseng_soil_land = fseng_soil; fseng_snow_land = fseng_snow
+         fevpg_land = fevpg; fevpg_soil_land = fevpg_soil; fevpg_snow_land = fevpg_snow
+         cgrnd_land = cgrnd; cgrndl_land = cgrndl; cgrnds_land = cgrnds
+         CALL get_fldevp (forc_hgt_u,forc_hgt_t,forc_hgt_q, &
+            forc_us,forc_vs,forc_t,forc_q,forc_rhoair,forc_psrf,t_grnd, &
+            forc_hpbl, taux_fld,tauy_fld,fseng_fld_local,fevpg_fld_local, &
+            tref_fld,qref_fld,z0m_fld,zol_fld,rib_fld,ustar_fld,qstar_fld, &
+            tstar_fld,fm_fld,fh_fld,fq_fld)
+         fevpg_fld_local = MIN(MAX(fevpg_fld_local,0._r8), flddepth/deltim)
+         fevpg_fld = fevpg_fld_local * fldfrc_eff
+         flddepth = MAX(0._r8, flddepth - deltim*fevpg_fld_local)
+         fseng = fseng_fld_local*fldfrc_eff + fseng_land*(1._r8-fldfrc_eff)
+         fevpg = (hvap/htvp)*fevpg_fld + fevpg_land*(1._r8-fldfrc_eff)
+         fseng_soil = fseng_fld_local*fldfrc_eff + fseng_soil_land*(1._r8-fldfrc_eff)
+         fevpg_soil = (hvap/htvp)*fevpg_fld + fevpg_soil_land*(1._r8-fldfrc_eff)
+         fseng_snow = fseng_fld_local*fldfrc_eff + fseng_snow_land*(1._r8-fldfrc_eff)
+         fevpg_snow = (hvap/htvp)*fevpg_fld + fevpg_snow_land*(1._r8-fldfrc_eff)
+         cgrnd = cgrnd_land*(1._r8-fldfrc_eff)
+         cgrndl = cgrndl_land*(1._r8-fldfrc_eff)
+         cgrnds = cgrnds_land*(1._r8-fldfrc_eff)
+      ENDIF
+#endif
 
 !=======================================================================
 ! [5] Ground temperature
@@ -1226,6 +1292,14 @@ ENDIF
       fevpg      = fevpg      + tinc*cgrndl
       fevpg_soil = fevpg_soil + tinc*cgrndl
       fevpg_snow = fevpg_snow + tinc*cgrndl
+
+#if (defined CaMa_Flood) || (defined GridRiverLakeFlow)
+      IF (flood_evap_active) THEN
+         fevpg = fevpg - (hvap/htvp)*fevpg_fld
+         fevpg_soil = fevpg_soil - (hvap/htvp)*fevpg_fld
+         fevpg_snow = fevpg_snow - (hvap/htvp)*fevpg_fld
+      ENDIF
+#endif
 
 ! calculation of evaporative potential; flux in kg m-2 s-1.
 ! egidif holds the excess energy IF all water is evaporated
@@ -1323,10 +1397,21 @@ ELSE
 ENDIF
 
 
+#if (defined CaMa_Flood) || (defined GridRiverLakeFlow)
+      IF (flood_evap_active) THEN
+         fevpg = fevpg + fevpg_fld
+         fevpg_soil = fevpg_soil + fevpg_fld
+         fevpg_snow = fevpg_snow + fevpg_fld
+      ENDIF
+#endif
+
 ! total fluxes to atmosphere
       fsena  = fsenl + fseng
       fevpa  = fevpl + fevpg
       lfevpa = hvap*fevpl + htvp*fevpg   ! W/m^2 (accounting for sublimation)
+#if (defined CaMa_Flood) || (defined GridRiverLakeFlow)
+      IF (flood_evap_active) lfevpa = lfevpa + (hvap-htvp)*fevpg_fld
+#endif
 
 ! ground heat flux
 IF (.not.DEF_SPLIT_SOILSNOW) THEN
@@ -1345,6 +1430,9 @@ ELSE
             + cpliq*pg_rain*(t_precip-t_grnd) &
             + cpice*pg_snow*(t_precip-t_grnd)
 ENDIF
+#if (defined CaMa_Flood) || (defined GridRiverLakeFlow)
+      IF (flood_evap_active) fgrnd = fgrnd - (hvap-htvp)*fevpg_fld
+#endif
 
 ! outgoing long-wave radiation from canopy + ground
       olrg = ulrad &

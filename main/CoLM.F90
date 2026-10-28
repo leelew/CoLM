@@ -55,7 +55,7 @@ PROGRAM CoLM
    USE MOD_HRUVector
 #endif
 #if (defined CaMa_Flood)
-   USE MOD_CaMa_colmCaMa
+   USE MOD_CaMa_colmCaMa, only: colm_CaMa_init, colm_CaMa_drv, colm_cama_write_restart, colm_cama_exit
 #endif
 #ifdef SinglePoint
    USE MOD_SingleSrfdata
@@ -349,7 +349,7 @@ PROGRAM CoLM
 #ifdef USEMPI
       CALL mpi_barrier (p_comm_glb, p_err)
 #endif
-      CALL colm_CaMa_init !initialize CaMa-Flood
+      CALL colm_CaMa_init(jdate) !initialize CaMa-Flood
 #ifdef USEMPI
       CALL mpi_barrier (p_comm_glb, p_err)
 #endif
@@ -393,7 +393,7 @@ PROGRAM CoLM
       CALL lateral_flow_init (lc_year)
 #endif
 #ifdef GridRiverLakeFlow
-      CALL grid_riverlake_flow_init ()
+      CALL grid_riverlake_flow_init (s_year, is_spinup)
 #endif
 
       CALL ParaOpt_init (jdate, lc_year)
@@ -506,7 +506,7 @@ PROGRAM CoLM
 #ifdef USEMPI
          CALL mpi_barrier (p_comm_glb, p_err)
 #endif
-         CALL colm_CaMa_drv(idate(3)) ! run CaMa-Flood
+         CALL colm_CaMa_drv(idate(3),deltim,save_to_restart(idate,deltim,itstamp,ptstamp,etstamp)) ! run CaMa-Flood
 #ifdef USEMPI
          CALL mpi_barrier (p_comm_glb, p_err)
 #endif
@@ -537,6 +537,9 @@ PROGRAM CoLM
 
             ! Call LULCC driver
             CALL LulccDriver (casename, dir_landdata, dir_restart, jdate, greenwich)
+#ifdef GridRiverLakeFlow
+            CALL grid_riverlake_flow_lulcc (jdate(1), is_spinup)
+#endif
 
             ! Allocate Forcing and Fluxes variable of next year
             CALL allocate_1D_Forcing

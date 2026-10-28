@@ -1295,6 +1295,7 @@ ENDIF
 #ifdef GridRiverLakeFlow
       file_restart = trim(dir_restart)// '/'//trim(cdate)//'/' // trim(site) //'_restart_gridriver_'//trim(cdate)//'_lc'//trim(cyear)//'.nc'
       CALL WRITE_GridRiverLakeTimeVars (file_restart)
+      CALL commit_GridRiverLakeRestart (file_restart)
 #endif
 
 #if (defined URBAN_MODEL)
@@ -1643,6 +1644,10 @@ ENDIF
 
 #if (defined BGC)
       CALL check_BGCTimeVariables
+#endif
+
+#ifdef URBAN_MODEL
+      CALL check_UrbanTimeVariables
 #endif
 
 #ifdef EXTERNAL_LAKE

@@ -14,6 +14,7 @@ MODULE MOD_DA_Main
    USE MOD_Spmd_task
    USE MOD_Namelist
    USE MOD_LandPatch
+   USE MOD_DA_Assim_2MTQ, ONLY: init_assim_2MTQ, run_assim_2MTQ, end_assim_2MTQ
    USE MOD_DA_Assim_SM
    USE MOD_DA_Assim_ST
    USE MOD_DA_Assim_2MTQ
@@ -30,6 +31,7 @@ MODULE MOD_DA_Main
    IMPLICIT NONE
    SAVE
 
+   logical :: use_assim_2mtq = .false.
    logical :: use_assim_sm = .false.
    logical :: use_assim_st = .false.
    logical :: use_assim_2mtq = .false.
@@ -150,7 +152,8 @@ CONTAINS
 
       IF (is_spinup) RETURN
 
-      ! data assimilation
+      ! Analysis order is independent of the namelist stream order.
+      ! Screen analysis produces the patch products consumed by SM.
       CALL mpi_barrier (p_comm_glb, p_err)
       IF (use_assim_2mtq) THEN
          CALL run_assim_2MTQ (idate, deltim)
@@ -230,8 +233,9 @@ CONTAINS
       IF (use_assim_2mtq) CALL end_assim_2MTQ ()
       use_assim_2mtq = .false.
       IF (use_assim_sm) CALL end_assim_SM ()
+      IF (use_assim_2mtq) CALL end_assim_2MTQ ()
+      use_assim_2mtq = .false.
       use_assim_sm = .false.
-      IF (use_assim_st) CALL end_assim_ST ()
       use_assim_st = .false.
 
    END SUBROUTINE end_DA
