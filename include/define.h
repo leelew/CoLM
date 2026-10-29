@@ -101,6 +101,7 @@
 #undef LULC_USGS
 #undef LULC_IGBP_PFT
 #undef LULC_IGBP_PC
+#define USEMPI
 #endif
 
 ! 10. Interface to AI model.

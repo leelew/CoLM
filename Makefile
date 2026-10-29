@@ -393,7 +393,7 @@ $(OBJS_MAIN) : %.o : %.F90 ${HEADER} ${OBJS_SHARED} ${OBJS_BASIC}
 
 # DA module dependencies (the renamed grid source still defines BasicType).
 MOD_DA_Obs_PM.o: MOD_DA_Obs_GridType.o MOD_DA_Operator_RTM.o
-MOD_DA_Obs_SM.o: MOD_DA_Obs_PM.o
+MOD_DA_Obs_SM.o: MOD_DA_Obs_PM.o MOD_WorkerPushData.o
 MOD_DA_Obs_ST.o: MOD_DA_Obs_PM.o
 MOD_DA_Assim_SM.o: MOD_DA_Obs_SM.o MOD_DA_EnKF.o
 MOD_DA_Assim_ST.o: MOD_DA_Obs_ST.o MOD_DA_EnKF.o

@@ -176,6 +176,7 @@ CONTAINS
       IMPLICIT NONE
 
       CALL sm%clear()
+      CALL sm%free_neighbors()
       IF (allocated(sm%cfgs)) deallocate(sm%cfgs)
       IF (allocated(sm%pm%sensors)) deallocate(sm%pm%sensors)
       IF (allocated(sm%pm%cfgs)) deallocate(sm%pm%cfgs)
@@ -183,6 +184,7 @@ CONTAINS
       sm%pm%nsensor = 0
       sm%use_pm = .false.
       sm%use_gnos = .false.
+      sm%use_ana2mtq = .false.
 
    END SUBROUTINE end_assim_SM
 

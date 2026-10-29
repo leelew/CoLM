@@ -1,28 +1,18 @@
 #include <define.h>
 
 #ifdef DataAssimilation
-MODULE MOD_DA_Obs_BasicType
+MODULE MOD_DA_Obs_GridType
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
-!    Basic observation derived types for data assimilation.
+!    Grid observation derived type for data assimilation.
 !
-!    This module defines common observation containers and utilities shared by
-!    source-specific observation modules. Observation sources are organized into
-!    two broad classes:
+!    A grid_obs_type represents one gridded observation stream: a satellite
+!    or gridded product that comes with its own spatial grid. It stores the
+!    observation grid, the grid-to-patch spatial mapping, and
+!    timestep-dependent observation vectors.
 !
-!      1. Grid observations:
-!         Satellite or gridded products with their own spatial grid. A
-!         grid_obs_type stores the observation grid, the grid-to-patch spatial
-!         mapping, and timestep-dependent observation vectors.
-!
-!      2. In-situ observations:
-!         Point-based measurements such as stations or field networks. These
-!         observations do not own a source grid, but still need common metadata,
-!         location, time, value, and error containers.
-!
-!    Higher-level modules, such as PM, AM, GNOS, and soil-moisture
-!    assimilation wrappers, should build on these basic types instead of
-!    duplicating storage and search logic.
+!    Source-specific modules, such as PM, AM, GNSS, and MR, build on this
+!    type instead of duplicating storage and search logic. 
 !
 ! SUPPORTED:
 ! +--------+----------+----------------------+-------------------------------+
@@ -35,13 +25,13 @@ MODULE MOD_DA_Obs_BasicType
 ! | PM     | SM       | Soil moisture        | SMAP L2 SM, SMOS L2 SM,       |
 ! |        |          |                      | AMSR2 SM                      |
 ! +--------+----------+----------------------+-------------------------------+
-! | AM     | TB_H/TB_V| Soil moisture, soil  | ATMS/MWHS/MWTS TB             |
+! | AM     | BS       | Soil moisture, soil  | ATMS/MWHS/MWTS TB             |
 ! |        |          | temperature, snow    |                               |
 ! |        |          | variables            |                               |
 ! +--------+----------+----------------------+-------------------------------+
 ! | AM     | SM       | Soil moisture        | ASCAT, Sentinel-1             |
 ! +--------+----------+----------------------+-------------------------------+
-! | GNOS   | DDM      | Soil moisture        | FY3E, CYGNSS                  |
+! | GNSS   | DDM      | Soil moisture        | FY3E, CYGNSS                  |
 ! +--------+----------+----------------------+-------------------------------+
 ! | MR     | LST      | Land surface         | MODIS LST, VIIRS LST, FY3F    |
 ! |        |          | temperature, soil    |                               |
@@ -51,9 +41,10 @@ MODULE MOD_DA_Obs_BasicType
 ! +--------+----------+----------------------+-------------------------------+
 !   PM   = passive microwave remote sensing
 !   AM   = active microwave remote sensing
-!   GNOS = GNSS-R observation source
+!   GNSS = GNSS-R observation source
 !   MR   = moderate-resolution optical/thermal remote sensing
 !   TB   = brightness temperature
+!   BS   = backscatter coefficient
 !   SM   = retrieved soil moisture
 !   DDM  = delay-Doppler map
 !   LST  = land surface temperature
@@ -61,6 +52,7 @@ MODULE MOD_DA_Obs_BasicType
 !
 ! HISTORY:
 !    Lu Li, 05/2026: Initial version
+!    Zhilong Fan, Lu Li, 10/2026: First operational version
 !-----------------------------------------------------------------------------
     USE MOD_Precision
     USE MOD_SPMD_Task
@@ -68,17 +60,19 @@ MODULE MOD_DA_Obs_BasicType
     USE MOD_Namelist
     USE MOD_NetCDFSerial
     USE MOD_Pixelset
-    USE MOD_Vars_Global, ONLY: spval
     USE MOD_SpatialMapping
     USE MOD_TimeManager
     IMPLICIT NONE
 
+!-----------------------------------------------------------------------------
+! Grid observation derived type
+!-----------------------------------------------------------------------------
     type :: grid_obs_type
 
         ! initialize once
-        character(len=16) :: source_name = ''        ! "PM", "PM", "AM", "AM", "GNOS", "MR", "MR"
-        character(len=32) :: sensor_name = ''        ! sensor/subdirectory name, e.g., "SMAP_L1C_D"
-        character(len=16) :: var_name    = ''        ! "TB_H/TB_V", "SM", "TB_H/TB_V", "SM", "DDM", "LST", "fSCA"
+        character(len=16) :: source_name = ''        ! e.g., "PM", "GNOS", "MR", "MR"
+        character(len=32) :: sensor_name = ''        ! e.g., "SMAP_L1C_D", 
+        character(len=16) :: var_name    = ''        ! e.g., "TB_H", "SM", "LST", "fSCA"
         type(grid_type)   :: grid                    ! grid info for obs
         type(spatial_mapping_type) :: mg2p           ! mapping from obs grid to patch
 
@@ -102,7 +96,6 @@ MODULE MOD_DA_Obs_BasicType
         procedure, PUBLIC :: clear => grid_obs_clear ! clear obs data for this time step (keep init info)
 
     END type grid_obs_type
-
 
 !-----------------------------------------------------------------------------
 
@@ -143,14 +136,14 @@ CONTAINS
 
         class(grid_obs_type),   intent(inout) :: this
 
-        IF (allocated(this%lat))  deallocate(this%lat )
-        IF (allocated(this%lon))  deallocate(this%lon )
-        IF (allocated(this%time)) deallocate(this%time)
-        IF (allocated(this%y))    deallocate(this%y   )
-        IF (allocated(this%r))    deallocate(this%r   )
-        IF (allocated(this%theta)) deallocate(this%theta)
-        IF (allocated(this%ii))   deallocate(this%ii  )
-        IF (allocated(this%jj))   deallocate(this%jj  )
+        IF (allocated(this%lat))    deallocate(this%lat  )
+        IF (allocated(this%lon))    deallocate(this%lon  )
+        IF (allocated(this%time))   deallocate(this%time )
+        IF (allocated(this%y))      deallocate(this%y    )
+        IF (allocated(this%r))      deallocate(this%r    )
+        IF (allocated(this%theta))  deallocate(this%theta)
+        IF (allocated(this%ii))     deallocate(this%ii   )
+        IF (allocated(this%jj))     deallocate(this%jj   )
 
         this%nobs = 0
 
@@ -258,13 +251,12 @@ CONTAINS
             IF (allocated(jj   )) deallocate(jj   )
         ENDIF
 
-        write (logmsg,'(A,A,A,L1,A,I0)') 'obs file=', trim(obs_file_name), &
-            ' exists=', exists_file, ' selected_nobs=', this%nobs
-        IF (p_is_master) WRITE (*,'(A)') '[CoLM-DA] '//trim(logmsg)
+        write (logmsg,'(A,A,A,L1,A,I0)') 'obs file = ', trim(obs_file_name), &
+            ' exists = ', exists_file, 'selected_nobs = ', this%nobs
+        IF (p_is_master) WRITE (*,'(A)') '[DA] '//trim(logmsg)
 
     END SUBROUTINE grid_obs_read
 
-
 !-----------------------------------------------------------------------------
-END MODULE MOD_DA_Obs_BasicType
+END MODULE MOD_DA_Obs_GridType
 #endif

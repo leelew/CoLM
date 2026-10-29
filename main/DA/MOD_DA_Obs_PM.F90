@@ -26,12 +26,15 @@ MODULE MOD_DA_Obs_PM
 !
 !    PM_set_type applies this workflow to all configured PM streams and
 !    concatenates their observation values, errors, metadata, and H(x) into
-!    set-level arrays for assimilation. Patch-space H(x), area-weighted from
-!    valid parts, remains stored in each PM_type instance as hx_pset for
-!    diagnostics.
+!    set-level arrays for assimilation. 
+!
+!    PM observation operator supports both satellite brightness temperature 
+!    assimilation through microwave radiative transfer modeling and the direct 
+!    assimilation of retrieved soil moisture products. 
 !
 ! HISTORY:
 !    Lu Li, 05/2026: First implementation
+!    Zhilong Fan, Lu Li, 10/2026: First operational version
 !-----------------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_Const_Physical, ONLY: denh2o
@@ -51,26 +54,30 @@ MODULE MOD_DA_Obs_PM
    USE MOD_TimeManager
    IMPLICIT NONE
 
-
-   ! process one PM data
+!-----------------------------------------------------------------------------
+! Passive-microwave observation derived type (process one PM data)
+!-----------------------------------------------------------------------------
    type :: PM_type
 
       ! metadata of specific passive microwave observation stream
       real(r8)              :: fghz
 
-      ! selected avaliable observation values and metadata at current timestep
-      type(grid_obs_type)   :: y
+      ! Intermediate H(x) on local patches, retained for patch-level diagnostic output.
+      real(r8), allocatable :: hx_pset(:,:)  ! [ens, patch]
 
-      ! H(x) from forward model for diagnostics and data assimilation
-      real(r8), allocatable :: hx_pset(:,:)  ! H(x) on patches for diagnostics [0:ens, patch]
-      real(r8), allocatable :: hx(:,:)       ! H(x) mapped to y locations for assimilation
+      ! Actual observations and metadata at the locations read for this time step.
+      type(grid_obs_type)   :: y             ! [nobs,]
+
+      ! Simulated observations mapped from hx_pset to the locations indexed by y.
+      ! Entries without a valid mapping remain spval.
+      real(r8), allocatable :: hx(:,:)       ! [nobs, ens]
 
    CONTAINS
 
-      procedure, PUBLIC :: init     => PM_init         ! initialize the obs type (grid info, mapping, etc.)
-      procedure, PUBLIC :: calcg    => PM_calc_on_grid ! calculate H(x) and y at y locations
-      procedure, PUBLIC :: calcp    => PM_calc_on_pset ! calculate H(x) on local patches only
-      procedure, PUBLIC :: clear    => PM_clear        ! clear obs data for this time step (keep init info)
+      procedure, PUBLIC :: init     => PM_init           ! initialize the obs type (grid info, mapping, etc.)
+      procedure, PUBLIC :: calcp    => PM_calc_on_pset   ! calculate H(x) on local patches only
+      procedure, PUBLIC :: calcg    => PM_calc_on_grid   ! read observations, calculate H(x) and y at y locations
+      procedure, PUBLIC :: clear    => PM_clear          ! clear obs data for this time step (keep init info)
 
    END type PM_type
 
@@ -84,30 +91,32 @@ MODULE MOD_DA_Obs_PM
 
    END type PM_config_type
 
-
-   ! process a set of PM data
+!-----------------------------------------------------------------------------
+! Collection of passive-microwave observation streams and their combined data
+!-----------------------------------------------------------------------------
    type :: PM_set_type
 
-      ! different sensors and configurations in the set
-      integer :: nsensor
-      type(PM_type), allocatable :: sensors(:)
-      type(PM_config_type), allocatable :: cfgs(:)
+      ! Each stream represents one source/sensor/variable configuration.
+      integer :: nsensor                          ! Number of configured observation streams
+      type(PM_type), allocatable :: sensors(:)     ! Stream objects [nsensor]
+      type(PM_config_type), allocatable :: cfgs(:)  ! Corresponding stream configurations [nsensor]
 
-      ! concatenated obs and H(x) from all sensors for assimilation
-      integer :: nobs
-      real(r8), allocatable :: lat(:)
-      real(r8), allocatable :: lon(:)
-      real(r8), allocatable :: y(:)
-      real(r8), allocatable :: r(:)
-      real(r8), allocatable :: hx(:,:)
+      ! Current time-step data concatenated in stream order for assimilation.
+      ! All arrays share the same observation index
+      integer :: nobs                        ! Total number of observations across streams in the combined arrays
+      real(r8), allocatable :: lat(:)        ! Observation latitude [nobs], degrees
+      real(r8), allocatable :: lon(:)        ! Observation longitude [nobs], degrees
+      real(r8), allocatable :: y(:)          ! Actual observation values [nobs]
+      real(r8), allocatable :: r(:)          ! Observation error variances [nobs]
+      real(r8), allocatable :: hx(:,:)       ! Simulated observations at y locations [nobs, ens]
 
    CONTAINS
 
-      procedure, PUBLIC :: init     => PM_set_init
-      procedure, PUBLIC :: concat   => PM_set_concat
-      procedure, PUBLIC :: calcg    => PM_set_calc_on_grid
-      procedure, PUBLIC :: calcp    => PM_set_calc_on_pset
-      procedure, PUBLIC :: clear    => PM_set_clear
+      procedure, PUBLIC :: init     => PM_set_init          ! Initialize all streams from their configurations
+      procedure, PUBLIC :: calcp    => PM_set_calc_on_pset  ! Recompute patch-space H(x) for all streams
+      procedure, PUBLIC :: concat   => PM_set_concat        ! Combine stream data into the set-level arrays
+      procedure, PUBLIC :: calcg    => PM_set_calc_on_grid  ! Read observations, compute H(x), and concatenate streams
+      procedure, PUBLIC :: clear    => PM_set_clear         ! Clear time-step data while retaining stream configurations
 
    END type PM_set_type
 
@@ -211,7 +220,8 @@ CONTAINS
 
                sumarea(:) = 0.0_r8
 
-               ! TB is evaluated only where the obs file supplies theta, so a domain-wide theta field gives domain-wide TB.
+               ! TB is evaluated only where the obs file supplies theta, 
+               ! so a domain-wide theta field gives domain-wide TB.
                DO ipart = 1, this%y%mg2p%npart(np)
                   IF (theta_part(np)%val(ipart) == spval) CYCLE
 
