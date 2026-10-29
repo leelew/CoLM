@@ -143,6 +143,11 @@ MODULE MOD_DA_Vars_TimeVariables
    real(r8), allocatable :: trad_ens  (:,:)  ! radiative temperature of surface [K]
    real(r8), allocatable :: tref_ens  (:,:)  ! 2 m height air temperature       [kelvin]
    real(r8), allocatable :: qref_ens  (:,:)  ! 2 m height air specific humidity
+   ! Screen-level forecast/analysis snapshots [0:DEF_DA_ENS_NUM, local patch].
+   real(r8), allocatable :: tref_ens_f(:,:)  ! prior 2 m air temperature [K]
+   real(r8), allocatable :: tref_ens_a(:,:)  ! posterior 2 m air temperature [K]
+   real(r8), allocatable :: qref_ens_f(:,:)  ! prior 2 m specific humidity [kg/kg]
+   real(r8), allocatable :: qref_ens_a(:,:)  ! posterior 2 m specific humidity [kg/kg]
    real(r8), allocatable :: rhref_ens (:,:)  ! 2 m height air relative humidity
    real(r8), allocatable :: tref_f    (:)    ! ensemble-mean prior 2 m air temperature       [K]
    real(r8), allocatable :: tref_a    (:)    ! ensemble-mean posterior 2 m air temperature   [K]
@@ -247,6 +252,10 @@ CONTAINS
             allocate (trad_ens                        (0:DEF_DA_ENS_NUM,numpatch)); trad_ens          (:,:) = spval
             allocate (tref_ens                        (0:DEF_DA_ENS_NUM,numpatch)); tref_ens          (:,:) = spval
             allocate (qref_ens                        (0:DEF_DA_ENS_NUM,numpatch)); qref_ens          (:,:) = spval
+            allocate (tref_ens_f                      (0:DEF_DA_ENS_NUM,numpatch)); tref_ens_f        (:,:) = spval
+            allocate (tref_ens_a                      (0:DEF_DA_ENS_NUM,numpatch)); tref_ens_a        (:,:) = spval
+            allocate (qref_ens_f                      (0:DEF_DA_ENS_NUM,numpatch)); qref_ens_f        (:,:) = spval
+            allocate (qref_ens_a                      (0:DEF_DA_ENS_NUM,numpatch)); qref_ens_a        (:,:) = spval
             allocate (rhref_ens                       (0:DEF_DA_ENS_NUM,numpatch)); rhref_ens         (:,:) = spval
             allocate (tref_f                          (numpatch)); tref_f            (:) = spval
             allocate (tref_a                          (numpatch)); tref_a            (:) = spval
@@ -350,6 +359,10 @@ CONTAINS
             deallocate (trad_ens                         )
             deallocate (tref_ens                         )
             deallocate (qref_ens                         )
+            deallocate (tref_ens_f                       )
+            deallocate (tref_ens_a                       )
+            deallocate (qref_ens_f                       )
+            deallocate (qref_ens_a                       )
             deallocate (rhref_ens                        )
             deallocate (tref_f                           )
             deallocate (tref_a                           )

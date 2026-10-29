@@ -309,6 +309,7 @@ OBJS_MAIN = \
 				MOD_DA_Obs_GridType.o                     \
 				MOD_DA_Obs_SiteType.o                     \
 				MOD_DA_Obs_PM.o                           \
+				MOD_DA_Obs_ANA2MTQ.o                      \
 				MOD_DA_Obs_SM.o                           \
 				MOD_DA_Obs_ST.o                           \
 				MOD_DA_Obs_SYNOP.o                        \
@@ -389,17 +390,17 @@ OBJS_MAIN = \
 $(OBJS_MAIN) : %.o : %.F90 ${HEADER} ${OBJS_SHARED} ${OBJS_BASIC}
 	${FF} -c ${FOPTS} $(INCLUDE_DIR) -o .bld/$@ $< ${MOD_CMD}.bld
 
-<<<<<<< HEAD
-# DA module dependencies (the renamed grid source still defines BasicType).
+# DA module dependencies.
 MOD_DA_Obs_PM.o: MOD_DA_Obs_GridType.o MOD_DA_Operator_RTM.o
-MOD_DA_Obs_SM.o: MOD_DA_Obs_PM.o MOD_WorkerPushData.o
+MOD_DA_Obs_ANA2MTQ.o: MOD_DA_Vars_TimeVariables.o
+MOD_DA_Obs_SM.o: MOD_DA_Obs_PM.o MOD_DA_Obs_ANA2MTQ.o
 MOD_DA_Obs_ST.o: MOD_DA_Obs_PM.o
+MOD_DA_Obs_SYNOP.o: MOD_DA_Obs_SiteType.o
+MOD_DA_Assim_2MTQ.o: MOD_DA_Obs_SYNOP.o MOD_DA_EnKF.o
 MOD_DA_Assim_SM.o: MOD_DA_Obs_SM.o MOD_DA_EnKF.o
 MOD_DA_Assim_ST.o: MOD_DA_Obs_ST.o MOD_DA_EnKF.o
 MOD_DA_Main.o: MOD_DA_Assim_2MTQ.o MOD_DA_Assim_SM.o MOD_DA_Assim_ST.o MOD_DA_Ens.o
 
-=======
->>>>>>> origin/DA
 MOD_Urban_Thermal.o: MOD_Urban_Flux.o
 MOD_LeafTemperature.o MOD_LeafTemperaturePC.o: MOD_LeafInterception.o
 MOD_Grid_RiverLakeNetwork.o: MOD_Grid_RiverLakePush.o

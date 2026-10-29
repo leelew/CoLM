@@ -137,10 +137,10 @@ CONTAINS
       real(r8), allocatable :: hx_p(:,:)
       real(r8), allocatable :: r_p(:)
       real(r8), allocatable :: trans(:,:)
-      real(r8), allocatable :: tref_ens_f(:,:)
-      real(r8), allocatable :: tref_ens_a(:,:)
-      real(r8), allocatable :: qref_ens_f(:,:)
-      real(r8), allocatable :: qref_ens_a(:,:)
+      real(r8), allocatable :: tref_work_f(:,:)
+      real(r8), allocatable :: tref_work_a(:,:)
+      real(r8), allocatable :: qref_work_f(:,:)
+      real(r8), allocatable :: qref_work_a(:,:)
 
 !-----------------------------------------------------------------------------
       ! read the SYNOP observations and calculate the prior H(x) at station
@@ -151,6 +151,11 @@ CONTAINS
       ENDIF
 
       IF (p_is_worker .and. numpatch > 0) THEN
+         ! Preserve the complete prior ensemble before either screen-level analysis.
+         tref_ens_f(:,:) = tref_ens
+         qref_ens_f(:,:) = qref_ens
+         tref_ens_a(:,:) = tref_ens_f
+         qref_ens_a(:,:) = qref_ens_f
          tref_f(:) = sum(tref_ens(1:DEF_DA_ENS_NUM,:), dim=1) / DEF_DA_ENS_NUM
          qref_f(:) = sum(qref_ens(1:DEF_DA_ENS_NUM,:), dim=1) / DEF_DA_ENS_NUM
       ENDIF
@@ -170,15 +175,15 @@ CONTAINS
             CALL letkf(DEF_DA_ENS_NUM, nobs_p, hx_p, y_p, r_p, synop_t%infl, trans)
 
             ! apply the LETKF transform to the 2 m temperature ensemble
-            allocate(tref_ens_f(1, DEF_DA_ENS_NUM))
-            allocate(tref_ens_a(1, DEF_DA_ENS_NUM))
+            allocate(tref_work_f(1, DEF_DA_ENS_NUM))
+            allocate(tref_work_a(1, DEF_DA_ENS_NUM))
             DO iens = 1, DEF_DA_ENS_NUM
-               tref_ens_f(1,iens) = tref_ens(iens,np)
+               tref_work_f(1,iens) = tref_ens(iens,np)
             ENDDO
 
             CALL dgemm('N', 'N', 1, DEF_DA_ENS_NUM, DEF_DA_ENS_NUM, &
-                        1.0_r8, tref_ens_f, 1, trans, DEF_DA_ENS_NUM, &
-                        0.0_r8, tref_ens_a, 1)
+                        1.0_r8, tref_work_f, 1, trans, DEF_DA_ENS_NUM, &
+                        0.0_r8, tref_work_a, 1)
 
             ! TODO: confirm the post-analysis constraints before finalizing.
             ! The +/-20 K temperature increment is a legacy heuristic from the
@@ -187,11 +192,11 @@ CONTAINS
             DO iens = 1, DEF_DA_ENS_NUM
                ! limit the temperature increment to keep the analysis physical
                tref_ens(iens,np) = tref_ens(iens,np) + &
-                  max(-20.0_r8, min(20.0_r8, tref_ens_a(1,iens) - tref_ens(iens,np)))
+                  max(-20.0_r8, min(20.0_r8, tref_work_a(1,iens) - tref_ens(iens,np)))
             ENDDO
 
             deallocate(y_p, r_p, hx_p, trans)
-            deallocate(tref_ens_f, tref_ens_a)
+            deallocate(tref_work_f, tref_work_a)
          ENDDO
       ENDIF
 
@@ -216,15 +221,15 @@ CONTAINS
             CALL letkf(DEF_DA_ENS_NUM, nobs_p, hx_p, y_p, r_p, synop_q%infl, trans)
 
             ! apply the LETKF transform to the 2 m specific humidity ensemble
-            allocate(qref_ens_f(1, DEF_DA_ENS_NUM))
-            allocate(qref_ens_a(1, DEF_DA_ENS_NUM))
+            allocate(qref_work_f(1, DEF_DA_ENS_NUM))
+            allocate(qref_work_a(1, DEF_DA_ENS_NUM))
             DO iens = 1, DEF_DA_ENS_NUM
-               qref_ens_f(1,iens) = qref_ens(iens,np)
+               qref_work_f(1,iens) = qref_ens(iens,np)
             ENDDO
 
             CALL dgemm('N', 'N', 1, DEF_DA_ENS_NUM, DEF_DA_ENS_NUM, &
-                        1.0_r8, qref_ens_f, 1, trans, DEF_DA_ENS_NUM, &
-                        0.0_r8, qref_ens_a, 1)
+                        1.0_r8, qref_work_f, 1, trans, DEF_DA_ENS_NUM, &
+                        0.0_r8, qref_work_a, 1)
 
             ! TODO: confirm the post-analysis constraints before finalizing.
             ! The q in [0, qsat] clipping enforces physical consistency, but
@@ -233,7 +238,7 @@ CONTAINS
             ! the model's own saturation adjustment handle q.
             DO iens = 1, DEF_DA_ENS_NUM
                ! keep specific humidity within [0, qsat]
-               qref_ens(iens,np) = max(0.0_r8, qref_ens_a(1,iens))
+               qref_ens(iens,np) = max(0.0_r8, qref_work_a(1,iens))
                IF (tref_ens(iens,np) /= spval .and. &
                    forc_psrf(np)    /= spval .and. &
                    forc_psrf(np)    >  0.0_r8) THEN
@@ -243,7 +248,7 @@ CONTAINS
             ENDDO
 
             deallocate(y_p, r_p, hx_p, trans)
-            deallocate(qref_ens_f, qref_ens_a)
+            deallocate(qref_work_f, qref_work_a)
          ENDDO
       ENDIF
 
@@ -252,6 +257,9 @@ CONTAINS
       ! so the ANA2MTQ products are always defined.
       IF (DEF_DA_ENS_NUM > 1) THEN
          IF (p_is_worker .and. numpatch > 0) THEN
+            ! Store the final ensembles after temperature and saturation constraints.
+            tref_ens_a(:,:) = tref_ens
+            qref_ens_a(:,:) = qref_ens
             IF (use_2mt) THEN
                tref_a(:) = sum(tref_ens(1:DEF_DA_ENS_NUM,:), dim=1) / DEF_DA_ENS_NUM
             ELSE

@@ -5,7 +5,7 @@ MODULE MOD_DA_Obs_ANA2MTQ
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
 !    SYNOP analysis means as pseudo-observations for soil-moisture assimilation.
-!    Prepare T/q on patches, gather on master, and broadcast for patch searches.
+!    Select changed patches, gather on master, and broadcast paired T/q data.
 !-----------------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_DA_Vars_TimeVariables, ONLY: tref_ens_f, tref_ens_a, qref_ens_f, qref_ens_a
@@ -22,8 +22,8 @@ MODULE MOD_DA_Obs_ANA2MTQ
    type :: ANA2MTQ_var_type
 
       real(r8) :: r = 0.01_r8               ! Error variance in squared variable units
-      real(r8), allocatable :: y(:)          ! Analysis means [npatch]
-      real(r8), allocatable :: hx(:,:)       ! Forecast H(x) [DEF_DA_ENS_NUM, npatch]
+      real(r8), allocatable :: y(:)          ! Analysis means [nobs]
+      real(r8), allocatable :: hx(:,:)       ! Forecast H(x) [nobs, DEF_DA_ENS_NUM]
 
    END type ANA2MTQ_var_type
 
@@ -32,9 +32,9 @@ MODULE MOD_DA_Obs_ANA2MTQ
 !-----------------------------------------------------------------------------
    type :: ANA2MTQ_type
 
-      integer :: npatch = 0                 ! Number of globally gathered valid patches
-      real(r8), allocatable :: lat(:)        ! Patch latitude [npatch], degrees
-      real(r8), allocatable :: lon(:)        ! Patch longitude [npatch], degrees
+      integer :: nobs = 0                 ! Number of patches with nonzero T and q analysis increments
+      real(r8), allocatable :: lat(:)        ! Patch latitude [nobs], degrees
+      real(r8), allocatable :: lon(:)        ! Patch longitude [nobs], degrees
       type(ANA2MTQ_var_type) :: t            ! Temperature [K], r in K^2
       type(ANA2MTQ_var_type) :: q            ! Specific humidity [kg/kg], r in (kg/kg)^2
 
@@ -125,6 +125,7 @@ CONTAINS
          IF (patchtype(np) >= 3) CYCLE
          IF (.not. ieee_is_finite(patchlatr(np)) .or. .not. ieee_is_finite(patchlonr(np))) CYCLE
          IF (patchlatr(np) == spval .or. patchlonr(np) == spval) CYCLE
+         IF (abs(patchlatr(np)) > pi/2.0_r8) CYCLE
          IF (.not. all(ieee_is_finite(tref_ens_f(1:DEF_DA_ENS_NUM,np)))) CYCLE
          IF (.not. all(ieee_is_finite(tref_ens_a(1:DEF_DA_ENS_NUM,np)))) CYCLE
          IF (.not. all(ieee_is_finite(qref_ens_f(1:DEF_DA_ENS_NUM,np)))) CYCLE
@@ -150,7 +151,7 @@ CONTAINS
          IF (.not. valid(np)) CYCLE
          ipatch = ipatch + 1
          local_data(1,ipatch) = patchlatr(np)*180.0_r8/pi
-         local_data(2,ipatch) = patchlonr(np)*180.0_r8/pi
+         local_data(2,ipatch) = (modulo(patchlonr(np)+pi,2.0_r8*pi)-pi)*180.0_r8/pi
          local_data(3,ipatch) = sum(tref_ens_a(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
          local_data(4,ipatch) = sum(qref_ens_a(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
          local_data(5:4+DEF_DA_ENS_NUM,ipatch) = tref_ens_f(1:DEF_DA_ENS_NUM,np)
@@ -163,46 +164,46 @@ CONTAINS
       counts = 0
       displs = 0
       CALL mpi_gather(nlocal, 1, MPI_INTEGER, counts, 1, MPI_INTEGER, p_address_master, p_comm_glb, p_err)
-      IF (p_is_master) this%npatch = sum(counts)
-      CALL mpi_bcast(this%npatch, 1, MPI_INTEGER, p_address_master, p_comm_glb, p_err)
-      IF (this%npatch == 0) RETURN
+      IF (p_is_master) this%nobs = sum(counts)
+      CALL mpi_bcast(this%nobs, 1, MPI_INTEGER, p_address_master, p_comm_glb, p_err)
+      IF (this%nobs == 0) RETURN
 
       IF (p_is_master) THEN
          counts = counts*nfield
          DO iproc = 1, p_np_glb-1
             displs(iproc) = displs(iproc-1) + counts(iproc-1)
          ENDDO
-         allocate(global_data(nfield,this%npatch))
+         allocate(global_data(nfield,this%nobs))
       ELSE
          allocate(global_data(nfield,1))
       ENDIF
       CALL mpi_gatherv(local_data, nfield*nlocal, MPI_REAL8, global_data, counts, displs, &
          MPI_REAL8, p_address_master, p_comm_glb, p_err)
 #else
-      this%npatch = nlocal
-      IF (this%npatch == 0) RETURN
-      allocate(global_data(nfield,this%npatch))
+      this%nobs = nlocal
+      IF (this%nobs == 0) RETURN
+      allocate(global_data(nfield,this%nobs))
       global_data = local_data
 #endif
 
-      allocate(this%lat(this%npatch), this%lon(this%npatch))
-      allocate(this%t%y(this%npatch), this%q%y(this%npatch))
-      allocate(this%t%hx(DEF_DA_ENS_NUM,this%npatch), this%q%hx(DEF_DA_ENS_NUM,this%npatch))
+      allocate(this%lat(this%nobs), this%lon(this%nobs))
+      allocate(this%t%y(this%nobs), this%q%y(this%nobs))
+      allocate(this%t%hx(this%nobs,DEF_DA_ENS_NUM), this%q%hx(this%nobs,DEF_DA_ENS_NUM))
       IF (p_is_master) THEN
          this%lat = global_data(1,:)
          this%lon = global_data(2,:)
          this%t%y = global_data(3,:)
          this%q%y = global_data(4,:)
-         this%t%hx = global_data(5:4+DEF_DA_ENS_NUM,:)
-         this%q%hx = global_data(5+DEF_DA_ENS_NUM:nfield,:)
+         this%t%hx = transpose(global_data(5:4+DEF_DA_ENS_NUM,:))
+         this%q%hx = transpose(global_data(5+DEF_DA_ENS_NUM:nfield,:))
       ENDIF
 #ifdef USEMPI
-      CALL mpi_bcast(this%lat, this%npatch, MPI_REAL8, p_address_master, p_comm_glb, p_err)
-      CALL mpi_bcast(this%lon, this%npatch, MPI_REAL8, p_address_master, p_comm_glb, p_err)
-      CALL mpi_bcast(this%t%y, this%npatch, MPI_REAL8, p_address_master, p_comm_glb, p_err)
-      CALL mpi_bcast(this%q%y, this%npatch, MPI_REAL8, p_address_master, p_comm_glb, p_err)
-      CALL mpi_bcast(this%t%hx, this%npatch*DEF_DA_ENS_NUM, MPI_REAL8, p_address_master, p_comm_glb, p_err)
-      CALL mpi_bcast(this%q%hx, this%npatch*DEF_DA_ENS_NUM, MPI_REAL8, p_address_master, p_comm_glb, p_err)
+      CALL mpi_bcast(this%lat, this%nobs, MPI_REAL8, p_address_master, p_comm_glb, p_err)
+      CALL mpi_bcast(this%lon, this%nobs, MPI_REAL8, p_address_master, p_comm_glb, p_err)
+      CALL mpi_bcast(this%t%y, this%nobs, MPI_REAL8, p_address_master, p_comm_glb, p_err)
+      CALL mpi_bcast(this%q%y, this%nobs, MPI_REAL8, p_address_master, p_comm_glb, p_err)
+      CALL mpi_bcast(this%t%hx, this%nobs*DEF_DA_ENS_NUM, MPI_REAL8, p_address_master, p_comm_glb, p_err)
+      CALL mpi_bcast(this%q%hx, this%nobs*DEF_DA_ENS_NUM, MPI_REAL8, p_address_master, p_comm_glb, p_err)
 #endif
 
    END SUBROUTINE ANA2MTQ_calc_on_pset
@@ -217,7 +218,7 @@ CONTAINS
       class(ANA2MTQ_type), intent(inout) :: this
 
 !-----------------------------------------------------------------------------
-      this%npatch = 0
+      this%nobs = 0
       IF (allocated(this%lat)) deallocate(this%lat)
       IF (allocated(this%lon)) deallocate(this%lon)
       IF (allocated(this%t%y))  deallocate(this%t%y)

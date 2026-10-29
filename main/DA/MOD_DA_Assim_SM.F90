@@ -176,7 +176,6 @@ CONTAINS
       IMPLICIT NONE
 
       CALL sm%clear()
-      CALL sm%free_neighbors()
       IF (allocated(sm%cfgs)) deallocate(sm%cfgs)
       IF (allocated(sm%pm%sensors)) deallocate(sm%pm%sensors)
       IF (allocated(sm%pm%cfgs)) deallocate(sm%pm%cfgs)
