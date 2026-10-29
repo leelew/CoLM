@@ -593,7 +593,7 @@ MODULE MOD_Namelist
 !    Observation source type for each configured observation stream.
 !    Supported examples: 'PM', 'GNOS', 'AM', 'situ', 'GRACE', 'SR'
 !    'ANA2MTQ' with VAR='2MTQ', TARGET='SM' uses patch SYNOP analyses;
-!    requires a 'SYNOP' stream with VAR='2MTQ', TARGET='2MTQ'.
+!    requires 'SYNOP' streams with TARGET='2MT' and TARGET='2MQ'.
 !
 ! DEF_DA_OBS_SENSOR(:)
 !    Sensor or product name for each observation stream. This name is also used
@@ -602,20 +602,23 @@ MODULE MOD_Namelist
 !
 ! DEF_DA_OBS_VAR(:)
 !    Observed variable name for each stream.
-!    Examples: 'TB_H', 'TB_V', 'SM', 'DDM', '2MTQ'.
-!    '2MTQ' reads <sensor>/tref_YYYY_MM_DD_HH.nc and
-!    <sensor>/qref_YYYY_MM_DD_HH.nc, which contain the station 2 m air
-!    temperature [K] and 2 m relative humidity [0-1] respectively. The model
-!    2 m specific humidity is converted to relative humidity with tref and
-!    surface pressure when building H(x).
+!    Examples: 'TB_H', 'TB_V', 'SM', 'DDM'.
+!    For SYNOP streams VAR is informational; the assimilation target decides
+!    which file is read: '2MT' reads <sensor>/tref_YYYY_MM_DD_HH.nc (station
+!    2 m air temperature [K]) and '2MQ' reads <sensor>/qref_YYYY_MM_DD_HH.nc
+!    (station 2 m relative humidity [0-1]). The model 2 m specific humidity
+!    is converted to relative humidity with tref and surface pressure when
+!    building H(x).
 !    For passive microwave, TB is simulated only where the file supplies the
 !    incidence angle 'theta'; a domain-wide theta field yields domain-wide TB.
 !
 ! DEF_DA_OBS_TARGET(:)
 !    Assimilation target controlled by each observation stream.
 !    Examples: 'SM' for soil moisture, 'ST' for soil temperature, 'SNOW' for
-!    snow-related variables, '2MTQ' for SYNOP 2 m air temperature and relative
-!    humidity, which update the model 2 m air temperature and specific humidity.
+!    snow-related variables, '2MT' for SYNOP 2 m air temperature (updates
+!    tref_ens) and '2MQ' for SYNOP 2 m relative humidity (updates qref_ens).
+!    2MT is analyzed before 2MQ so the RH observation operator sees the
+!    analyzed 2 m temperature.
 !
 ! DEF_DA_OBS_FGHZ(:)
 !    Sensor frequency in GHz used by observation operators when needed.
@@ -626,6 +629,11 @@ MODULE MOD_Namelist
 !
 ! DEF_DA_ENS_SM
 !    Enable ensemble perturbations or ensemble DA workflow for soil moisture.
+!
+! DEF_DA_Operation
+!    DA operation mode, either 'online' or 'offline'. The ensemble-mean state
+!    is written back to the model state (member 0) after the ensemble
+!    forecasts only when DEF_DA_Operation = 'online'.
 !
 ! DEF_DA_OPERATOR_RTM_DIEL
 !    Dielectric model option used by the radiative transfer observation operator.
@@ -670,6 +678,8 @@ MODULE MOD_Namelist
 !    Inflation factor used to inflate the analysis ensemble spread after 2 m
 !    temperature/humidity assimilation. The analysis variables are the model
 !    2 m air temperature (tref_ens) and specific humidity (qref_ens).
+!    The same set of parameters applies to both SYNOP targets, '2MT' and
+!    '2MQ'.
 !---------------------------------------------------------------------------------
    character(len=256) :: DEF_DA_OBS_DIR            = ''
    character(len=16)  :: DEF_DA_OBS_SOURCE(10)     = ''
@@ -680,6 +690,7 @@ MODULE MOD_Namelist
 
    integer            :: DEF_DA_ENS_NUM            = 20
    logical            :: DEF_DA_ENS_SM             = .false.  ! (optional)
+   character(len=16)  :: DEF_DA_Operation          = 'offline' ! (optional)
 
    integer            :: DEF_DA_OPERATOR_RTM_DIEL  = 0
    integer            :: DEF_DA_OPERATOR_RTM_ROUGH = 0
@@ -1555,6 +1566,7 @@ CONTAINS
       DEF_DA_OBS_FGHZ,                        &
       DEF_DA_ENS_NUM,                         &
       DEF_DA_ENS_SM,                          &
+      DEF_DA_Operation,                       &
       DEF_DA_OPERATOR_RTM_DIEL,               &
       DEF_DA_OPERATOR_RTM_ROUGH,              &
       DEF_DA_OPERATOR_RTM_TEFF,               &
@@ -1668,6 +1680,11 @@ CONTAINS
             write(*,'(A,I0,A)') 'ERROR: DEF_DA_ENS_NUM = ', DEF_DA_ENS_NUM, &
                ' must be even for Box-Muller ensemble sampling.'
             CALL CoLM_Stop ()
+         ENDIF
+         IF (trim(DEF_DA_Operation) /= 'online' .and. trim(DEF_DA_Operation) /= 'offline') THEN
+            write(*,*) '                  *****                  '
+            write(*,'(A,A)') 'ERROR: DEF_DA_Operation = ', trim(DEF_DA_Operation)
+            CALL CoLM_Stop ('DEF_DA_Operation must be either "online" or "offline".')
          ENDIF
 #endif
          IF (DEF_UnitCatchment_regional) THEN
@@ -2344,6 +2361,7 @@ ENDIF
       CALL mpi_bcast (DEF_DA_OBS_FGHZ                        ,10  ,mpi_real8     ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_ENS_NUM                         ,1   ,mpi_integer   ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_ENS_SM                          ,1   ,mpi_logical   ,p_address_master ,p_comm_glb ,p_err)
+      CALL mpi_bcast (DEF_DA_Operation                       ,16  ,mpi_character ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_OPERATOR_RTM_DIEL               ,1   ,mpi_integer   ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_OPERATOR_RTM_ROUGH              ,1   ,mpi_integer   ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_OPERATOR_RTM_TEFF               ,1   ,mpi_integer   ,p_address_master ,p_comm_glb ,p_err)
