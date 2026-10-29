@@ -5,13 +5,17 @@ MODULE MOD_DA_Obs_SYNOP
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
 !    SYNOP in-situ observation handling for 2 m temperature and humidity
-!    data assimilation.
-!
-!    A SYNOP observation stream is configured with
+!    data assimilation. Temperature and humidity are assimilated by two
+!    independent streams, configured with
 !       DEF_DA_OBS_SOURCE = 'situ'
 !       DEF_DA_OBS_SENSOR = 'SYNOP'
-!       DEF_DA_OBS_VAR    = '2MTQ'
-!       DEF_DA_OBS_TARGET = '2MTQ'
+!       DEF_DA_OBS_VAR    = '2MT'
+!       DEF_DA_OBS_TARGET = '2MT'
+!    and
+!       DEF_DA_OBS_SOURCE = 'situ'
+!       DEF_DA_OBS_SENSOR = 'SYNOP'
+!       DEF_DA_OBS_VAR    = '2MQ'
+!       DEF_DA_OBS_TARGET = '2MQ'
 !
 !    The hourly files are
 !       <DEF_DA_OBS_DIR>/<sensor>/tref_YYYY_MM_DD_HH.nc
@@ -21,21 +25,23 @@ MODULE MOD_DA_Obs_SYNOP
 !    'latitude', 'longitude', 'time', and 'id'. The station table is
 !       <DEF_DA_OBS_DIR>/<sensor>/sites.nc
 !
-!    Observation operator:
+!    Observation operators:
 !       H_T   = tref_ens
 !       H_RH  = RH(qref_ens, tref_ens, forc_psrf)
 !    where RH is calculated from the model 2 m specific humidity and
 !    temperature following the legacy SYNOP implementation. The analysis
 !    variables are the model 2 m air temperature and specific humidity,
-!    tref_ens and qref_ens.
+!    tref_ens and qref_ens. A '2MT' stream reads only the tref file and
+!    updates tref_ens; a '2MQ' stream reads only the qref file and updates
+!    qref_ens. The 2MT analysis runs first, so H_RH for a '2MQ' stream is
+!    evaluated with the analyzed tref_ens.
 !
-!    SYNOP_set_type owns the 2MTQ observation workflow:
-!      1. read the 2 m temperature and relative humidity observations;
+!    SYNOP_set_type owns the observation workflow:
+!      1. read the 2 m temperature and/or relative humidity observations;
 !      2. derive rhref_ens from qref_ens, tref_ens, and surface pressure;
-!      3. gather tref_ens and rhref_ens to station locations through
+!      3. gather tref_ens and/or rhref_ens to station locations through
 !         site_obs_type;
-!      4. concatenate temperature and relative humidity into one observation
-!         vector;
+!      4. concatenate the enabled variables into one observation vector;
 !      5. prepare localized patch-level y, R, and H(x) arrays for LETKF.
 !
 !    Observation error variances are read from each hourly file as 'r',
@@ -45,7 +51,7 @@ MODULE MOD_DA_Obs_SYNOP
 !    Lu Li, 05/2026: Initial implementation
 !-----------------------------------------------------------------------------
    USE MOD_Precision
-   USE MOD_DA_Site_Type
+   USE MOD_DA_Obs_SiteType
    USE MOD_DA_Vars_TimeVariables
    USE MOD_Namelist
    USE MOD_Pixelset
@@ -61,8 +67,12 @@ MODULE MOD_DA_Obs_SYNOP
 
       character(len=16) :: source_name ! 'situ'
       character(len=32) :: sensor_name ! 'SYNOP'
-      character(len=16) :: var_name    ! '2MTQ'
-      integer  :: istream              ! index of this stream in the shared hx_* diagnostics
+      character(len=16) :: var_name    ! '2MT' / '2MQ' (informational)
+      integer  :: istream              ! ordinal of this stream among the non-empty
+                                       ! DEF_DA_OBS_TARGET entries; slot in the
+                                       ! shared hx_* diagnostics
+      logical  :: use_t  = .false.     ! assimilate the 2 m temperature variable
+      logical  :: use_rh = .false.     ! assimilate the 2 m relative humidity variable
 
    END type SYNOP_config_type
 
@@ -92,6 +102,10 @@ MODULE MOD_DA_Obs_SYNOP
       real(r8) :: dres      ! search radius for observations around a target patch [deg]
       real(r8) :: locr      ! localization radius [km]
       real(r8) :: infl      ! inflation factor for error covariance
+
+      ! enabled variables
+      logical  :: use_t  = .false.     ! any configured stream assimilates 2 m temperature
+      logical  :: use_rh = .false.     ! any configured stream assimilates 2 m relative humidity
 
       ! outputs used for assimilation
       integer :: nobs = 0
@@ -185,22 +199,30 @@ CONTAINS
       allocate(this%cfgs(size(configs)))
       this%cfgs = configs
 
+      this%use_t  = any(configs%use_t)
+      this%use_rh = any(configs%use_rh)
+
       this%dres = DEF_DA_ASSIM_2MTQ_DRES
       this%locr = DEF_DA_ASSIM_2MTQ_LOCR
       this%infl = DEF_DA_ASSIM_2MTQ_INFL
 
       ! One sensor owns the temperature and relative humidity pair. Each
-      ! variable is stored in its own hourly file, named after var_name,
-      ! following the same convention as the gridded observation type.
+      ! variable is stored in its own hourly file, named after the file
+      ! variable, following the same convention as the gridded observation
+      ! type. Only the variables enabled by the stream are initialized.
       allocate(this%sensors(size(configs)))
       DO i = 1, size(configs)
          this%sensors(i)%sensor_name = configs(i)%sensor_name
          this%sensors(i)%var_name    = configs(i)%var_name
 
-         CALL this%sensors(i)%t%init(pixelset, configs(i)%source_name, &
-            configs(i)%sensor_name, 'tref')
-         CALL this%sensors(i)%rh%init(pixelset, configs(i)%source_name, &
-            configs(i)%sensor_name, 'qref')
+         IF (configs(i)%use_t) THEN
+            CALL this%sensors(i)%t%init(pixelset, configs(i)%source_name, &
+               configs(i)%sensor_name, 'tref')
+         ENDIF
+         IF (configs(i)%use_rh) THEN
+            CALL this%sensors(i)%rh%init(pixelset, configs(i)%source_name, &
+               configs(i)%sensor_name, 'qref')
+         ENDIF
       ENDDO
 
    END SUBROUTINE SYNOP_type_init
@@ -257,15 +279,19 @@ CONTAINS
 
       IF (.not. allocated(this%sensors)) RETURN
 
-      ! H(x) for humidity is relative humidity, derived from qref_ens
-      CALL SYNOP_calc_rh()
+      ! H(x) for humidity is relative humidity, derived from qref_ens;
+      ! only needed when a relative humidity stream is enabled
+      IF (this%use_rh) CALL SYNOP_calc_rh()
 
       DO i = 1, size(this%sensors)
-         CALL this%sensors(i)%t%read(idate, deltim)
-         CALL this%sensors(i)%rh%read(idate, deltim)
-
-         CALL this%sensors(i)%t%gather(tref_ens, this%sensors(i)%hx_t)
-         CALL this%sensors(i)%rh%gather(rhref_ens, this%sensors(i)%hx_rh)
+         IF (this%cfgs(i)%use_t) THEN
+            CALL this%sensors(i)%t%read(idate, deltim)
+            CALL this%sensors(i)%t%gather(tref_ens, this%sensors(i)%hx_t)
+         ENDIF
+         IF (this%cfgs(i)%use_rh) THEN
+            CALL this%sensors(i)%rh%read(idate, deltim)
+            CALL this%sensors(i)%rh%gather(rhref_ens, this%sensors(i)%hx_rh)
+         ENDIF
       ENDDO
 
       CALL this%concat()
@@ -297,7 +323,8 @@ CONTAINS
       IF (.not. allocated(this%sensors)) RETURN
 
       DO i = 1, size(this%sensors)
-         this%nobs = this%nobs + this%sensors(i)%t%nobs + this%sensors(i)%rh%nobs
+         IF (this%cfgs(i)%use_t)  this%nobs = this%nobs + this%sensors(i)%t%nobs
+         IF (this%cfgs(i)%use_rh) this%nobs = this%nobs + this%sensors(i)%rh%nobs
       ENDDO
       IF (this%nobs == 0) RETURN
 
@@ -311,27 +338,31 @@ CONTAINS
 
       DO i = 1, size(this%sensors)
          ! 2 m temperature observations
-         nt = this%sensors(i)%t%nobs
-         IF (nt > 0) THEN
-            n = offset + 1
-            this%lat(n:offset+nt) = this%sensors(i)%t%lat
-            this%lon(n:offset+nt) = this%sensors(i)%t%lon
-            this%y  (n:offset+nt) = this%sensors(i)%t%y
-            this%hx (n:offset+nt,:) = this%sensors(i)%hx_t(:,1:DEF_DA_ENS_NUM)
-            this%r  (n:offset+nt) = this%sensors(i)%t%r
-            offset = offset + nt
+         IF (this%cfgs(i)%use_t) THEN
+            nt = this%sensors(i)%t%nobs
+            IF (nt > 0) THEN
+               n = offset + 1
+               this%lat(n:offset+nt) = this%sensors(i)%t%lat
+               this%lon(n:offset+nt) = this%sensors(i)%t%lon
+               this%y  (n:offset+nt) = this%sensors(i)%t%y
+               this%hx (n:offset+nt,:) = this%sensors(i)%hx_t(:,1:DEF_DA_ENS_NUM)
+               this%r  (n:offset+nt) = this%sensors(i)%t%r
+               offset = offset + nt
+            ENDIF
          ENDIF
 
          ! 2 m relative humidity observations
-         nrh = this%sensors(i)%rh%nobs
-         IF (nrh > 0) THEN
-            n = offset + 1
-            this%lat(n:offset+nrh) = this%sensors(i)%rh%lat
-            this%lon(n:offset+nrh) = this%sensors(i)%rh%lon
-            this%y  (n:offset+nrh) = this%sensors(i)%rh%y
-            this%hx (n:offset+nrh,:) = this%sensors(i)%hx_rh(:,1:DEF_DA_ENS_NUM)
-            this%r  (n:offset+nrh) = this%sensors(i)%rh%r
-            offset = offset + nrh
+         IF (this%cfgs(i)%use_rh) THEN
+            nrh = this%sensors(i)%rh%nobs
+            IF (nrh > 0) THEN
+               n = offset + 1
+               this%lat(n:offset+nrh) = this%sensors(i)%rh%lat
+               this%lon(n:offset+nrh) = this%sensors(i)%rh%lon
+               this%y  (n:offset+nrh) = this%sensors(i)%rh%y
+               this%hx (n:offset+nrh,:) = this%sensors(i)%hx_rh(:,1:DEF_DA_ENS_NUM)
+               this%r  (n:offset+nrh) = this%sensors(i)%rh%r
+               offset = offset + nrh
+            ENDIF
          ENDIF
       ENDDO
 
@@ -343,15 +374,10 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 ! Save patch-space H(x) diagnostics. The shared hx_* arrays have one slot per
-! observation stream, while a 2MTQ stream carries both temperature and
-! humidity; this diagnostic slot stores 2 m temperature. Since tref_ens is
-! also an analysis variable, the analysis H(x) is available directly after
-! the update.
-!
-! TODO: the relative humidity H(x) is not saved. 2MTQ needs two consecutive
-! diagnostic slots, one for tref and one for rhref, which also requires
-! updating the nsource/istream mapping in MOD_DA_Vars_TimeVariables and the
-! assimilation modules.
+! observation stream; a '2MT' stream stores 2 m temperature in its slot and a
+! '2MQ' stream stores 2 m relative humidity. Since tref_ens and rhref_ens are
+! derived from the analysis variables, the analysis H(x) is available directly
+! after the update.
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
 
@@ -369,7 +395,8 @@ CONTAINS
       IF (nsource <= 0) RETURN
       IF (numpatch <= 0) RETURN
       IF (.not. allocated(hx_f_ens)) RETURN
-      IF (.not. allocated(tref_ens)) RETURN
+      IF (this%use_t  .and. .not. allocated(tref_ens))  RETURN
+      IF (this%use_rh .and. .not. allocated(rhref_ens)) RETURN
 
       DO i = 1, size(this%cfgs)
          is = this%cfgs(i)%istream
@@ -386,17 +413,32 @@ CONTAINS
       DO i = 1, size(this%cfgs)
          is = this%cfgs(i)%istream
          DO np = 1, numpatch
-            valid_hx = all(tref_ens(1:DEF_DA_ENS_NUM,np) /= spval)
+            IF (this%cfgs(i)%use_t) THEN
+               valid_hx = all(tref_ens(1:DEF_DA_ENS_NUM,np) /= spval)
 
-            IF (is_analysis) THEN
-               hx_a_ens(is,1:DEF_DA_ENS_NUM,np) = tref_ens(1:DEF_DA_ENS_NUM,np)
-               IF (valid_hx) hx_a(is,np) = &
-                  sum(tref_ens(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
-            ELSE
-               hx_ol(is,np) = tref_ens(0,np)
-               hx_f_ens(is,1:DEF_DA_ENS_NUM,np) = tref_ens(1:DEF_DA_ENS_NUM,np)
-               IF (valid_hx) hx_f(is,np) = &
-                  sum(tref_ens(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
+               IF (is_analysis) THEN
+                  hx_a_ens(is,1:DEF_DA_ENS_NUM,np) = tref_ens(1:DEF_DA_ENS_NUM,np)
+                  IF (valid_hx) hx_a(is,np) = &
+                     sum(tref_ens(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
+               ELSE
+                  hx_ol(is,np) = tref_ens(0,np)
+                  hx_f_ens(is,1:DEF_DA_ENS_NUM,np) = tref_ens(1:DEF_DA_ENS_NUM,np)
+                  IF (valid_hx) hx_f(is,np) = &
+                     sum(tref_ens(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
+               ENDIF
+            ELSE IF (this%cfgs(i)%use_rh) THEN
+               valid_hx = all(rhref_ens(1:DEF_DA_ENS_NUM,np) /= spval)
+
+               IF (is_analysis) THEN
+                  hx_a_ens(is,1:DEF_DA_ENS_NUM,np) = rhref_ens(1:DEF_DA_ENS_NUM,np)
+                  IF (valid_hx) hx_a(is,np) = &
+                     sum(rhref_ens(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
+               ELSE
+                  hx_ol(is,np) = rhref_ens(0,np)
+                  hx_f_ens(is,1:DEF_DA_ENS_NUM,np) = rhref_ens(1:DEF_DA_ENS_NUM,np)
+                  IF (valid_hx) hx_f(is,np) = &
+                     sum(rhref_ens(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
+               ENDIF
             ENDIF
          ENDDO
       ENDDO

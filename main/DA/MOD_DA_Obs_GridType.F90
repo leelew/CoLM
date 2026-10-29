@@ -1,28 +1,19 @@
 #include <define.h>
 
 #ifdef DataAssimilation
-MODULE MOD_DA_Obs_BasicType
+MODULE MOD_DA_Obs_GridType
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
-!    Basic observation derived types for data assimilation.
+!    Grid observation derived type for data assimilation.
 !
-!    This module defines common observation containers and utilities shared by
-!    source-specific observation modules. Observation sources are organized into
-!    two broad classes:
+!    A grid_obs_type represents one gridded observation stream: a satellite
+!    or gridded product that comes with its own spatial grid. It stores the
+!    observation grid, the grid-to-patch spatial mapping, and
+!    timestep-dependent observation vectors.
 !
-!      1. Grid observations:
-!         Satellite or gridded products with their own spatial grid. A
-!         grid_obs_type stores the observation grid, the grid-to-patch spatial
-!         mapping, and timestep-dependent observation vectors.
-!
-!      2. In-situ observations:
-!         Point-based measurements such as stations or field networks. These
-!         observations do not own a source grid, but still need common metadata,
-!         location, time, value, and error containers.
-!
-!    Higher-level modules, such as PM, AM, GNOS, and soil-moisture
-!    assimilation wrappers, should build on these basic types instead of
-!    duplicating storage and search logic.
+!    Source-specific modules, such as PM, AM, GNOS, and MR, build on this
+!    type instead of duplicating storage and search logic. Site-based
+!    observations are handled by site_obs_type in MOD_DA_Obs_SiteType.
 !
 ! SUPPORTED:
 ! +--------+----------+----------------------+-------------------------------+
@@ -68,7 +59,6 @@ MODULE MOD_DA_Obs_BasicType
     USE MOD_Namelist
     USE MOD_NetCDFSerial
     USE MOD_Pixelset
-    USE MOD_Vars_Global, ONLY: spval
     USE MOD_SpatialMapping
     USE MOD_TimeManager
     IMPLICIT NONE
@@ -266,5 +256,5 @@ CONTAINS
 
 
 !-----------------------------------------------------------------------------
-END MODULE MOD_DA_Obs_BasicType
+END MODULE MOD_DA_Obs_GridType
 #endif

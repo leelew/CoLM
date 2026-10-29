@@ -31,10 +31,10 @@ MODULE MOD_DA_Main
    IMPLICIT NONE
    SAVE
 
-   logical :: use_assim_2mtq = .false.
+   logical :: use_assim_2mt = .false.
+   logical :: use_assim_2mq = .false.
    logical :: use_assim_sm = .false.
    logical :: use_assim_st = .false.
-   logical :: use_assim_2mtq = .false.
 
 !-----------------------------------------------------------------------------
 
@@ -68,17 +68,25 @@ CONTAINS
             EXIT
          ENDIF
       ENDDO
-      use_assim_2mtq = .false.
+      use_assim_2mt = .false.
       DO i = 1, size(DEF_DA_OBS_TARGET)
-         IF (trim(DEF_DA_OBS_TARGET(i)) == '2MTQ') THEN
-            use_assim_2mtq = .true.
+         IF (trim(DEF_DA_OBS_TARGET(i)) == '2MT') THEN
+            use_assim_2mt = .true.
+            EXIT
+         ENDIF
+      ENDDO
+      use_assim_2mq = .false.
+      DO i = 1, size(DEF_DA_OBS_TARGET)
+         IF (trim(DEF_DA_OBS_TARGET(i)) == '2MQ') THEN
+            use_assim_2mq = .true.
             EXIT
          ENDIF
       ENDDO
 
       IF (p_is_master) THEN
          WRITE (*,'(A)') '[CoLM-DA] Initialize data assimilation.'
-         IF (use_assim_2mtq) WRITE (*,'(A)') '[CoLM-DA] Start SYNOP 2 m temperature/humidity (2MTQ) data assimilation.'
+         IF (use_assim_2mt) WRITE (*,'(A)') '[CoLM-DA] Start SYNOP 2 m temperature (2MT) data assimilation.'
+         IF (use_assim_2mq) WRITE (*,'(A)') '[CoLM-DA] Start SYNOP 2 m relative humidity (2MQ) data assimilation.'
          IF (use_assim_sm) WRITE (*,'(A)') '[CoLM-DA] Start surface soil moisture (SM) data assimilation.'
          IF (use_assim_st) WRITE (*,'(A)') '[CoLM-DA] Start soil temperature (ST) data assimilation.'
 
@@ -108,7 +116,7 @@ CONTAINS
          WRITE (*,'(A)') '+------+----------+----------+------------------+----------+------------+'
       ENDIF
 
-      IF (use_assim_2mtq) CALL init_assim_2MTQ ()
+      IF (use_assim_2mt .or. use_assim_2mq) CALL init_assim_2MTQ ()
       IF (use_assim_sm) CALL init_assim_SM ()
       IF (use_assim_st) CALL init_assim_ST ()
 
@@ -148,22 +156,26 @@ CONTAINS
 #endif
       ENDIF
 
-      CALL ens_to_model(0)
-
-      IF (is_spinup) RETURN
-
       ! Analysis order is independent of the namelist stream order.
       ! Screen analysis produces the patch products consumed by SM.
-      CALL mpi_barrier (p_comm_glb, p_err)
-      IF (use_assim_2mtq) THEN
-         CALL run_assim_2MTQ (idate, deltim)
+      ! Within run_assim_2MTQ, 2MT is analyzed before 2MQ so the RH
+      ! observation operator sees the analyzed temperature.
+      IF (.not. is_spinup) THEN
+         CALL mpi_barrier (p_comm_glb, p_err)
+         IF (use_assim_2mt .or. use_assim_2mq) THEN
+            CALL run_assim_2MTQ (idate, deltim)
+         ENDIF
+         IF (use_assim_sm) THEN
+            CALL run_assim_SM (idate, deltim)
+         ENDIF
+         IF (use_assim_st) THEN
+            CALL run_assim_ST (idate, deltim)
+         ENDIF
       ENDIF
-      IF (use_assim_sm) THEN
-         CALL run_assim_SM (idate, deltim)
-      ENDIF
-      IF (use_assim_st) THEN
-         CALL run_assim_ST (idate, deltim)
-      ENDIF
+
+      ! In online mode this writes the analyzed ensemble mean into the model
+      ! state; in offline mode it restores the open-loop member 0.
+      CALL ens_to_model(0)
 
    END SUBROUTINE run_DA
 
@@ -230,12 +242,12 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-      IF (use_assim_2mtq) CALL end_assim_2MTQ ()
-      use_assim_2mtq = .false.
+      IF (use_assim_2mt .or. use_assim_2mq) CALL end_assim_2MTQ ()
+      use_assim_2mt = .false.
+      use_assim_2mq = .false.
       IF (use_assim_sm) CALL end_assim_SM ()
-      IF (use_assim_2mtq) CALL end_assim_2MTQ ()
-      use_assim_2mtq = .false.
       use_assim_sm = .false.
+      IF (use_assim_st) CALL end_assim_ST ()
       use_assim_st = .false.
 
    END SUBROUTINE end_DA
