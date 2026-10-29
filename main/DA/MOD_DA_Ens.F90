@@ -21,8 +21,8 @@ MODULE MOD_DA_Ens
    USE MOD_Vars_1DForcing
    USE MOD_LandPatch
    USE MOD_SPMD_Task
-#ifdef GridRiverLakeFlow
    USE MOD_Vars_Global,            only: spval
+#ifdef GridRiverLakeFlow
    USE MOD_Grid_RiverLakeTimeVars, only: wdsrf_ucat, veloc_riv, volresv
 #endif
    IMPLICIT NONE
@@ -59,6 +59,12 @@ MODULE MOD_DA_Ens
    real(r8), dimension(nvar_sm) :: sigma_sm = (/0.035, 0.0552/)      ! standard deviation of perturbed soil moisture (equal to 0.002 m3/m3)
    real(r8), allocatable :: r_prev_sm(:,:,:)                         ! previous perturbation (numpatch, nvar_sm, DEF_DA_ENS_NUM)
    real(r8), allocatable :: r_curr_sm(:,:,:)                         ! current perturbation (numpatch, nvar_sm, DEF_DA_ENS_NUM)
+
+!-----------------------------------------------------------------------
+
+   INTERFACE ens_mean
+      MODULE PROCEDURE ens_mean_1d, ens_mean_2d, ens_mean_3d
+   END INTERFACE
 
 !-----------------------------------------------------------------------
 
@@ -374,70 +380,141 @@ CONTAINS
 
       IF (.not. p_is_worker) RETURN
 
-      forc_t       = forc_t_ens      (    iens,:)
-      forc_prc     = forc_prc_ens    (    iens,:)
-      forc_prl     = forc_prl_ens    (    iens,:)
-      forc_sols    = forc_sols_ens   (    iens,:)
-      forc_soll    = forc_soll_ens   (    iens,:)
-      forc_solsd   = forc_solsd_ens  (    iens,:)
-      forc_solld   = forc_solld_ens  (    iens,:)
-      forc_frl     = forc_frl_ens    (    iens,:)
+      ! In online mode, member 0 carries the ensemble mean over members
+      ! 1:DEF_DA_ENS_NUM after the ensemble forecasts; in offline mode it
+      ! keeps its open-loop trajectory.
+      IF (iens == 0 .and. DEF_DA_ENS_NUM > 1 .and. &
+          trim(DEF_DA_Operation) == 'online') THEN
+         CALL ens_mean (forc_t_ens,       forc_t)
+         CALL ens_mean (forc_prc_ens,     forc_prc)
+         CALL ens_mean (forc_prl_ens,     forc_prl)
+         CALL ens_mean (forc_sols_ens,    forc_sols)
+         CALL ens_mean (forc_soll_ens,    forc_soll)
+         CALL ens_mean (forc_solsd_ens,   forc_solsd)
+         CALL ens_mean (forc_solld_ens,   forc_solld)
+         CALL ens_mean (forc_frl_ens,     forc_frl)
 
-      z_sno        = z_sno_ens       (  :,iens,:)
-      dz_sno       = dz_sno_ens      (  :,iens,:)
-      t_soisno     = t_soisno_ens    (  :,iens,:)
-      wliq_soisno  = wliq_soisno_ens (  :,iens,:)
-      wice_soisno  = wice_soisno_ens (  :,iens,:)
-      smp          = smp_ens         (  :,iens,:)
-      hk           = hk_ens          (  :,iens,:)
-      t_grnd       = t_grnd_ens      (    iens,:)
-      tleaf        = tleaf_ens       (    iens,:)
-      ldew         = ldew_ens        (    iens,:)
-      ldew_rain    = ldew_rain_ens   (    iens,:)
-      ldew_snow    = ldew_snow_ens   (    iens,:)
-      fwet_snow    = fwet_snow_ens   (    iens,:)
-      sag          = sag_ens         (    iens,:)
-      scv          = scv_ens         (    iens,:)
-      snowdp       = snowdp_ens      (    iens,:)
-      fveg         = fveg_ens        (    iens,:)
-      fsno         = fsno_ens        (    iens,:)
-      sigf         = sigf_ens        (    iens,:)
-      green        = green_ens       (    iens,:)
-      tlai         = tlai_ens        (    iens,:)
-      lai          = lai_ens         (    iens,:)
-      tsai         = tsai_ens        (    iens,:)
-      sai          = sai_ens         (    iens,:)
-      alb          = alb_ens         (:,:,iens,:)
-      ssun         = ssun_ens        (:,:,iens,:)
-      ssha         = ssha_ens        (:,:,iens,:)
-      ssoi         = ssoi_ens        (:,:,iens,:)
-      ssno         = ssno_ens        (:,:,iens,:)
-      thermk       = thermk_ens      (    iens,:)
-      extkb        = extkb_ens       (    iens,:)
-      extkd        = extkd_ens       (    iens,:)
-      zwt          = zwt_ens         (    iens,:)
-      wdsrf        = wdsrf_ens       (    iens,:)
-      wa           = wa_ens          (    iens,:)
-      wetwat       = wetwat_ens      (    iens,:)
-      t_lake       = t_lake_ens      (  :,iens,:)
-      lake_icefrac = lake_icefrac_ens(  :,iens,:)
-      savedtke1    = savedtke1_ens   (    iens,:)
+         CALL ens_mean (z_sno_ens,        z_sno)
+         CALL ens_mean (dz_sno_ens,       dz_sno)
+         CALL ens_mean (t_soisno_ens,     t_soisno)
+         CALL ens_mean (wliq_soisno_ens,  wliq_soisno)
+         CALL ens_mean (wice_soisno_ens,  wice_soisno)
+         CALL ens_mean (smp_ens,          smp)
+         CALL ens_mean (hk_ens,           hk)
+         CALL ens_mean (t_grnd_ens,       t_grnd)
+         CALL ens_mean (tleaf_ens,        tleaf)
+         CALL ens_mean (ldew_ens,         ldew)
+         CALL ens_mean (ldew_rain_ens,    ldew_rain)
+         CALL ens_mean (ldew_snow_ens,    ldew_snow)
+         CALL ens_mean (fwet_snow_ens,    fwet_snow)
+         CALL ens_mean (sag_ens,          sag)
+         CALL ens_mean (scv_ens,          scv)
+         CALL ens_mean (snowdp_ens,       snowdp)
+         CALL ens_mean (fveg_ens,         fveg)
+         CALL ens_mean (fsno_ens,         fsno)
+         CALL ens_mean (sigf_ens,         sigf)
+         CALL ens_mean (green_ens,        green)
+         CALL ens_mean (tlai_ens,         tlai)
+         CALL ens_mean (lai_ens,          lai)
+         CALL ens_mean (tsai_ens,         tsai)
+         CALL ens_mean (sai_ens,          sai)
+         CALL ens_mean (alb_ens,          alb)
+         CALL ens_mean (ssun_ens,         ssun)
+         CALL ens_mean (ssha_ens,         ssha)
+         CALL ens_mean (ssoi_ens,         ssoi)
+         CALL ens_mean (ssno_ens,         ssno)
+         CALL ens_mean (thermk_ens,       thermk)
+         CALL ens_mean (extkb_ens,        extkb)
+         CALL ens_mean (extkd_ens,        extkd)
+         CALL ens_mean (zwt_ens,          zwt)
+         CALL ens_mean (wdsrf_ens,        wdsrf)
+         CALL ens_mean (wa_ens,           wa)
+         CALL ens_mean (wetwat_ens,       wetwat)
+         CALL ens_mean (t_lake_ens,       t_lake)
+         CALL ens_mean (lake_icefrac_ens, lake_icefrac)
+         CALL ens_mean (savedtke1_ens,    savedtke1)
 
-      trad         = trad_ens        (    iens,:)
-      tref         = tref_ens        (    iens,:)
-      qref         = qref_ens        (    iens,:)
-      ustar        = ustar_ens       (    iens,:)
-      qstar        = qstar_ens       (    iens,:)
-      tstar        = tstar_ens       (    iens,:)
-      fm           = fm_ens          (    iens,:)
-      fh           = fh_ens          (    iens,:)
-      fq           = fq_ens          (    iens,:)
+         CALL ens_mean (trad_ens,         trad)
+         CALL ens_mean (tref_ens,         tref)
+         CALL ens_mean (qref_ens,         qref)
+         CALL ens_mean (ustar_ens,        ustar)
+         CALL ens_mean (qstar_ens,        qstar)
+         CALL ens_mean (tstar_ens,        tstar)
+         CALL ens_mean (fm_ens,           fm)
+         CALL ens_mean (fh_ens,           fh)
+         CALL ens_mean (fq_ens,           fq)
 
-      fsena        = fsena_ens       (    iens,:)
-      lfevpa       = lfevpa_ens      (    iens,:)
-      fevpa        = fevpa_ens       (    iens,:)
-      rsur         = rsur_ens        (    iens,:)
-      rnof         = rnof_ens        (    iens,:)
+         CALL ens_mean (fsena_ens,        fsena)
+         CALL ens_mean (lfevpa_ens,       lfevpa)
+         CALL ens_mean (fevpa_ens,        fevpa)
+         CALL ens_mean (rsur_ens,         rsur)
+         CALL ens_mean (rnof_ens,         rnof)
+      ELSE
+         forc_t       = forc_t_ens      (    iens,:)
+         forc_prc     = forc_prc_ens    (    iens,:)
+         forc_prl     = forc_prl_ens    (    iens,:)
+         forc_sols    = forc_sols_ens   (    iens,:)
+         forc_soll    = forc_soll_ens   (    iens,:)
+         forc_solsd   = forc_solsd_ens  (    iens,:)
+         forc_solld   = forc_solld_ens  (    iens,:)
+         forc_frl     = forc_frl_ens    (    iens,:)
+
+         z_sno        = z_sno_ens       (  :,iens,:)
+         dz_sno       = dz_sno_ens      (  :,iens,:)
+         t_soisno     = t_soisno_ens    (  :,iens,:)
+         wliq_soisno  = wliq_soisno_ens (  :,iens,:)
+         wice_soisno  = wice_soisno_ens (  :,iens,:)
+         smp          = smp_ens         (  :,iens,:)
+         hk           = hk_ens          (  :,iens,:)
+         t_grnd       = t_grnd_ens      (    iens,:)
+         tleaf        = tleaf_ens       (    iens,:)
+         ldew         = ldew_ens        (    iens,:)
+         ldew_rain    = ldew_rain_ens   (    iens,:)
+         ldew_snow    = ldew_snow_ens   (    iens,:)
+         fwet_snow    = fwet_snow_ens   (    iens,:)
+         sag          = sag_ens         (    iens,:)
+         scv          = scv_ens         (    iens,:)
+         snowdp       = snowdp_ens      (    iens,:)
+         fveg         = fveg_ens        (    iens,:)
+         fsno         = fsno_ens        (    iens,:)
+         sigf         = sigf_ens        (    iens,:)
+         green        = green_ens       (    iens,:)
+         tlai         = tlai_ens        (    iens,:)
+         lai          = lai_ens         (    iens,:)
+         tsai         = tsai_ens        (    iens,:)
+         sai          = sai_ens         (    iens,:)
+         alb          = alb_ens         (:,:,iens,:)
+         ssun         = ssun_ens        (:,:,iens,:)
+         ssha         = ssha_ens        (:,:,iens,:)
+         ssoi         = ssoi_ens        (:,:,iens,:)
+         ssno         = ssno_ens        (:,:,iens,:)
+         thermk       = thermk_ens      (    iens,:)
+         extkb        = extkb_ens       (    iens,:)
+         extkd        = extkd_ens       (    iens,:)
+         zwt          = zwt_ens         (    iens,:)
+         wdsrf        = wdsrf_ens       (    iens,:)
+         wa           = wa_ens          (    iens,:)
+         wetwat       = wetwat_ens      (    iens,:)
+         t_lake       = t_lake_ens      (  :,iens,:)
+         lake_icefrac = lake_icefrac_ens(  :,iens,:)
+         savedtke1    = savedtke1_ens   (    iens,:)
+
+         trad         = trad_ens        (    iens,:)
+         tref         = tref_ens        (    iens,:)
+         qref         = qref_ens        (    iens,:)
+         ustar        = ustar_ens       (    iens,:)
+         qstar        = qstar_ens       (    iens,:)
+         tstar        = tstar_ens       (    iens,:)
+         fm           = fm_ens          (    iens,:)
+         fh           = fh_ens          (    iens,:)
+         fq           = fq_ens          (    iens,:)
+
+         fsena        = fsena_ens       (    iens,:)
+         lfevpa       = lfevpa_ens      (    iens,:)
+         fevpa        = fevpa_ens       (    iens,:)
+         rsur         = rsur_ens        (    iens,:)
+         rnof         = rnof_ens        (    iens,:)
+      ENDIF
 
 #ifdef GridRiverLakeFlow
       IF (iens == 0) THEN
@@ -454,6 +531,51 @@ CONTAINS
 #endif
 
    END SUBROUTINE ens_to_model
+
+!-----------------------------------------------------------------------
+
+   SUBROUTINE ens_mean_1d (ens, mean)
+
+!-----------------------------------------------------------------------
+      IMPLICIT NONE
+
+      real(r8), intent(in)  :: ens  (0:,:)
+      real(r8), intent(out) :: mean (:)
+
+      mean = sum(ens(1:DEF_DA_ENS_NUM,:), dim=1) / DEF_DA_ENS_NUM
+      WHERE (any(ens(1:DEF_DA_ENS_NUM,:) == spval, dim=1)) mean = spval
+
+   END SUBROUTINE ens_mean_1d
+
+!-----------------------------------------------------------------------
+
+   SUBROUTINE ens_mean_2d (ens, mean)
+
+!-----------------------------------------------------------------------
+      IMPLICIT NONE
+
+      real(r8), intent(in)  :: ens  (:,:,:)
+      real(r8), intent(out) :: mean (:,:)
+
+      mean = sum(ens(:,1:DEF_DA_ENS_NUM,:), dim=2) / DEF_DA_ENS_NUM
+      WHERE (any(ens(:,1:DEF_DA_ENS_NUM,:) == spval, dim=2)) mean = spval
+
+   END SUBROUTINE ens_mean_2d
+
+!-----------------------------------------------------------------------
+
+   SUBROUTINE ens_mean_3d (ens, mean)
+
+!-----------------------------------------------------------------------
+      IMPLICIT NONE
+
+      real(r8), intent(in)  :: ens  (:,:,:,:)
+      real(r8), intent(out) :: mean (:,:,:)
+
+      mean = sum(ens(:,:,1:DEF_DA_ENS_NUM,:), dim=3) / DEF_DA_ENS_NUM
+      WHERE (any(ens(:,:,1:DEF_DA_ENS_NUM,:) == spval, dim=3)) mean = spval
+
+   END SUBROUTINE ens_mean_3d
 
 !-----------------------------------------------------------------------
 END MODULE MOD_DA_Ens

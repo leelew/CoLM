@@ -181,9 +181,9 @@ CONTAINS
 
       this%use_ana2mtq = any(configs%source_name == 'ANA2MTQ')
       IF (this%use_ana2mtq) THEN
-         IF (.not. any(DEF_DA_OBS_SOURCE == 'SYNOP' .and. DEF_DA_OBS_TARGET == '2MTQ')) &
-            ERROR STOP 'ANA2MTQ requires a screen level analysis'
-         CALL this%build_neighbors()
+         IF (.not. (any(DEF_DA_OBS_SOURCE == 'SYNOP' .and. DEF_DA_OBS_TARGET == '2MT') .and. &
+                    any(DEF_DA_OBS_SOURCE == 'SYNOP' .and. DEF_DA_OBS_TARGET == '2MQ'))) &
+            ERROR STOP 'ANA2MTQ requires SYNOP 2MT and 2MQ screen level analyses'
       ENDIF
 
    END SUBROUTINE SM_type_init
