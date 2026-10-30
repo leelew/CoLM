@@ -601,14 +601,15 @@ MODULE MOD_Namelist
 !    Examples: 'SMAP_L1C_D', 'FY3D_L1', 'CYGNSS', 'ISMN', etc.
 !
 ! DEF_DA_OBS_VAR(:)
-!    Observed variable name for each stream.
-!    Examples: 'TB_H', 'TB_V', 'SM', 'DDM'.
-!    For SYNOP streams VAR is informational; the assimilation target decides
-!    which file is read: '2MT' reads <sensor>/tref_YYYY_MM_DD_HH.nc (station
-!    2 m air temperature [K]) and '2MQ' reads <sensor>/qref_YYYY_MM_DD_HH.nc
-!    (station 2 m relative humidity [0-1]). The model 2 m specific humidity
-!    is converted to relative humidity with tref and surface pressure when
-!    building H(x).
+!    Observed variable name for each stream. This name is also used to locate
+!    the observation file and to read the variable from it.
+!    Examples: 'TB_H', 'TB_V', 'SM', 'DDM', '2MT', '2MQ'.
+!    For SYNOP streams '2MT' reads <sensor>/2MT_YYYY_MM_DD_HH.nc (station 2 m
+!    air temperature [K]) and '2MQ' reads <sensor>/2MQ_YYYY_MM_DD_HH.nc
+!    (station 2 m relative humidity [0-1]); TARGET selects the analyzed
+!    variable (tref_ens for '2MT', qref_ens for '2MQ'). The model 2 m specific
+!    humidity is converted to relative humidity with tref and surface
+!    pressure when building H(x).
 !    For passive microwave, TB is simulated only where the file supplies the
 !    incidence angle 'theta'; a domain-wide theta field yields domain-wide TB.
 !
