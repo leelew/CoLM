@@ -132,7 +132,7 @@ CONTAINS
       IMPLICIT NONE
 
 !------------------------ Dummy Arguments ------------------------------------
-      class(PM_type),     intent(inout)  :: this
+      class(PM_type),      intent(inout) :: this
       type(pixelset_type), intent(in)    :: pixelset     ! target pixel/patch set
       character(len=*),    intent(in)    :: source_name  ! observation source class, e.g., "PM"
       character(len=*),    intent(in)    :: sensor_name  ! sensor/subdirectory name

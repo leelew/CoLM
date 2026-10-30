@@ -182,7 +182,6 @@ CONTAINS
         character(len=512) :: logmsg           ! log message buffer
 
 !-----------------------------------------------------------------------------
-
         CALL this%clear()
 
         ! UTC begin time of the current DA window

@@ -20,9 +20,9 @@ MODULE MOD_DA_Obs_SM
 !      4. concatenate all enabled source/sensor observations into one vector;
 !      5. prepare localized patch-level y, R, and H(x) arrays for LETKF.
 !
-!    ANA2MTQ selects patches with nonzero T and q analysis increments,
-!    gathers their paired data on master, and broadcasts to all workers.
-!    Its nobs counts patches; the SM arrays contain two rows per selected patch.
+!    ANA2MTQ selects changed T and q records independently, gathers them on
+!    master, and broadcasts to all workers. Its combined vectors follow the
+!    same concatenation and localization path as the other sources.
 !
 !    Source-level parameters, such as PM sensor, variable, and frequency,
 !    are passed to the corresponding source module config type.
@@ -155,9 +155,9 @@ CONTAINS
 
       this%use_ana2mtq = any(configs%source_name == 'ANA2MTQ')
       IF (this%use_ana2mtq) THEN
-         IF (.not. (any(DEF_DA_OBS_SOURCE == 'SYNOP' .and. DEF_DA_OBS_TARGET == '2MT') .and. &
-                    any(DEF_DA_OBS_SOURCE == 'SYNOP' .and. DEF_DA_OBS_TARGET == '2MQ'))) &
-            ERROR STOP 'ANA2MTQ requires SYNOP 2MT and 2MQ screen level analyses'
+         IF (.not. any(DEF_DA_OBS_SOURCE == 'SYNOP' .and. &
+                      (DEF_DA_OBS_TARGET == '2MT' .or. DEF_DA_OBS_TARGET == '2MQ'))) &
+            ERROR STOP 'ANA2MTQ requires a SYNOP 2MT or 2MQ screen level analysis'
          CALL this%ana2mtq%init()
       ENDIF
 
@@ -209,7 +209,7 @@ CONTAINS
       IF (allocated(this%r))   deallocate(this%r)
 
       IF (this%use_pm) this%nobs = this%nobs + this%pm%nobs
-      IF (this%use_ana2mtq) this%nobs = this%nobs + 2*this%ana2mtq%nobs
+      IF (this%use_ana2mtq) this%nobs = this%nobs + this%ana2mtq%nobs
       IF (this%nobs == 0) RETURN
 
       allocate(this%lat(this%nobs))
@@ -232,20 +232,15 @@ CONTAINS
          ENDIF
       ENDIF
 
-      ! Each selected ANA2MTQ patch supplies one T row and one q row.
       IF (this%use_ana2mtq) THEN
          n = this%ana2mtq%nobs
          IF (n > 0) THEN
-            this%lat(offset+1:offset+2*n:2) = this%ana2mtq%lat
-            this%lat(offset+2:offset+2*n:2) = this%ana2mtq%lat
-            this%lon(offset+1:offset+2*n:2) = this%ana2mtq%lon
-            this%lon(offset+2:offset+2*n:2) = this%ana2mtq%lon
-            this%y(offset+1:offset+2*n:2) = this%ana2mtq%t%y
-            this%y(offset+2:offset+2*n:2) = this%ana2mtq%q%y
-            this%hx(offset+1:offset+2*n:2,:) = this%ana2mtq%t%hx
-            this%hx(offset+2:offset+2*n:2,:) = this%ana2mtq%q%hx
-            this%r(offset+1:offset+2*n:2) = this%ana2mtq%t%r
-            this%r(offset+2:offset+2*n:2) = this%ana2mtq%q%r
+            this%lat(offset+1:offset+n) = this%ana2mtq%lat
+            this%lon(offset+1:offset+n) = this%ana2mtq%lon
+            this%y(offset+1:offset+n) = this%ana2mtq%y
+            this%hx(offset+1:offset+n,:) = this%ana2mtq%hx
+            this%r(offset+1:offset+n) = this%ana2mtq%r
+            offset = offset + n
          ENDIF
       ENDIF
 
