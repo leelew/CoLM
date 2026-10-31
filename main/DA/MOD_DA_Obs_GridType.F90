@@ -84,7 +84,7 @@ MODULE MOD_DA_Obs_GridType
         real(r8), allocatable :: lon(:)              ! longitude of each obs point
         real(r8), allocatable :: time(:)             ! UTC time of each obs point (seconds since begin of current day)
         real(r8), allocatable :: y(:)                ! observed value
-        real(r8), allocatable :: r(:)                ! observation error variance
+        real(r8), allocatable :: r(:)                ! observation error standard deviation
         real(r8), allocatable :: theta(:)            ! incidence angle for each obs point [rad]
         integer,  allocatable :: ii(:)               ! the number of lat grids of this cell
         integer,  allocatable :: jj(:)               ! the number of lon grids of this cell
@@ -174,7 +174,7 @@ CONTAINS
         real(r8), allocatable :: lon(:)        ! raw obs longitudes read from file [deg]
         real(r8), allocatable :: time(:)       ! raw obs times read from file [s since current UTC day]
         real(r8), allocatable :: y(:)          ! raw obs values for var
-        real(r8), allocatable :: r(:)          ! raw obs error variance for var
+        real(r8), allocatable :: r(:)          ! raw obs error standard deviation for var
         real(r8), allocatable :: theta(:)      ! raw incidence angles read from file [rad]
         integer,  allocatable :: ii(:)         ! raw obs ii index read from file
         integer,  allocatable :: jj(:)         ! raw obs jj index read from file

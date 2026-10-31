@@ -366,7 +366,7 @@ CONTAINS
          hx_p(:,iens) = pack(this%hx(:,iens), valid)
       ENDDO
 
-      ! calculate distance between y and patch, then inflate R with the Gaspari-Cohn function
+      ! Convert the error standard deviation to variance and localize R.
       allocate(r_p(n))
       allocate(lat(n))
       allocate(lon(n))
@@ -377,7 +377,7 @@ CONTAINS
          sin((lat*pi/180.0 - patchlatr(np))/2.0)**2 + &
          cos(lat*pi/180.0)*cos(patchlatr(np))* &
          sin((lon*pi/180.0 - patchlonr(np))/2.0)**2))
-      r_p = pack(this%r, valid) / max(exp(-(dist**2)/(2.0*this%locr**2)), 1.0e-6)
+      r_p = pack(this%r, valid)**2 / max(exp(-(dist**2)/(2.0*this%locr**2)), 1.0e-6)
 
    END SUBROUTINE ST_type_prepare_on_pset
 

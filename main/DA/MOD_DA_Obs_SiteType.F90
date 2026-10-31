@@ -80,7 +80,7 @@ MODULE MOD_DA_Obs_SiteType
         real(r8), allocatable :: lon(:)              ! longitude of each observation [deg]
         real(r8), allocatable :: time(:)             ! UTC time of each observation [s since begin of current day]
         real(r8), allocatable :: y(:)                ! observed value
-        real(r8), allocatable :: r(:)                ! observation error variance
+        real(r8), allocatable :: r(:)                ! observation error standard deviation
 
     CONTAINS
 
@@ -351,7 +351,7 @@ CONTAINS
         real(r8), allocatable :: lon(:)        ! raw obs longitudes read from file [deg]
         real(r8), allocatable :: time(:)       ! raw obs times read from file [s since current UTC day]
         real(r8), allocatable :: y(:)          ! raw obs values for var
-        real(r8), allocatable :: r(:)          ! raw obs error variance for var
+        real(r8), allocatable :: r(:)          ! raw obs error standard deviation for var
         integer,  allocatable :: id(:)         ! raw site row indices in sites.nc
         logical,  allocatable :: valid(:)      ! full-length mask for selected observations
         character(len=512) :: logmsg           ! log message buffer

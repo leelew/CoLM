@@ -404,12 +404,12 @@ CONTAINS
       lat = pack(this%lat, valid)
       lon = pack(this%lon, valid)
 
-      ! Inflate R with the same Gaussian localization for all sources.
+      ! Convert the error standard deviation to variance, then inflate R.
       hav = sin((lat*pi/180.0_r8 - patchlatr(np))/2.0_r8)**2 + &
             cos(lat*pi/180.0_r8)*cos(patchlatr(np))* &
             sin((lon*pi/180.0_r8 - patchlonr(np))/2.0_r8)**2
       dist = 2.0_r8*6378.1_r8*asin(sqrt(max(0.0_r8,min(1.0_r8,hav))))
-      r_p = r_p / max(exp(-(dist**2)/(2.0_r8*this%locr**2)), 1.0e-6_r8)
+      r_p = r_p**2 / max(exp(-(dist**2)/(2.0_r8*this%locr**2)), 1.0e-6_r8)
 
    END SUBROUTINE SM_type_prepare_on_pset
 

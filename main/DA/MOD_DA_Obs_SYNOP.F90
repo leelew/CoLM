@@ -17,11 +17,14 @@ MODULE MOD_DA_Obs_SYNOP
 !       DEF_DA_OBS_VAR    = '2MQ'
 !       DEF_DA_OBS_TARGET = '2MQ'
 !
+!    DEF_DA_OBS_VAR is the observed variable and the hourly file variable
+!    name; DEF_DA_OBS_TARGET selects the analysis variable.
+!
 !    The hourly files are
-!       <DEF_DA_OBS_DIR>/<sensor>/tref_YYYY_MM_DD_HH.nc
-!       <DEF_DA_OBS_DIR>/<sensor>/qref_YYYY_MM_DD_HH.nc
-!    containing the station observations 'tref' (2 m air temperature [K])
-!    and 'qref' (2 m relative humidity [0-1]) respectively, together with
+!       <DEF_DA_OBS_DIR>/<sensor>/2MT_YYYY_MM_DD_HH.nc
+!       <DEF_DA_OBS_DIR>/<sensor>/2MQ_YYYY_MM_DD_HH.nc
+!    containing the station observations '2MT' (2 m air temperature [K])
+!    and '2MQ' (2 m relative humidity [0-1]) respectively, together with
 !    'latitude', 'longitude', 'time', and 'id'. The station table is
 !       <DEF_DA_OBS_DIR>/<sensor>/sites.nc
 !
@@ -31,8 +34,8 @@ MODULE MOD_DA_Obs_SYNOP
 !    where RH is calculated from the model 2 m specific humidity and
 !    temperature following the legacy SYNOP implementation. The analysis
 !    variables are the model 2 m air temperature and specific humidity,
-!    tref_ens and qref_ens. A '2MT' stream reads only the tref file and
-!    updates tref_ens; a '2MQ' stream reads only the qref file and updates
+!    tref_ens and qref_ens. A '2MT' stream reads only the 2MT file and
+!    updates tref_ens; a '2MQ' stream reads only the 2MQ file and updates
 !    qref_ens. The 2MT analysis runs first, so H_RH for a '2MQ' stream is
 !    evaluated with the analyzed tref_ens.
 !
@@ -44,8 +47,8 @@ MODULE MOD_DA_Obs_SYNOP
 !      4. concatenate the enabled variables into one observation vector;
 !      5. prepare localized patch-level y, R, and H(x) arrays for LETKF.
 !
-!    Observation error variances are read from each hourly file as 'r',
-!    in K^2 for 2 m temperature and in (RH fraction)^2 for relative humidity.
+!    Observation errors 'r' are standard deviations: K for 2 m temperature
+!    and RH fraction for relative humidity.
 !
 ! HISTORY:
 !    Lu Li, 05/2026: Initial implementation
@@ -67,9 +70,8 @@ MODULE MOD_DA_Obs_SYNOP
 
       character(len=16) :: source_name ! 'situ'
       character(len=32) :: sensor_name ! 'SYNOP'
-      character(len=16) :: var_name    ! '2MT' / '2MQ' (informational)
-      integer  :: istream              ! ordinal of this stream among the non-empty
-                                       ! DEF_DA_OBS_TARGET entries; slot in the
+      character(len=16) :: var_name    ! observed variable: '2MT' / '2MQ'
+      integer  :: istream              ! namelist index of this stream; slot in the
                                        ! shared hx_* diagnostics
       logical  :: use_t  = .false.     ! assimilate the 2 m temperature variable
       logical  :: use_rh = .false.     ! assimilate the 2 m relative humidity variable
@@ -210,6 +212,7 @@ CONTAINS
       ! variable is stored in its own hourly file, named after the file
       ! variable, following the same convention as the gridded observation
       ! type. Only the variables enabled by the stream are initialized.
+      ! The namelist VAR ('2MT' / '2MQ') is also the hourly file variable.
       allocate(this%sensors(size(configs)))
       DO i = 1, size(configs)
          this%sensors(i)%sensor_name = configs(i)%sensor_name
@@ -217,11 +220,11 @@ CONTAINS
 
          IF (configs(i)%use_t) THEN
             CALL this%sensors(i)%t%init(pixelset, configs(i)%source_name, &
-               configs(i)%sensor_name, 'tref')
+               configs(i)%sensor_name, configs(i)%var_name)
          ENDIF
          IF (configs(i)%use_rh) THEN
             CALL this%sensors(i)%rh%init(pixelset, configs(i)%source_name, &
-               configs(i)%sensor_name, 'qref')
+               configs(i)%sensor_name, configs(i)%var_name)
          ENDIF
       ENDDO
 
@@ -498,8 +501,7 @@ CONTAINS
          hx_p(:,iens) = pack(this%hx(:,iens), valid)
       ENDDO
 
-      ! calculate distance between y and patch, then inflate R with the
-      ! Gaussian localization function
+      ! Convert the error standard deviation to variance and localize R.
       allocate(r_p(n))
       allocate(lat(n))
       allocate(lon(n))
@@ -510,7 +512,7 @@ CONTAINS
          sin((lat*pi/180.0 - patchlatr(np))/2.0)**2 + &
          cos(lat*pi/180.0)*cos(patchlatr(np))* &
          sin((lon*pi/180.0 - patchlonr(np))/2.0)**2))
-      r_p = pack(this%r, valid) / max(exp(-(dist**2)/(2.0*this%locr**2)), 1.0e-6)
+      r_p = pack(this%r, valid)**2 / max(exp(-(dist**2)/(2.0*this%locr**2)), 1.0e-6)
 
    END SUBROUTINE SYNOP_type_prepare_on_pset
 

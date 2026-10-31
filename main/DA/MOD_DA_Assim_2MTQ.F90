@@ -59,7 +59,7 @@ CONTAINS
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
 
-      integer :: is, i, nslot, nsensor_t, nsensor_q
+      integer :: is, i, nsensor_t, nsensor_q
       type(SYNOP_config_type), allocatable :: configs(:)
 
 !-----------------------------------------------------------------------------
@@ -74,21 +74,19 @@ CONTAINS
       IF (.not. use_2mt .and. .not. use_2mq) RETURN
 
       ! Each SYNOP stream is packed with the variable enabled by its target.
-      ! istream is the ordinal of the stream among the non-empty
-      ! DEF_DA_OBS_TARGET entries, matching the slot index of the shared
-      ! hx_* diagnostics (see nsource in MOD_DA_Vars_TimeVariables).
+      ! istream is the namelist index of the stream, consistent with the
+      ! other assimilation drivers and the shared hx_* diagnostics, so the
+      ! DEF_DA_OBS_TARGET entries must be filled contiguously from 1.
       IF (nsensor_t > 0) THEN
          allocate(configs(nsensor_t))
          is = 0
-         nslot = 0
          DO i = 1, size(DEF_DA_OBS_TARGET)
-            IF (len_trim(DEF_DA_OBS_TARGET(i)) > 0) nslot = nslot + 1
             IF (trim(DEF_DA_OBS_TARGET(i)) == '2MT') THEN
                is = is + 1
                configs(is)%source_name = DEF_DA_OBS_SOURCE(i)
                configs(is)%sensor_name = DEF_DA_OBS_SENSOR(i)
                configs(is)%var_name    = DEF_DA_OBS_VAR(i)
-               configs(is)%istream     = nslot
+               configs(is)%istream     = i
                configs(is)%use_t       = .true.
             ENDIF
          ENDDO
@@ -99,15 +97,13 @@ CONTAINS
       IF (nsensor_q > 0) THEN
          allocate(configs(nsensor_q))
          is = 0
-         nslot = 0
          DO i = 1, size(DEF_DA_OBS_TARGET)
-            IF (len_trim(DEF_DA_OBS_TARGET(i)) > 0) nslot = nslot + 1
             IF (trim(DEF_DA_OBS_TARGET(i)) == '2MQ') THEN
                is = is + 1
                configs(is)%source_name = DEF_DA_OBS_SOURCE(i)
                configs(is)%sensor_name = DEF_DA_OBS_SENSOR(i)
                configs(is)%var_name    = DEF_DA_OBS_VAR(i)
-               configs(is)%istream     = nslot
+               configs(is)%istream     = i
                configs(is)%use_rh      = .true.
             ENDIF
          ENDDO
@@ -188,7 +184,6 @@ CONTAINS
             ! TODO: confirm the post-analysis constraints before finalizing.
             ! The +/-20 K temperature increment is a legacy heuristic from the
             ! soil-temperature DA, not a LETKF or 2 m temperature requirement.
-            ! Decide whether to keep it, make it a namelist option, or drop it.
             DO iens = 1, DEF_DA_ENS_NUM
                ! limit the temperature increment to keep the analysis physical
                tref_ens(iens,np) = tref_ens(iens,np) + &
@@ -234,8 +229,6 @@ CONTAINS
             ! TODO: confirm the post-analysis constraints before finalizing.
             ! The q in [0, qsat] clipping enforces physical consistency, but
             ! it makes the analysis depart from the direct LETKF solution.
-            ! Decide whether to keep it, make it a namelist option, or let
-            ! the model's own saturation adjustment handle q.
             DO iens = 1, DEF_DA_ENS_NUM
                ! keep specific humidity within [0, qsat]
                qref_ens(iens,np) = max(0.0_r8, qref_work_a(1,iens))
@@ -300,6 +293,7 @@ CONTAINS
          IF (allocated(synop_q%cfgs))    deallocate(synop_q%cfgs)
          IF (allocated(synop_q%sensors)) deallocate(synop_q%sensors)
       ENDIF
+
       use_2mt = .false.
       use_2mq = .false.
 
