@@ -4,7 +4,7 @@
 MODULE MOD_DA_Obs_ANA2MTQ
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
-!    2m t/q analysis means as pseudo-observations
+!    2 m temperature and relative humidity analysis means as pseudo-observations
 !
 !    Use for land-atmosphere coupling assimilation
 !
@@ -18,27 +18,29 @@ MODULE MOD_DA_Obs_ANA2MTQ
    IMPLICIT NONE
 
 !-----------------------------------------------------------------------------
-! Screen-level pseudo-observation collection
+! Patch-based pseudo-observations from SYNOP 2 m temperature and humidity analyses.
+! Temperature and humidity select changed patches independently.
+! Combined arrays store temperature records first, followed by humidity records.
 !-----------------------------------------------------------------------------
    type :: ANA2MTQ_type
 
-      type(pseudo_obs_type) :: t         ! 2 m temperature [K]
-      type(pseudo_obs_type) :: q         ! 2 m specific humidity [kg/kg]
+      type(pseudo_obs_type) :: tref      ! 2 m temperature pseudo-observations [K]
+      type(pseudo_obs_type) :: rhref     ! 2 m relative humidity pseudo-observations [0-1]
 
-      ! Concatenated temperature and humidity records for assimilation.
-      integer :: nobs = 0                ! t%nobs + q%nobs
-      real(r8), allocatable :: lat(:)    ! [nobs], degrees
-      real(r8), allocatable :: lon(:)    ! [nobs], degrees
-      real(r8), allocatable :: y(:)      ! [nobs]
-      real(r8), allocatable :: r(:)      ! Error standard deviations [nobs]
-      real(r8), allocatable :: hx(:,:)   ! Forecast H(x) [nobs, ens]
+      ! Combined records available on all ranks for land-surface assimilation.
+      integer :: nobs = 0                ! Total record count: tref%nobs + rhref%nobs
+      real(r8), allocatable :: lat(:)    ! Patch latitudes [nobs], degrees north
+      real(r8), allocatable :: lon(:)    ! Patch longitudes [nobs], degrees east in [-180, 180)
+      real(r8), allocatable :: y(:)      ! Analysis ensemble means [nobs]; K for T, fraction for RH
+      real(r8), allocatable :: r(:)      ! Error variances [nobs]; K^2 for T, fraction squared for RH
+      real(r8), allocatable :: hx(:,:)   ! Forecast values [nobs, DEF_DA_ENS_NUM]; same units as y
 
    CONTAINS
 
-      procedure, PUBLIC  :: init   => ANA2MTQ_init
-      procedure, PUBLIC  :: calcp  => ANA2MTQ_calc_on_pset
-      procedure, PUBLIC  :: clear  => ANA2MTQ_clear
-      procedure, PRIVATE :: concat => ANA2MTQ_concat
+      procedure, PUBLIC  :: init   => ANA2MTQ_init         ! Initialize empty temperature and humidity collections
+      procedure, PUBLIC  :: calcp  => ANA2MTQ_calc_on_pset ! Construct and communicate both collections, then combine
+      procedure, PUBLIC  :: clear  => ANA2MTQ_clear        ! Clear both collections and deallocate combined arrays
+      procedure, PRIVATE :: concat => ANA2MTQ_concat       ! Combine temperature and humidity records in this order
 
    END type ANA2MTQ_type
 
@@ -57,8 +59,8 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
       CALL this%clear()
-      CALL this%t%init()
-      CALL this%q%init()
+      CALL this%tref%init()
+      CALL this%rhref%init()
 
    END SUBROUTINE ANA2MTQ_init
 
@@ -74,9 +76,8 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
       CALL this%clear()
-      ! Observation errors are standard deviations.
-      CALL this%t%read(tref_ens_f, tref_ens_a, 1.0_r8)
-      CALL this%q%read(qref_ens_f, qref_ens_a, 0.2_r8)
+      CALL this%tref%read(tref_ens_f, tref_ens_a, 1.0_r8)
+      CALL this%rhref%read(rhref_ens_f, rhref_ens_a, 0.04_r8**2)
       CALL this%concat()
 
    END SUBROUTINE ANA2MTQ_calc_on_pset
@@ -92,26 +93,26 @@ CONTAINS
       integer :: nt, nq
 
 !-----------------------------------------------------------------------------
-      nt = this%t%nobs
-      nq = this%q%nobs
+      nt = this%tref%nobs
+      nq = this%rhref%nobs
       this%nobs = nt + nq
       IF (this%nobs == 0) RETURN
 
-      allocate(this%lat(this%nobs), this%lon(this%nobs))
-      allocate(this%y(this%nobs), this%r(this%nobs), this%hx(this%nobs,DEF_DA_ENS_NUM))
+      allocate(this%lat(this%nobs), this%lon(this%nobs), this%y(this%nobs), this%r(this%nobs))
+      allocate(this%hx(this%nobs,DEF_DA_ENS_NUM))
       IF (nt > 0) THEN
-         this%lat(1:nt) = this%t%lat
-         this%lon(1:nt) = this%t%lon
-         this%y(1:nt) = this%t%y
-         this%r(1:nt) = this%t%r
-         this%hx(1:nt,:) = this%t%hx
+         this%lat(1:nt) = this%tref%lat
+         this%lon(1:nt) = this%tref%lon
+         this%y(1:nt) = this%tref%y
+         this%r(1:nt) = this%tref%r
+         this%hx(1:nt,:) = this%tref%hx
       ENDIF
       IF (nq > 0) THEN
-         this%lat(nt+1:nt+nq) = this%q%lat
-         this%lon(nt+1:nt+nq) = this%q%lon
-         this%y(nt+1:nt+nq) = this%q%y
-         this%r(nt+1:nt+nq) = this%q%r
-         this%hx(nt+1:nt+nq,:) = this%q%hx
+         this%lat(nt+1:nt+nq) = this%rhref%lat
+         this%lon(nt+1:nt+nq) = this%rhref%lon
+         this%y(nt+1:nt+nq) = this%rhref%y
+         this%r(nt+1:nt+nq) = this%rhref%r
+         this%hx(nt+1:nt+nq,:) = this%rhref%hx
       ENDIF
 
    END SUBROUTINE ANA2MTQ_concat
@@ -126,8 +127,8 @@ CONTAINS
       class(ANA2MTQ_type), intent(inout) :: this
 
 !-----------------------------------------------------------------------------
-      CALL this%t%clear()
-      CALL this%q%clear()
+      CALL this%tref%clear()
+      CALL this%rhref%clear()
       this%nobs = 0
       IF (allocated(this%lat)) deallocate(this%lat)
       IF (allocated(this%lon)) deallocate(this%lon)
