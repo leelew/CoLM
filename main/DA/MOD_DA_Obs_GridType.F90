@@ -52,7 +52,7 @@ MODULE MOD_DA_Obs_GridType
 !
 ! HISTORY:
 !    Lu Li, 05/2026: Initial version
-!    Zhilong Fan, Lu Li, 10/2026: First operational version
+!    Lu Li, Zhilong Fan, 10/2026: First operational version
 !-----------------------------------------------------------------------------
     USE MOD_Precision
     USE MOD_SPMD_Task
@@ -182,7 +182,6 @@ CONTAINS
         character(len=512) :: logmsg           ! log message buffer
 
 !-----------------------------------------------------------------------------
-
         CALL this%clear()
 
         ! UTC begin time of the current DA window
@@ -251,9 +250,14 @@ CONTAINS
             IF (allocated(jj   )) deallocate(jj   )
         ENDIF
 
-        write (logmsg,'(A,A,A,L1,A,I0)') 'obs file = ', trim(obs_file_name), &
-            ' exists = ', exists_file, 'selected_nobs = ', this%nobs
-        IF (p_is_master) WRITE (*,'(A)') '[DA] '//trim(logmsg)
+        IF (p_is_master) THEN
+            IF (exists_file) THEN
+                WRITE (*,'(A,I0,2A)') '[DA] Selected ', this%nobs, &
+                    ' observations from ', trim(obs_file_name)
+            ELSE
+                WRITE (*,'(2A)') '[DA] Observation file not found: ', trim(obs_file_name)
+            ENDIF
+        ENDIF
 
     END SUBROUTINE grid_obs_read
 

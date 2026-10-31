@@ -34,7 +34,7 @@ MODULE MOD_DA_Obs_PM
 !
 ! HISTORY:
 !    Lu Li, 05/2026: First implementation
-!    Zhilong Fan, Lu Li, 10/2026: First operational version
+!    Lu Li, Zhilong Fan, 10/2026: First operational version
 !-----------------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_Const_Physical, ONLY: denh2o
@@ -97,12 +97,11 @@ MODULE MOD_DA_Obs_PM
    type :: PM_set_type
 
       ! Each stream represents one source/sensor/variable configuration.
-      integer :: nsensor                          ! Number of configured observation streams
-      type(PM_type), allocatable :: sensors(:)     ! Stream objects [nsensor]
+      integer :: nsensor                            ! Number of configured observation streams
+      type(PM_type), allocatable :: sensors(:)      ! Stream objects [nsensor]
       type(PM_config_type), allocatable :: cfgs(:)  ! Corresponding stream configurations [nsensor]
 
       ! Current time-step data concatenated in stream order for assimilation.
-      ! All arrays share the same observation index
       integer :: nobs                        ! Total number of observations across streams in the combined arrays
       real(r8), allocatable :: lat(:)        ! Observation latitude [nobs], degrees
       real(r8), allocatable :: lon(:)        ! Observation longitude [nobs], degrees
@@ -133,7 +132,7 @@ CONTAINS
       IMPLICIT NONE
 
 !------------------------ Dummy Arguments ------------------------------------
-      class(PM_type),     intent(inout)  :: this
+      class(PM_type),      intent(inout) :: this
       type(pixelset_type), intent(in)    :: pixelset     ! target pixel/patch set
       character(len=*),    intent(in)    :: source_name  ! observation source class, e.g., "PM"
       character(len=*),    intent(in)    :: sensor_name  ! sensor/subdirectory name
@@ -157,21 +156,21 @@ CONTAINS
       class(PM_type), intent(inout) :: this
 
 !------------------------ Local Variables ------------------------------------
-      integer :: iobs                         ! observation index
-      integer :: iens                         ! ensemble member index
-      integer :: np                           ! patch index
-      integer :: ipart                        ! patch-grid intersection part index
-      integer :: ib, jb                       ! block indices of an observation grid cell
-      integer :: il, jl                       ! local indices inside the block
-      integer :: ipol                         ! polarization selected by the observation variable
+      integer :: iobs                                      ! observation index
+      integer :: iens                                      ! ensemble member index
+      integer :: np                                        ! patch index
+      integer :: ipart                                     ! patch-grid intersection part index
+      integer :: ib, jb                                    ! block indices of an observation grid cell
+      integer :: il, jl                                    ! local indices inside the block
+      integer :: ipol                                      ! polarization selected by the observation variable
 
-      real(r8) :: hx_tmp(2)                   ! H(x) for H and V pol from one part-level RTM call
-      real(r8) :: sumarea(0:DEF_DA_ENS_NUM)   ! valid part area accumulated for each ensemble
+      real(r8) :: hx_tmp(2)                                ! H(x) for H and V pol from one part-level RTM call
+      real(r8) :: sumarea(0:DEF_DA_ENS_NUM)                ! valid part area accumulated for each ensemble
 
-      logical, allocatable :: filter(:)       ! local land-patch mask
+      logical, allocatable :: filter(:)                    ! local land-patch mask
 
-      type(block_data_real8_2d) :: theta_wgrid                ! incidence angle on obs world grid
-      type(pointer_real8_1d), allocatable :: theta_part(:)    ! incidence angle on patch-grid parts
+      type(block_data_real8_2d) :: theta_wgrid             ! incidence angle on obs world grid
+      type(pointer_real8_1d), allocatable :: theta_part(:) ! incidence angle on patch-grid parts
 
 !-----------------------------------------------------------------------------
       IF (allocated(this%hx_pset)) deallocate(this%hx_pset)
@@ -209,15 +208,14 @@ CONTAINS
             IF (this%y%mg2p%npart(np) == 0) CYCLE
             IF (.not. filter(np)) CYCLE
 
-            ! var_name selects the H(x) operator.
+            ! the H(x) operator.
             SELECT CASE (trim(this%y%var_name))
+!-----------------------------------------------------------------------------
+! Level-1 brightness temperature observations from passive microwave radiometers.
+! Forward modeling uses the passive microwave radiative transfer operator
+!-----------------------------------------------------------------------------
             CASE ('TB_H', 'TB_V')
-               IF (trim(this%y%var_name) == 'TB_V') THEN
-                  ipol = 2
-               ELSE
-                  ipol = 1
-               ENDIF
-
+               ipol = merge(2, 1, this%y%var_name == 'TB_V')
                sumarea(:) = 0.0_r8
 
                ! TB is evaluated only where the obs file supplies theta, 
@@ -246,16 +244,21 @@ CONTAINS
                   ENDDO
                ENDDO
 
-               DO iens = 0, DEF_DA_ENS_NUM
-                  IF (sumarea(iens) > 0) this%hx_pset(iens,np) = this%hx_pset(iens,np) / sumarea(iens)
-               ENDDO
+               WHERE (sumarea > 0.0)
+                  this%hx_pset(:,np) = this%hx_pset(:,np) / sumarea(iens)
+               ENDWHERE
+
+!-----------------------------------------------------------------------------
+! Retrieved soil moisture products from passive microwave observations.
+! H(x) is the mean liquid volumetric soil moisture over the upper 5 cm [m3/m3].
+!-----------------------------------------------------------------------------
             CASE ('SM')
-               ! retrieved soil moisture: 0-5 cm layer mean of the top three layers
                DO iens = 0, DEF_DA_ENS_NUM
                   IF (wliq_soisno_ens(1,iens,np) == spval) CYCLE
-                  this%hx_pset(iens,np) = (wliq_soisno_ens(1,iens,np) + &
-                     wliq_soisno_ens(2,iens,np) + &
-                     wliq_soisno_ens(3,iens,np)*(0.05 - 0.0451)/(0.0906 - 0.0451)) / &
+                  this%hx_pset(iens,np) = &
+                     (wliq_soisno_ens(1,iens,np) + &
+                      wliq_soisno_ens(2,iens,np) + &
+                      wliq_soisno_ens(3,iens,np)*(0.05-0.0451)/(0.0906-0.0451)) / &
                      (0.05*denh2o)
                ENDDO
             CASE DEFAULT

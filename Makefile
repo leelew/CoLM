@@ -309,6 +309,7 @@ OBJS_MAIN = \
 				MOD_DA_Obs_GridType.o                     \
 				MOD_DA_Obs_SiteType.o                     \
 				MOD_DA_Obs_PM.o                           \
+				MOD_DA_Obs_PseudoType.o                   \
 				MOD_DA_Obs_ANA2MTQ.o                      \
 				MOD_DA_Obs_SM.o                           \
 				MOD_DA_Obs_ST.o                           \
@@ -392,7 +393,7 @@ $(OBJS_MAIN) : %.o : %.F90 ${HEADER} ${OBJS_SHARED} ${OBJS_BASIC}
 
 # DA module dependencies.
 MOD_DA_Obs_PM.o: MOD_DA_Obs_GridType.o MOD_DA_Operator_RTM.o
-MOD_DA_Obs_ANA2MTQ.o: MOD_DA_Vars_TimeVariables.o
+MOD_DA_Obs_ANA2MTQ.o: MOD_DA_Obs_PseudoType.o MOD_DA_Vars_TimeVariables.o
 MOD_DA_Obs_SM.o: MOD_DA_Obs_PM.o MOD_DA_Obs_ANA2MTQ.o
 MOD_DA_Obs_ST.o: MOD_DA_Obs_PM.o
 MOD_DA_Obs_SYNOP.o: MOD_DA_Obs_SiteType.o
