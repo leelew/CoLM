@@ -21,7 +21,7 @@ MODULE MOD_DA_Obs_ANA2MTQ
 
    type :: ANA2MTQ_var_type
 
-      real(r8) :: r = 0.01_r8               ! Error variance in squared variable units
+      real(r8) :: r = 0.1_r8                 ! Error standard deviation in variable units
       real(r8), allocatable :: y(:)          ! Analysis means [nobs]
       real(r8), allocatable :: hx(:,:)       ! Forecast H(x) [nobs, DEF_DA_ENS_NUM]
 
@@ -32,11 +32,11 @@ MODULE MOD_DA_Obs_ANA2MTQ
 !-----------------------------------------------------------------------------
    type :: ANA2MTQ_type
 
-      integer :: nobs = 0                 ! Number of patches with nonzero T and q analysis increments
+      integer :: nobs = 0                    ! Number of patches with nonzero T and q analysis increments
       real(r8), allocatable :: lat(:)        ! Patch latitude [nobs], degrees
       real(r8), allocatable :: lon(:)        ! Patch longitude [nobs], degrees
-      type(ANA2MTQ_var_type) :: t            ! Temperature [K], r in K^2
-      type(ANA2MTQ_var_type) :: q            ! Specific humidity [kg/kg], r in (kg/kg)^2
+      type(ANA2MTQ_var_type) :: t            ! Temperature [K], r in K
+      type(ANA2MTQ_var_type) :: q            ! Specific humidity [kg/kg], r in kg/kg
 
    CONTAINS
 
@@ -65,9 +65,9 @@ CONTAINS
       IF (present(r_t)) this%t%r = r_t
       IF (present(r_q)) this%q%r = r_q
       IF (.not. ieee_is_finite(this%t%r) .or. this%t%r <= 0.0_r8) &
-         ERROR STOP 'ANA2MTQ requires a positive temperature error variance'
+         ERROR STOP 'ANA2MTQ requires a positive temperature error standard deviation'
       IF (.not. ieee_is_finite(this%q%r) .or. this%q%r <= 0.0_r8) &
-         ERROR STOP 'ANA2MTQ requires a positive humidity error variance'
+         ERROR STOP 'ANA2MTQ requires a positive humidity error standard deviation'
 
    END SUBROUTINE ANA2MTQ_init
 

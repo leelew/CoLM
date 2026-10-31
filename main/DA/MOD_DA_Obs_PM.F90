@@ -107,7 +107,7 @@ MODULE MOD_DA_Obs_PM
       real(r8), allocatable :: lat(:)        ! Observation latitude [nobs], degrees
       real(r8), allocatable :: lon(:)        ! Observation longitude [nobs], degrees
       real(r8), allocatable :: y(:)          ! Actual observation values [nobs]
-      real(r8), allocatable :: r(:)          ! Observation error variances [nobs]
+      real(r8), allocatable :: r(:)          ! Observation error standard deviations [nobs]
       real(r8), allocatable :: hx(:,:)       ! Simulated observations at y locations [nobs, ens]
 
    CONTAINS

@@ -47,8 +47,8 @@ MODULE MOD_DA_Obs_SYNOP
 !      4. concatenate the enabled variables into one observation vector;
 !      5. prepare localized patch-level y, R, and H(x) arrays for LETKF.
 !
-!    Observation error variances are read from each hourly file as 'r',
-!    in K^2 for 2 m temperature and in (RH fraction)^2 for relative humidity.
+!    Observation errors 'r' are standard deviations: K for 2 m temperature
+!    and RH fraction for relative humidity.
 !
 ! HISTORY:
 !    Lu Li, 05/2026: Initial implementation
@@ -501,8 +501,7 @@ CONTAINS
          hx_p(:,iens) = pack(this%hx(:,iens), valid)
       ENDDO
 
-      ! calculate distance between y and patch, then inflate R with the
-      ! Gaussian localization function
+      ! Convert the error standard deviation to variance and localize R.
       allocate(r_p(n))
       allocate(lat(n))
       allocate(lon(n))
@@ -513,7 +512,7 @@ CONTAINS
          sin((lat*pi/180.0 - patchlatr(np))/2.0)**2 + &
          cos(lat*pi/180.0)*cos(patchlatr(np))* &
          sin((lon*pi/180.0 - patchlonr(np))/2.0)**2))
-      r_p = pack(this%r, valid) / max(exp(-(dist**2)/(2.0*this%locr**2)), 1.0e-6)
+      r_p = pack(this%r, valid)**2 / max(exp(-(dist**2)/(2.0*this%locr**2)), 1.0e-6)
 
    END SUBROUTINE SYNOP_type_prepare_on_pset
 
