@@ -139,6 +139,8 @@ CONTAINS
       CALL mpi_gather(nlocal, 1, MPI_INTEGER, counts, 1, MPI_INTEGER, p_address_master, p_comm_glb, p_err)
       IF (p_is_master) this%nobs = sum(counts)
       CALL mpi_bcast(this%nobs, 1, MPI_INTEGER, p_address_master, p_comm_glb, p_err)
+      IF (p_is_master) WRITE (*,'(A,I0)') &
+         '[CoLM-DA] pseudo observations selected: ', this%nobs
       IF (this%nobs == 0) RETURN
 
       ! Compute receive offsets in patch units and allocate receive buffers.
