@@ -8,7 +8,7 @@ MODULE MOD_DA_Obs_SM
 !
 !    This module provides SM_type, a soil-moisture-specific observation
 !    container used by MOD_DA_Assim_SM. It sits above source-specific
-!    observation modules such as PM, GNOS, AM, ANA2MTQ.
+!    observation modules such as PM, GNSS, ANA2MTQ.
 !
 !    SM_type owns the soil-moisture observation workflow:
 !      1. receive a unified list of observation configs from the assimilation
@@ -31,11 +31,11 @@ MODULE MOD_DA_Obs_SM
 !
 ! HISTORY:
 !    Lu Li, 05/2026: First implementation
-!    Zhilong Fan, Lu Li, 10/2026: First operational version
+!    Lu Li, Zhilong Fan, 10/2026: First operational version
 !-----------------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_DA_Obs_PM
-   USE MOD_DA_Obs_ANA2MTQ, ONLY: ANA2MTQ_type
+   USE MOD_DA_Obs_ANA2MTQ
    USE MOD_DA_Vars_TimeVariables
    USE MOD_Namelist
    USE MOD_Pixelset
@@ -43,51 +43,57 @@ MODULE MOD_DA_Obs_SM
    USE MOD_Vars_TimeInvariants
    IMPLICIT NONE
 
+!-----------------------------------------------------------------------------
+! Configuration for one observation stream used in soil moisture assimilation.
+!-----------------------------------------------------------------------------
    type :: SM_config_type
 
-      character(len=16) :: source_name ! 'PM', 'GNOS', 'AM', 'situ', 'ANA2MTQ'
-      character(len=32) :: sensor_name ! 'SMAP', 'SMOS', 'CYGNSS', 'FY3D', 'ISMN', etc.
-      character(len=16) :: var_name    ! 'TB_H', 'TB_V', 'SM', 'DDM', '2MTQ'
-      real(r8) :: fghz                 ! frequency in GHz
-      integer  :: istream              ! index of this stream in the shared hx_* diagnostics
+      character(len=16) :: source_name                    ! Observation source, e.g., 'PM' or 'ANA2MTQ'
+      character(len=32) :: sensor_name                    ! Sensor or dataset identifier used by the source module
+      character(len=16) :: var_name                       ! Observation variable, e.g., 'TB_H', 'TB_V' or 'SM' for PM
+      real(r8) :: fghz                                    ! Microwave frequency [GHz], used by the PM brightness temperature operator
+      integer  :: istream                                 ! Stream index in the shared hx_ol, hx_f* and hx_a* diagnostic arrays
 
    END type SM_config_type
 
+!-----------------------------------------------------------------------------
+! Observation collection for soil moisture assimilation.
+! Source modules prepare observations and ensemble H(x); this type combines
+! their records and selects nearby observations for each target patch.
+!-----------------------------------------------------------------------------
    type :: SM_type
 
-      type(SM_config_type), allocatable :: cfgs(:)
+      type(SM_config_type), allocatable :: cfgs(:)        ! Configuration for each observation stream
 
-      logical :: use_pm = .false.
-      logical :: use_gnos = .false.
-      logical :: use_ana2mtq = .false.
+      logical :: use_pm = .false.                         ! Include passive microwave observations
+      logical :: use_ana2mtq = .false.                    ! Include 2 m temperature and RH analysis pseudo-observations
 
-      ! assimilation parameters
-      real(r8) :: dres      ! search radius for observations around a target patch [deg]
-      real(r8) :: locr      ! localization radius [km]
-      real(r8) :: infl      ! inflation factor for error covariance
+      ! Observation selection and LETKF parameters.
+      real(r8) :: dres                                    ! Maximum latitude and longitude separation from the target patch [degrees]
+      real(r8) :: locr                                    ! Gaussian localization length scale for distance-based R inflation [km]
+      real(r8) :: infl                                    ! Ensemble background covariance inflation factor
 
-      ! source-specific observation containers
-      type(PM_set_type) :: pm
-      type(ANA2MTQ_type) :: ana2mtq
-      !type(GNOS_set_type) :: gnos
+      ! Source-specific observation containers.
+      type(PM_set_type) :: pm                             ! Passive microwave observations and ensemble H(x)
+      type(ANA2MTQ_type) :: ana2mtq                       ! 2 m temperature and RH pseudo-observations and ensemble H(x)
 
-      ! outputs used for assimilation
-      integer :: nobs = 0
-      real(r8), allocatable :: lat(:)
-      real(r8), allocatable :: lon(:)
-      real(r8), allocatable :: y(:)
-      real(r8), allocatable :: hx(:,:)
-      real(r8), allocatable :: r(:)
+      ! Combined records on all ranks; units of y, hx and r depend on the variable.
+      integer :: nobs = 0                                 ! Total number of records from all enabled sources
+      real(r8), allocatable :: lat(:)                     ! Observation latitudes [nobs], degrees north
+      real(r8), allocatable :: lon(:)                     ! Observation longitudes [nobs], degrees east
+      real(r8), allocatable :: y(:)                       ! Observed values or analysis ensemble means [nobs]
+      real(r8), allocatable :: hx(:,:)                    ! Forecast observation equivalents [nobs, DEF_DA_ENS_NUM]
+      real(r8), allocatable :: r(:)                       ! Observation error variances before localization [nobs]
 
    CONTAINS
 
-      procedure :: init       => SM_type_init
-      procedure :: calcg      => SM_type_calc_on_grid
-      procedure :: calcp      => SM_type_calc_on_pset
-      procedure :: save       => SM_type_save
-      procedure :: clear      => SM_type_clear
-      procedure :: concat     => SM_type_concat
-      procedure :: prepare    => SM_type_prepare_on_pset
+      procedure :: init       => SM_type_init             ! Configure enabled sources and assimilation parameters
+      procedure :: calcg      => SM_type_calc_on_grid     ! Prepare source observations and H(x), then combine records
+      procedure :: calcp      => SM_type_calc_on_pset     ! Recompute PM H(x) on local patches after state updates
+      procedure :: save       => SM_type_save             ! Copy PM patch H(x) into forecast or analysis diagnostics
+      procedure :: clear      => SM_type_clear            ! Deallocate combined records and clear source observations
+      procedure :: concat     => SM_type_concat           ! Combine enabled sources in matching y, hx and r order
+      procedure :: prepare    => SM_type_prepare_on_pset  ! Select nearby valid records and localize their error variances
 
    END type SM_type
 
