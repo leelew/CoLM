@@ -4,7 +4,9 @@
 MODULE MOD_DA_Ens
 !-----------------------------------------------------------------------
 ! DESCRIPTION:
-!    Provide functions to generate ensemble samples for data assimilation
+!    Provide procedures for ensemble generation and management in data 
+!    assimilation, including perturbation generation, member state exchange,
+!    and analysis feedback to the model.
 !
 ! REFERENCES:
 !    [1] Algorithm Theoretical Basis Document Level 4 Surface and Root
@@ -16,55 +18,42 @@ MODULE MOD_DA_Ens
 !-----------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_Namelist
-   USE MOD_Vars_TimeVariables
-   USE MOD_DA_Vars_TimeVariables
-   USE MOD_Vars_1DForcing
    USE MOD_LandPatch
    USE MOD_SPMD_Task
-   USE MOD_Vars_Global,            only: spval
-#ifdef GridRiverLakeFlow
-   USE MOD_Grid_RiverLakeTimeVars, only: wdsrf_ucat, veloc_riv, volresv
-#endif
+   USE MOD_Vars_Global
+   USE MOD_Vars_1DForcing
+   USE MOD_Vars_TimeVariables
+   USE MOD_Vars_1DFluxes
+   USE MOD_DA_Vars_TimeVariables
    IMPLICIT NONE
    SAVE
 
-   ! public functions
-   PUBLIC :: ensemble
-   PUBLIC :: model_to_ens
-   PUBLIC :: ens_to_model
-
    ! local parameters
    ! forcing [parameters used here is consistent with SMAP L4 (Table 4 in [1])]
-   integer,  parameter :: nvar = 4                                   ! number of pertutated forcing variables
-   real(r8), parameter :: tau_ar = 24.0                              ! correlation time scale in hours
+   integer,  parameter :: nvar = 4                               ! number of pertutated forcing variables
+   real(r8), parameter :: tau_ar = 24.0                          ! correlation time scale in hours
 
-   real(r8) :: dt                                                    ! time step in hours
-   real(r8) :: phi                                                   ! AR(1) autocorrelation coefficient consider time scale
-   real(r8) :: sigma_eps                                             ! standard deviation of noise in AR(1) process
-   real(r8), dimension(nvar) :: sigma = (/0.5, 0.3, 20.0, 1.0/)      ! standard deviation of perturbed forcing variables (prcp, sw, lw, t)
+   real(r8) :: dt                                                ! time step in hours
+   real(r8) :: phi                                               ! AR(1) autocorrelation coefficient consider time scale
+   real(r8) :: sigma_eps                                         ! standard deviation of noise in AR(1) process
+   real(r8), dimension(nvar) :: sigma = (/0.5, 0.3, 20.0, 1.0/)  ! standard deviation of perturbed forcing variables (prcp, sw, lw, t)
    real(r8), dimension(nvar, nvar) :: C = reshape([ &
          1.0, -0.8,  0.5, 0.0, &
         -0.8,  1.0, -0.5, 0.4, &
          0.5, -0.5,  1.0, 0.4, &
-         0.0,  0.4,  0.4, 1.0], shape=[nvar, nvar])                  ! cross-correlation matrix between perturbed forcing variables
-   real(r8), allocatable :: r_prev(:,:,:)                            ! previous perturbation (numpatch, nvar, DEF_DA_ENS_NUM)
-   real(r8), allocatable :: r_curr(:,:,:)                            ! current perturbation (numpatch, nvar, DEF_DA_ENS_NUM)
-   logical :: initialized = .false.                                  ! flag to indicate if is initialized
+         0.0,  0.4,  0.4, 1.0], shape=[nvar, nvar])              ! cross-correlation matrix between perturbed forcing variables
+   real(r8), allocatable :: r_prev(:,:,:)                        ! previous perturbation (numpatch, nvar, DEF_DA_ENS_NUM)
+   real(r8), allocatable :: r_curr(:,:,:)                        ! current perturbation (numpatch, nvar, DEF_DA_ENS_NUM)
+   logical :: initialized = .false.                              ! flag to indicate if is initialized
 
    ! soil moisture [default set 0.002 m3/m3 disterbulance]
-   integer,  parameter :: nvar_sm = 2                                ! number of pertutated soil moisture layers
-   real(r8), parameter :: tau_sm = 3.0                               ! correlation time scale in hours
-   real(r8) :: phi_sm                                                ! AR(1) autocorrelation coefficient consider time scale
-   real(r8) :: sigma_eps_sm                                          ! standard deviation of noise in AR(1) process
-   real(r8), dimension(nvar_sm) :: sigma_sm = (/0.035, 0.0552/)      ! standard deviation of perturbed soil moisture (equal to 0.002 m3/m3)
-   real(r8), allocatable :: r_prev_sm(:,:,:)                         ! previous perturbation (numpatch, nvar_sm, DEF_DA_ENS_NUM)
-   real(r8), allocatable :: r_curr_sm(:,:,:)                         ! current perturbation (numpatch, nvar_sm, DEF_DA_ENS_NUM)
-
-!-----------------------------------------------------------------------
-
-   INTERFACE ens_mean
-      MODULE PROCEDURE ens_mean_1d, ens_mean_2d, ens_mean_3d
-   END INTERFACE
+   integer,  parameter :: nvar_sm = 2                            ! number of pertutated soil moisture layers
+   real(r8), parameter :: tau_sm = 3.0                           ! correlation time scale in hours
+   real(r8) :: phi_sm                                            ! AR(1) autocorrelation coefficient consider time scale
+   real(r8) :: sigma_eps_sm                                      ! standard deviation of noise in AR(1) process
+   real(r8), dimension(nvar_sm) :: sigma_sm = (/0.035, 0.0552/)  ! standard deviation of perturbed soil moisture (equal to 0.002 m3/m3)
+   real(r8), allocatable :: r_prev_sm(:,:,:)                     ! previous perturbation (numpatch, nvar_sm, DEF_DA_ENS_NUM)
+   real(r8), allocatable :: r_curr_sm(:,:,:)                     ! current perturbation (numpatch, nvar_sm, DEF_DA_ENS_NUM)
 
 !-----------------------------------------------------------------------
 
@@ -82,28 +71,26 @@ CONTAINS
 !------------------------ Local Variables ------------------------------
       integer  ::  np, i, j
 
-      real(r8) :: cov_matrix(nvar, nvar)                      ! covariance matrix between perturbed forcing variables
-      real(r8) :: L(nvar, nvar)                               ! Cholesky decomposition of correlation matrix
-      integer  :: info                                        ! info flag for Cholesky decomposition
-      real(r8) :: u1(DEF_DA_ENS_NUM/2), u2(DEF_DA_ENS_NUM/2)  ! uniform random variables
-      real(r8) :: z(nvar, DEF_DA_ENS_NUM)                     ! standard normal random variables
-      real(r8) :: mean_z(nvar)                                ! mean of perturbation (nvar)
-      real(r8) :: std_z(nvar)                                 ! std of perturbation (nvar)
-      real(r8) :: zxL(nvar, DEF_DA_ENS_NUM)                   ! correlated random variables (nvar, DEF_DA_ENS_NUM)
+      real(r8) :: cov_matrix(nvar, nvar)                         ! covariance matrix between perturbed forcing variables
+      real(r8) :: L(nvar, nvar)                                  ! Cholesky decomposition of correlation matrix
+      integer  :: info                                           ! info flag for Cholesky decomposition
+      real(r8) :: u1(DEF_DA_ENS_NUM/2), u2(DEF_DA_ENS_NUM/2)     ! uniform random variables
+      real(r8) :: z(nvar, DEF_DA_ENS_NUM)                        ! standard normal random variables
+      real(r8) :: mean_z(nvar)                                   ! mean of perturbation (nvar)
+      real(r8) :: std_z(nvar)                                    ! std of perturbation (nvar)
+      real(r8) :: zxL(nvar, DEF_DA_ENS_NUM)                      ! correlated random variables (nvar, DEF_DA_ENS_NUM)
 
-      real(r8) :: z_sm(DEF_DA_ENS_NUM)                        ! standard normal random variables
-      real(r8) :: mean_z_sm                                   ! mean of perturbation
-      real(r8) :: std_z_sm                                    ! std of perturbation
-      real(r8) :: mean_r_sm(nvar_sm)                          ! mean of perturbation for soil moisture (nvar_sm)
-      real(r8) :: std_r_sm(nvar_sm)                           ! std of perturbation for soil moisture (nvar_sm)
-      real(r8) :: a1(DEF_DA_ENS_NUM)                          ! temporary disturbed variable for soil moisture layer 1
-      real(r8) :: a2(DEF_DA_ENS_NUM)                          ! temporary disturbed variable for soil moisture layer 2
+      real(r8) :: z_sm(DEF_DA_ENS_NUM)                           ! standard normal random variables
+      real(r8) :: mean_z_sm                                      ! mean of perturbation
+      real(r8) :: std_z_sm                                       ! std of perturbation
+      real(r8) :: mean_r_sm(nvar_sm)                             ! mean of perturbation for soil moisture (nvar_sm)
+      real(r8) :: std_r_sm(nvar_sm)                              ! std of perturbation for soil moisture (nvar_sm)
+      real(r8) :: a1(DEF_DA_ENS_NUM)                             ! temporary disturbed variable for soil moisture layer 1
+      real(r8) :: a2(DEF_DA_ENS_NUM)                             ! temporary disturbed variable for soil moisture layer 2
 
 !-----------------------------------------------------------------------
-
       IF (.not. p_is_worker) RETURN
-
-      IF (DEF_DA_ENS_NUM == 1) RETURN   ! single member: open-loop only, nothing to perturb
+      IF (DEF_DA_ENS_NUM == 1) RETURN
 
       ! initialize persistent variables
       IF (.not. initialized) THEN
@@ -273,192 +260,101 @@ CONTAINS
 
 !-----------------------------------------------------------------------
 
-   SUBROUTINE model_to_ens(iens)
+   SUBROUTINE save_member(iens)
 
 !-----------------------------------------------------------------------
-      USE MOD_Vars_1DFluxes
+! DESCRIPTION:
+!    Save the current model states, forcing, and diagnostic and flux
+!    outputs into ensemble member.
+!-----------------------------------------------------------------------
       IMPLICIT NONE
-
-!------------------------ Dummy Arguments ------------------------------
       integer, intent(in) :: iens
 
-!-----------------------------------------------------------------------
+      IF (p_is_worker) THEN
+         ! Restart states
+         z_sno_ens       (  :,iens,:) = z_sno
+         dz_sno_ens      (  :,iens,:) = dz_sno
+         t_soisno_ens    (  :,iens,:) = t_soisno
+         wliq_soisno_ens (  :,iens,:) = wliq_soisno
+         wice_soisno_ens (  :,iens,:) = wice_soisno
+         smp_ens         (  :,iens,:) = smp
+         hk_ens          (  :,iens,:) = hk
+         t_grnd_ens      (    iens,:) = t_grnd
+         tleaf_ens       (    iens,:) = tleaf
+         ldew_ens        (    iens,:) = ldew
+         ldew_rain_ens   (    iens,:) = ldew_rain
+         ldew_snow_ens   (    iens,:) = ldew_snow
+         fwet_snow_ens   (    iens,:) = fwet_snow
+         sag_ens         (    iens,:) = sag
+         scv_ens         (    iens,:) = scv
+         snowdp_ens      (    iens,:) = snowdp
+         fveg_ens        (    iens,:) = fveg
+         fsno_ens        (    iens,:) = fsno
+         sigf_ens        (    iens,:) = sigf
+         green_ens       (    iens,:) = green
+         tlai_ens        (    iens,:) = tlai
+         lai_ens         (    iens,:) = lai
+         tsai_ens        (    iens,:) = tsai
+         sai_ens         (    iens,:) = sai
+         alb_ens         (:,:,iens,:) = alb
+         ssun_ens        (:,:,iens,:) = ssun
+         ssha_ens        (:,:,iens,:) = ssha
+         ssoi_ens        (:,:,iens,:) = ssoi
+         ssno_ens        (:,:,iens,:) = ssno
+         thermk_ens      (    iens,:) = thermk
+         extkb_ens       (    iens,:) = extkb
+         extkd_ens       (    iens,:) = extkd
+         zwt_ens         (    iens,:) = zwt
+         wdsrf_ens       (    iens,:) = wdsrf
+         wa_ens          (    iens,:) = wa
+         wetwat_ens      (    iens,:) = wetwat
+         t_lake_ens      (  :,iens,:) = t_lake
+         lake_icefrac_ens(  :,iens,:) = lake_icefrac
+         savedtke1_ens   (    iens,:) = savedtke1
 
-      IF (.not. p_is_worker) RETURN
+         ! Forcings
+         forc_t_ens      (    iens,:) = forc_t
+         forc_prc_ens    (    iens,:) = forc_prc
+         forc_prl_ens    (    iens,:) = forc_prl
+         forc_sols_ens   (    iens,:) = forc_sols
+         forc_soll_ens   (    iens,:) = forc_soll
+         forc_solsd_ens  (    iens,:) = forc_solsd
+         forc_solld_ens  (    iens,:) = forc_solld
+         forc_frl_ens    (    iens,:) = forc_frl
 
-      z_sno_ens       (  :,iens,:) = z_sno
-      dz_sno_ens      (  :,iens,:) = dz_sno
-      t_soisno_ens    (  :,iens,:) = t_soisno
-      wliq_soisno_ens (  :,iens,:) = wliq_soisno
-      wice_soisno_ens (  :,iens,:) = wice_soisno
-      smp_ens         (  :,iens,:) = smp
-      hk_ens          (  :,iens,:) = hk
-      t_grnd_ens      (    iens,:) = t_grnd
-      tleaf_ens       (    iens,:) = tleaf
-      ldew_ens        (    iens,:) = ldew
-      ldew_rain_ens   (    iens,:) = ldew_rain
-      ldew_snow_ens   (    iens,:) = ldew_snow
-      fwet_snow_ens   (    iens,:) = fwet_snow
-      sag_ens         (    iens,:) = sag
-      scv_ens         (    iens,:) = scv
-      snowdp_ens      (    iens,:) = snowdp
-      fveg_ens        (    iens,:) = fveg
-      fsno_ens        (    iens,:) = fsno
-      sigf_ens        (    iens,:) = sigf
-      green_ens       (    iens,:) = green
-      tlai_ens        (    iens,:) = tlai
-      lai_ens         (    iens,:) = lai
-      tsai_ens        (    iens,:) = tsai
-      sai_ens         (    iens,:) = sai
-      alb_ens         (:,:,iens,:) = alb
-      ssun_ens        (:,:,iens,:) = ssun
-      ssha_ens        (:,:,iens,:) = ssha
-      ssoi_ens        (:,:,iens,:) = ssoi
-      ssno_ens        (:,:,iens,:) = ssno
-      thermk_ens      (    iens,:) = thermk
-      extkb_ens       (    iens,:) = extkb
-      extkd_ens       (    iens,:) = extkd
-      zwt_ens         (    iens,:) = zwt
-      wdsrf_ens       (    iens,:) = wdsrf
-      wa_ens          (    iens,:) = wa
-      wetwat_ens      (    iens,:) = wetwat
-      t_lake_ens      (  :,iens,:) = t_lake
-      lake_icefrac_ens(  :,iens,:) = lake_icefrac
-      savedtke1_ens   (    iens,:) = savedtke1
-
-      trad_ens        (    iens,:) = trad
-      tref_ens        (    iens,:) = tref
-      qref_ens        (    iens,:) = qref
-      ustar_ens       (    iens,:) = ustar
-      qstar_ens       (    iens,:) = qstar
-      tstar_ens       (    iens,:) = tstar
-      fm_ens          (    iens,:) = fm
-      fh_ens          (    iens,:) = fh
-      fq_ens          (    iens,:) = fq
-
-      forc_t_ens      (    iens,:) = forc_t
-      forc_prc_ens    (    iens,:) = forc_prc
-      forc_prl_ens    (    iens,:) = forc_prl
-      forc_sols_ens   (    iens,:) = forc_sols
-      forc_soll_ens   (    iens,:) = forc_soll
-      forc_solsd_ens  (    iens,:) = forc_solsd
-      forc_solld_ens  (    iens,:) = forc_solld
-      forc_frl_ens    (    iens,:) = forc_frl
-
-      fsena_ens       (    iens,:) = fsena
-      lfevpa_ens      (    iens,:) = lfevpa
-      fevpa_ens       (    iens,:) = fevpa
-      rsur_ens        (    iens,:) = rsur
-      rnof_ens        (    iens,:) = rnof
-
-#ifdef GridRiverLakeFlow
-      IF (iens == 0) THEN
-         IF (allocated(wdsrf_ucat_ol)) THEN
-            wdsrf_ucat_ol = wdsrf_ucat
-            veloc_riv_ol  = veloc_riv
-         ENDIF
-         IF (DEF_Reservoir_Method > 0) THEN
-            IF (allocated(volresv_ol)) volresv_ol = volresv
-         ENDIF
+         ! Fluxes (save for land-atmosphere coupling assimilation)
+         trad_ens        (    iens,:) = trad
+         tref_ens        (    iens,:) = tref
+         qref_ens        (    iens,:) = qref
+         ustar_ens       (    iens,:) = ustar
+         qstar_ens       (    iens,:) = qstar
+         tstar_ens       (    iens,:) = tstar
+         fm_ens          (    iens,:) = fm
+         fh_ens          (    iens,:) = fh
+         fq_ens          (    iens,:) = fq
+         fsena_ens       (    iens,:) = fsena
+         lfevpa_ens      (    iens,:) = lfevpa
+         fevpa_ens       (    iens,:) = fevpa
+         rsur_ens        (    iens,:) = rsur
+         rnof_ens        (    iens,:) = rnof
       ENDIF
-#endif
 
-   END SUBROUTINE model_to_ens
+   END SUBROUTINE save_member
 
-!-----------------------------------------------------------------------
+!-----------------------------------------------------------------------------
 
-   SUBROUTINE ens_to_model(iens)
+   SUBROUTINE load_member(iens)
 
-!-----------------------------------------------------------------------
-      USE MOD_Vars_1DFluxes
+!-----------------------------------------------------------------------------
+! DESCRIPTION:
+!    Load the restart states and forcing of ensemble member into the
+!    model variables before advancing that member.
+!-----------------------------------------------------------------------------
       IMPLICIT NONE
-
-!------------------------ Dummy Arguments ------------------------------
       integer, intent(in) :: iens
 
-!-----------------------------------------------------------------------
-
-      IF (.not. p_is_worker) RETURN
-
-      ! In online mode, member 0 carries the ensemble mean over members
-      ! 1:DEF_DA_ENS_NUM after the ensemble forecasts; in offline mode it
-      ! keeps its open-loop trajectory.
-      IF (iens == 0 .and. DEF_DA_ENS_NUM > 1 .and. &
-          trim(DEF_DA_Operation) == 'online') THEN
-         CALL ens_mean (forc_t_ens,       forc_t)
-         CALL ens_mean (forc_prc_ens,     forc_prc)
-         CALL ens_mean (forc_prl_ens,     forc_prl)
-         CALL ens_mean (forc_sols_ens,    forc_sols)
-         CALL ens_mean (forc_soll_ens,    forc_soll)
-         CALL ens_mean (forc_solsd_ens,   forc_solsd)
-         CALL ens_mean (forc_solld_ens,   forc_solld)
-         CALL ens_mean (forc_frl_ens,     forc_frl)
-
-         CALL ens_mean (z_sno_ens,        z_sno)
-         CALL ens_mean (dz_sno_ens,       dz_sno)
-         CALL ens_mean (t_soisno_ens,     t_soisno)
-         CALL ens_mean (wliq_soisno_ens,  wliq_soisno)
-         CALL ens_mean (wice_soisno_ens,  wice_soisno)
-         CALL ens_mean (smp_ens,          smp)
-         CALL ens_mean (hk_ens,           hk)
-         CALL ens_mean (t_grnd_ens,       t_grnd)
-         CALL ens_mean (tleaf_ens,        tleaf)
-         CALL ens_mean (ldew_ens,         ldew)
-         CALL ens_mean (ldew_rain_ens,    ldew_rain)
-         CALL ens_mean (ldew_snow_ens,    ldew_snow)
-         CALL ens_mean (fwet_snow_ens,    fwet_snow)
-         CALL ens_mean (sag_ens,          sag)
-         CALL ens_mean (scv_ens,          scv)
-         CALL ens_mean (snowdp_ens,       snowdp)
-         CALL ens_mean (fveg_ens,         fveg)
-         CALL ens_mean (fsno_ens,         fsno)
-         CALL ens_mean (sigf_ens,         sigf)
-         CALL ens_mean (green_ens,        green)
-         CALL ens_mean (tlai_ens,         tlai)
-         CALL ens_mean (lai_ens,          lai)
-         CALL ens_mean (tsai_ens,         tsai)
-         CALL ens_mean (sai_ens,          sai)
-         CALL ens_mean (alb_ens,          alb)
-         CALL ens_mean (ssun_ens,         ssun)
-         CALL ens_mean (ssha_ens,         ssha)
-         CALL ens_mean (ssoi_ens,         ssoi)
-         CALL ens_mean (ssno_ens,         ssno)
-         CALL ens_mean (thermk_ens,       thermk)
-         CALL ens_mean (extkb_ens,        extkb)
-         CALL ens_mean (extkd_ens,        extkd)
-         CALL ens_mean (zwt_ens,          zwt)
-         CALL ens_mean (wdsrf_ens,        wdsrf)
-         CALL ens_mean (wa_ens,           wa)
-         CALL ens_mean (wetwat_ens,       wetwat)
-         CALL ens_mean (t_lake_ens,       t_lake)
-         CALL ens_mean (lake_icefrac_ens, lake_icefrac)
-         CALL ens_mean (savedtke1_ens,    savedtke1)
-
-         CALL ens_mean (trad_ens,         trad)
-         CALL ens_mean (tref_ens,         tref)
-         CALL ens_mean (qref_ens,         qref)
-         CALL ens_mean (ustar_ens,        ustar)
-         CALL ens_mean (qstar_ens,        qstar)
-         CALL ens_mean (tstar_ens,        tstar)
-         CALL ens_mean (fm_ens,           fm)
-         CALL ens_mean (fh_ens,           fh)
-         CALL ens_mean (fq_ens,           fq)
-
-         CALL ens_mean (fsena_ens,        fsena)
-         CALL ens_mean (lfevpa_ens,       lfevpa)
-         CALL ens_mean (fevpa_ens,        fevpa)
-         CALL ens_mean (rsur_ens,         rsur)
-         CALL ens_mean (rnof_ens,         rnof)
-      ELSE
-         forc_t       = forc_t_ens      (    iens,:)
-         forc_prc     = forc_prc_ens    (    iens,:)
-         forc_prl     = forc_prl_ens    (    iens,:)
-         forc_sols    = forc_sols_ens   (    iens,:)
-         forc_soll    = forc_soll_ens   (    iens,:)
-         forc_solsd   = forc_solsd_ens  (    iens,:)
-         forc_solld   = forc_solld_ens  (    iens,:)
-         forc_frl     = forc_frl_ens    (    iens,:)
-
+      IF (p_is_worker) THEN
+         ! Restart states
          z_sno        = z_sno_ens       (  :,iens,:)
          dz_sno       = dz_sno_ens      (  :,iens,:)
          t_soisno     = t_soisno_ens    (  :,iens,:)
@@ -499,6 +395,17 @@ CONTAINS
          lake_icefrac = lake_icefrac_ens(  :,iens,:)
          savedtke1    = savedtke1_ens   (    iens,:)
 
+         ! Forcings
+         forc_t       = forc_t_ens      (    iens,:)
+         forc_prc     = forc_prc_ens    (    iens,:)
+         forc_prl     = forc_prl_ens    (    iens,:)
+         forc_sols    = forc_sols_ens   (    iens,:)
+         forc_soll    = forc_soll_ens   (    iens,:)
+         forc_solsd   = forc_solsd_ens  (    iens,:)
+         forc_solld   = forc_solld_ens  (    iens,:)
+         forc_frl     = forc_frl_ens    (    iens,:)
+
+         ! Fluxes (save for land-atmosphere coupling assimilation)
          trad         = trad_ens        (    iens,:)
          tref         = tref_ens        (    iens,:)
          qref         = qref_ens        (    iens,:)
@@ -508,7 +415,6 @@ CONTAINS
          fm           = fm_ens          (    iens,:)
          fh           = fh_ens          (    iens,:)
          fq           = fq_ens          (    iens,:)
-
          fsena        = fsena_ens       (    iens,:)
          lfevpa       = lfevpa_ens      (    iens,:)
          fevpa        = fevpa_ens       (    iens,:)
@@ -516,67 +422,88 @@ CONTAINS
          rnof         = rnof_ens        (    iens,:)
       ENDIF
 
-#ifdef GridRiverLakeFlow
-      IF (iens == 0) THEN
-         IF (allocated(wdsrf_ucat_ol)) THEN
-            WHERE (wdsrf_ucat_ol /= spval) wdsrf_ucat = wdsrf_ucat_ol
-            WHERE (veloc_riv_ol  /= spval) veloc_riv  = veloc_riv_ol
-         ENDIF
-         IF (DEF_Reservoir_Method > 0) THEN
-            IF (allocated(volresv_ol)) THEN
-               WHERE (volresv_ol /= spval) volresv = volresv_ol
-            ENDIF
+   END SUBROUTINE load_member
+
+!-----------------------------------------------------------------------------
+
+   SUBROUTINE postprocess()
+
+!-----------------------------------------------------------------------------
+! DESCRIPTION:
+!    Set the final model states and outputs after data assimilation.
+!
+!    When land-atmosphere feedback is enabled, apply the analysis 
+!    ensemble means for restart states and fluxes.
+!
+!    Otherwise, restore the open-loop trajectory for diagnostic.
+!-----------------------------------------------------------------------------
+      IMPLICIT NONE
+
+      IF (p_is_worker) THEN
+         CALL load_member(0)
+
+         IF (DEF_DA_FEEDBACK) THEN
+            ! Restart
+            z_sno        = sum(z_sno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2)        / DEF_DA_ENS_NUM
+            dz_sno       = sum(dz_sno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2)       / DEF_DA_ENS_NUM
+            t_soisno     = sum(t_soisno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2)     / DEF_DA_ENS_NUM
+            wliq_soisno  = sum(wliq_soisno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2)  / DEF_DA_ENS_NUM
+            wice_soisno  = sum(wice_soisno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2)  / DEF_DA_ENS_NUM
+            smp          = sum(smp_ens(:,1:DEF_DA_ENS_NUM,:), dim=2)          / DEF_DA_ENS_NUM
+            hk           = sum(hk_ens(:,1:DEF_DA_ENS_NUM,:), dim=2)           / DEF_DA_ENS_NUM
+            t_grnd       = sum(t_grnd_ens(1:DEF_DA_ENS_NUM,:), dim=1)         / DEF_DA_ENS_NUM
+            tleaf        = sum(tleaf_ens(1:DEF_DA_ENS_NUM,:), dim=1)          / DEF_DA_ENS_NUM
+            ldew         = sum(ldew_ens(1:DEF_DA_ENS_NUM,:), dim=1)           / DEF_DA_ENS_NUM
+            ldew_rain    = sum(ldew_rain_ens(1:DEF_DA_ENS_NUM,:), dim=1)      / DEF_DA_ENS_NUM
+            ldew_snow    = sum(ldew_snow_ens(1:DEF_DA_ENS_NUM,:), dim=1)      / DEF_DA_ENS_NUM
+            fwet_snow    = sum(fwet_snow_ens(1:DEF_DA_ENS_NUM,:), dim=1)      / DEF_DA_ENS_NUM
+            sag          = sum(sag_ens(1:DEF_DA_ENS_NUM,:), dim=1)            / DEF_DA_ENS_NUM
+            scv          = sum(scv_ens(1:DEF_DA_ENS_NUM,:), dim=1)            / DEF_DA_ENS_NUM
+            snowdp       = sum(snowdp_ens(1:DEF_DA_ENS_NUM,:), dim=1)         / DEF_DA_ENS_NUM
+            fveg         = sum(fveg_ens(1:DEF_DA_ENS_NUM,:), dim=1)           / DEF_DA_ENS_NUM
+            fsno         = sum(fsno_ens(1:DEF_DA_ENS_NUM,:), dim=1)           / DEF_DA_ENS_NUM
+            sigf         = sum(sigf_ens(1:DEF_DA_ENS_NUM,:), dim=1)           / DEF_DA_ENS_NUM
+            green        = sum(green_ens(1:DEF_DA_ENS_NUM,:), dim=1)          / DEF_DA_ENS_NUM
+            tlai         = sum(tlai_ens(1:DEF_DA_ENS_NUM,:), dim=1)           / DEF_DA_ENS_NUM
+            lai          = sum(lai_ens(1:DEF_DA_ENS_NUM,:), dim=1)            / DEF_DA_ENS_NUM
+            tsai         = sum(tsai_ens(1:DEF_DA_ENS_NUM,:), dim=1)           / DEF_DA_ENS_NUM
+            sai          = sum(sai_ens(1:DEF_DA_ENS_NUM,:), dim=1)            / DEF_DA_ENS_NUM
+            alb          = sum(alb_ens(:,:,1:DEF_DA_ENS_NUM,:), dim=3)        / DEF_DA_ENS_NUM
+            ssun         = sum(ssun_ens(:,:,1:DEF_DA_ENS_NUM,:), dim=3)       / DEF_DA_ENS_NUM
+            ssha         = sum(ssha_ens(:,:,1:DEF_DA_ENS_NUM,:), dim=3)       / DEF_DA_ENS_NUM
+            ssoi         = sum(ssoi_ens(:,:,1:DEF_DA_ENS_NUM,:), dim=3)       / DEF_DA_ENS_NUM
+            ssno         = sum(ssno_ens(:,:,1:DEF_DA_ENS_NUM,:), dim=3)       / DEF_DA_ENS_NUM
+            thermk       = sum(thermk_ens(1:DEF_DA_ENS_NUM,:), dim=1)         / DEF_DA_ENS_NUM
+            extkb        = sum(extkb_ens(1:DEF_DA_ENS_NUM,:), dim=1)          / DEF_DA_ENS_NUM
+            extkd        = sum(extkd_ens(1:DEF_DA_ENS_NUM,:), dim=1)          / DEF_DA_ENS_NUM
+            zwt          = sum(zwt_ens(1:DEF_DA_ENS_NUM,:), dim=1)            / DEF_DA_ENS_NUM
+            wdsrf        = sum(wdsrf_ens(1:DEF_DA_ENS_NUM,:), dim=1)          / DEF_DA_ENS_NUM
+            wa           = sum(wa_ens(1:DEF_DA_ENS_NUM,:), dim=1)             / DEF_DA_ENS_NUM
+            wetwat       = sum(wetwat_ens(1:DEF_DA_ENS_NUM,:), dim=1)         / DEF_DA_ENS_NUM
+            t_lake       = sum(t_lake_ens(:,1:DEF_DA_ENS_NUM,:), dim=2)       / DEF_DA_ENS_NUM
+            lake_icefrac = sum(lake_icefrac_ens(:,1:DEF_DA_ENS_NUM,:), dim=2) / DEF_DA_ENS_NUM
+            savedtke1    = sum(savedtke1_ens(1:DEF_DA_ENS_NUM,:), dim=1)      / DEF_DA_ENS_NUM
+
+            ! Fluxes
+            trad         = sum(trad_ens(1:DEF_DA_ENS_NUM,:), dim=1)           / DEF_DA_ENS_NUM
+            tref         = sum(tref_ens(1:DEF_DA_ENS_NUM,:), dim=1)           / DEF_DA_ENS_NUM
+            qref         = sum(qref_ens(1:DEF_DA_ENS_NUM,:), dim=1)           / DEF_DA_ENS_NUM
+            ustar        = sum(ustar_ens(1:DEF_DA_ENS_NUM,:), dim=1)          / DEF_DA_ENS_NUM
+            qstar        = sum(qstar_ens(1:DEF_DA_ENS_NUM,:), dim=1)          / DEF_DA_ENS_NUM
+            tstar        = sum(tstar_ens(1:DEF_DA_ENS_NUM,:), dim=1)          / DEF_DA_ENS_NUM
+            fm           = sum(fm_ens(1:DEF_DA_ENS_NUM,:), dim=1)             / DEF_DA_ENS_NUM
+            fh           = sum(fh_ens(1:DEF_DA_ENS_NUM,:), dim=1)             / DEF_DA_ENS_NUM
+            fq           = sum(fq_ens(1:DEF_DA_ENS_NUM,:), dim=1)             / DEF_DA_ENS_NUM
+            fsena        = sum(fsena_ens(1:DEF_DA_ENS_NUM,:), dim=1)          / DEF_DA_ENS_NUM
+            lfevpa       = sum(lfevpa_ens(1:DEF_DA_ENS_NUM,:), dim=1)         / DEF_DA_ENS_NUM
+            fevpa        = sum(fevpa_ens(1:DEF_DA_ENS_NUM,:), dim=1)          / DEF_DA_ENS_NUM
+            rsur         = sum(rsur_ens(1:DEF_DA_ENS_NUM,:), dim=1)           / DEF_DA_ENS_NUM
+            rnof         = sum(rnof_ens(1:DEF_DA_ENS_NUM,:), dim=1)           / DEF_DA_ENS_NUM
          ENDIF
       ENDIF
-#endif
 
-   END SUBROUTINE ens_to_model
+   END SUBROUTINE postprocess
 
-!-----------------------------------------------------------------------
-
-   SUBROUTINE ens_mean_1d (ens, mean)
-
-!-----------------------------------------------------------------------
-      IMPLICIT NONE
-
-      real(r8), intent(in)  :: ens  (0:,:)
-      real(r8), intent(out) :: mean (:)
-
-      mean = sum(ens(1:DEF_DA_ENS_NUM,:), dim=1) / DEF_DA_ENS_NUM
-      WHERE (any(ens(1:DEF_DA_ENS_NUM,:) == spval, dim=1)) mean = spval
-
-   END SUBROUTINE ens_mean_1d
-
-!-----------------------------------------------------------------------
-
-   SUBROUTINE ens_mean_2d (ens, mean)
-
-!-----------------------------------------------------------------------
-      IMPLICIT NONE
-
-      real(r8), intent(in)  :: ens  (:,:,:)
-      real(r8), intent(out) :: mean (:,:)
-
-      mean = sum(ens(:,1:DEF_DA_ENS_NUM,:), dim=2) / DEF_DA_ENS_NUM
-      WHERE (any(ens(:,1:DEF_DA_ENS_NUM,:) == spval, dim=2)) mean = spval
-
-   END SUBROUTINE ens_mean_2d
-
-!-----------------------------------------------------------------------
-
-   SUBROUTINE ens_mean_3d (ens, mean)
-
-!-----------------------------------------------------------------------
-      IMPLICIT NONE
-
-      real(r8), intent(in)  :: ens  (:,:,:,:)
-      real(r8), intent(out) :: mean (:,:,:)
-
-      mean = sum(ens(:,:,1:DEF_DA_ENS_NUM,:), dim=3) / DEF_DA_ENS_NUM
-      WHERE (any(ens(:,:,1:DEF_DA_ENS_NUM,:) == spval, dim=3)) mean = spval
-
-   END SUBROUTINE ens_mean_3d
-
-!-----------------------------------------------------------------------
+!-----------------------------------------------------------------------------
 END MODULE MOD_DA_Ens
 #endif
