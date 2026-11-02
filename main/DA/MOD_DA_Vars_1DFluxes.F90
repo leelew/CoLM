@@ -1,50 +1,58 @@
 #include <define.h>
 
 #ifdef DataAssimilation
-MODULE MOD_DA_Vars_1DAccFluxes
+MODULE MOD_DA_Vars_1DFluxes
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
-!   Accumulators for DA diagnostic variables
+!    Stores ensemble surface fluxes and land-atmosphere coupling variables
+!    specifically for land-atmosphere coupling data assimilation.
 !
-! AUTHOR:
-!   Zhilong Fan, 10/2026
+! HISTORY:
+!    Lu Li, 10/2026
 !-----------------------------------------------------------------------------
    USE MOD_Precision
+   USE MOD_Namelist
    USE MOD_Vars_Global
    USE MOD_SPMD_Task
    USE MOD_LandPatch
-   USE MOD_Namelist, only: DEF_DA_ENS_NUM, DEF_DA_OBS_TARGET
-   USE MOD_DA_Vars_TimeVariables
-#ifdef GridRiverLakeFlow
-   USE MOD_Grid_RiverLakeNetwork, only: numucat
-#endif
    IMPLICIT NONE
    SAVE
 
-   PUBLIC :: allocate_1D_DAAccFluxes
-   PUBLIC :: deallocate_1D_DAAccFluxes
-   PUBLIC :: flush_1D_DAAccFluxes
-   PUBLIC :: accumulate_1D_DAAccFluxes
+   PUBLIC :: allocate_1D_DAFluxes
+   PUBLIC :: deallocate_1D_DAFluxes
 
-   real(r8), allocatable :: a_hx_ol          (:,:  ) ! open-loop H(x)                                 [source, patch]
-   real(r8), allocatable :: a_hx_f_ens       (:,:,:) ! prior H(x)                                     [source, ensemble, patch]
-   real(r8), allocatable :: a_hx_a_ens       (:,:,:) ! posterior H(x)                                 [source, ensemble, patch]
-   real(r8), allocatable :: a_hx_f           (:,:  ) ! ensemble-mean prior H(x)                       [source, patch]
-   real(r8), allocatable :: a_hx_a           (:,:  ) ! ensemble-mean posterior H(x)                   [source, patch]
-   real(r8), allocatable :: a_wliq_soisno_ol (:,:  ) ! open-loop liquid water in layers               [kg/m2]
-   real(r8), allocatable :: a_wliq_soisno_f  (:,:  ) ! ensemble-mean prior liquid water in layers     [kg/m2]
-   real(r8), allocatable :: a_wliq_soisno_a  (:,:  ) ! ensemble-mean posterior liquid water in layers [kg/m2]
-   real(r8), allocatable :: a_wliq_soisno_ens(:,:,:) ! ensemble liquid water in layers                [kg/m2]
-   real(r8), allocatable :: a_t_soisno_ol    (:,:  ) ! open-loop temperature in layers                [K]
-   real(r8), allocatable :: a_t_soisno_f     (:,:  ) ! ensemble-mean prior temperature in layers      [K]
-   real(r8), allocatable :: a_t_soisno_a     (:,:  ) ! ensemble-mean posterior temperature in layers  [K]
+!-----------------------------------------------------------------------------
+! Surface flux variables
+!-----------------------------------------------------------------------------
+   real(r8), allocatable :: fsena_ens        (:,:)      ! sensible heat flux to the atmosphere                     [W/m2]
+   real(r8), allocatable :: lfevpa_ens       (:,:)      ! latent heat flux to the atmosphere                       [W/m2]
+   real(r8), allocatable :: fevpa_ens        (:,:)      ! evapotranspiration to the atmosphere                     [mm/s]
+   real(r8), allocatable :: rsur_ens         (:,:)      ! surface runoff                                           [mm/s]
+   real(r8), allocatable :: rnof_ens         (:,:)      ! total runoff                                             [mm/s]
 
-#ifdef GridRiverLakeFlow
-   real(r8), allocatable :: a_discharge_ol   (:) ! open-loop discharge sum                          [m^3/s*s]
-   real(r8), allocatable :: acctime_ucat_ol  (:) ! open-loop averaging time                         [s]
-   real(r8), allocatable :: a_discharge_a    (:) ! analysis discharge sum                           [m^3/s*s]
-   real(r8), allocatable :: acctime_ucat_a   (:) ! analysis averaging time                          [s]
-#endif
+!-----------------------------------------------------------------------------
+! Land-atmosphere coupling variables
+!-----------------------------------------------------------------------------
+   real(r8), allocatable :: trad_ens         (:,:)      ! surface radiative temperature                            [K]
+   real(r8), allocatable :: tref_ens         (:,:)      ! 2 m air temperature                                      [K]
+   real(r8), allocatable :: tref_ens_f       (:,:)      ! prior 2 m air temperature                                [K]
+   real(r8), allocatable :: tref_ens_a       (:,:)      ! posterior 2 m air temperature                            [K]
+   real(r8), allocatable :: tref_f           (:)        ! ensemble-mean prior 2 m air temperature                  [K]
+   real(r8), allocatable :: tref_a           (:)        ! ensemble-mean posterior 2 m air temperature              [K]
+   real(r8), allocatable :: qref_ens         (:,:)      ! 2 m specific humidity                                    [kg/kg]
+   real(r8), allocatable :: qref_ens_f       (:,:)      ! prior 2 m specific humidity                              [kg/kg]
+   real(r8), allocatable :: qref_ens_a       (:,:)      ! posterior 2 m specific humidity                          [kg/kg]
+   real(r8), allocatable :: qref_f           (:)        ! ensemble-mean prior 2 m specific humidity                [kg/kg]
+   real(r8), allocatable :: qref_a           (:)        ! ensemble-mean posterior 2 m specific humidity            [kg/kg]
+   real(r8), allocatable :: rhref_ens        (:,:)      ! 2 m relative humidity                                    [-]
+   real(r8), allocatable :: rhref_ens_f      (:,:)      ! prior 2 m relative humidity                              [-]
+   real(r8), allocatable :: rhref_ens_a      (:,:)      ! posterior 2 m relative humidity                          [-]
+   real(r8), allocatable :: ustar_ens        (:,:)      ! friction velocity in similarity theory                   [m/s]
+   real(r8), allocatable :: qstar_ens        (:,:)      ! humidity scale in similarity theory                      [kg/kg]
+   real(r8), allocatable :: tstar_ens        (:,:)      ! temperature scale in similarity theory                   [K]
+   real(r8), allocatable :: fm_ens           (:,:)      ! integrated momentum profile function                     [-]
+   real(r8), allocatable :: fh_ens           (:,:)      ! integrated heat profile function                         [-]
+   real(r8), allocatable :: fq_ens           (:,:)      ! integrated moisture profile function                     [-]
 
 !-----------------------------------------------------------------------------
 
@@ -52,195 +60,82 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE allocate_1D_DAAccFluxes ()
+   SUBROUTINE allocate_1D_DAFluxes()
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
-
-      integer :: i
-
-!-----------------------------------------------------------------------------
-      nsource = 0
-      DO i = 1, size(DEF_DA_OBS_TARGET)
-         IF (len_trim(DEF_DA_OBS_TARGET(i)) > 0) nsource = nsource + 1
-      ENDDO
 
       IF (p_is_worker) THEN
          IF (numpatch > 0) THEN
-            IF (nsource > 0) THEN
-               allocate (a_hx_ol   (nsource,               numpatch))
-               allocate (a_hx_f_ens(nsource,DEF_DA_ENS_NUM,numpatch))
-               allocate (a_hx_a_ens(nsource,DEF_DA_ENS_NUM,numpatch))
-               allocate (a_hx_f    (nsource,               numpatch))
-               allocate (a_hx_a    (nsource,               numpatch))
-            ENDIF
-            allocate (a_wliq_soisno_ol (maxsnl+1:nl_soil,numpatch))
-            allocate (a_wliq_soisno_f  (maxsnl+1:nl_soil,numpatch))
-            allocate (a_wliq_soisno_a  (maxsnl+1:nl_soil,numpatch))
-            allocate (a_wliq_soisno_ens(maxsnl+1:nl_soil,DEF_DA_ENS_NUM,numpatch))
-            allocate (a_t_soisno_ol    (maxsnl+1:nl_soil,numpatch))
-            allocate (a_t_soisno_f     (maxsnl+1:nl_soil,numpatch))
-            allocate (a_t_soisno_a     (maxsnl+1:nl_soil,numpatch))
+            allocate (fsena_ens        (0:DEF_DA_ENS_NUM,numpatch)); fsena_ens        (:,:) = spval
+            allocate (lfevpa_ens       (0:DEF_DA_ENS_NUM,numpatch)); lfevpa_ens       (:,:) = spval
+            allocate (fevpa_ens        (0:DEF_DA_ENS_NUM,numpatch)); fevpa_ens        (:,:) = spval
+            allocate (rsur_ens         (0:DEF_DA_ENS_NUM,numpatch)); rsur_ens         (:,:) = spval
+            allocate (rnof_ens         (0:DEF_DA_ENS_NUM,numpatch)); rnof_ens         (:,:) = spval
+            allocate (trad_ens         (0:DEF_DA_ENS_NUM,numpatch)); trad_ens         (:,:) = spval
+            allocate (tref_ens         (0:DEF_DA_ENS_NUM,numpatch)); tref_ens         (:,:) = spval
+            allocate (tref_ens_f       (0:DEF_DA_ENS_NUM,numpatch)); tref_ens_f       (:,:) = spval
+            allocate (tref_ens_a       (0:DEF_DA_ENS_NUM,numpatch)); tref_ens_a       (:,:) = spval
+            allocate (tref_f           (numpatch)); tref_f           (:) = spval
+            allocate (tref_a           (numpatch)); tref_a           (:) = spval
+            allocate (qref_ens         (0:DEF_DA_ENS_NUM,numpatch)); qref_ens         (:,:) = spval
+            allocate (qref_ens_f       (0:DEF_DA_ENS_NUM,numpatch)); qref_ens_f       (:,:) = spval
+            allocate (qref_ens_a       (0:DEF_DA_ENS_NUM,numpatch)); qref_ens_a       (:,:) = spval
+            allocate (qref_f           (numpatch)); qref_f           (:) = spval
+            allocate (qref_a           (numpatch)); qref_a           (:) = spval
+            allocate (rhref_ens        (0:DEF_DA_ENS_NUM,numpatch)); rhref_ens        (:,:) = spval
+            allocate (rhref_ens_f      (0:DEF_DA_ENS_NUM,numpatch)); rhref_ens_f      (:,:) = spval
+            allocate (rhref_ens_a      (0:DEF_DA_ENS_NUM,numpatch)); rhref_ens_a      (:,:) = spval
+            allocate (ustar_ens        (0:DEF_DA_ENS_NUM,numpatch)); ustar_ens        (:,:) = spval
+            allocate (qstar_ens        (0:DEF_DA_ENS_NUM,numpatch)); qstar_ens        (:,:) = spval
+            allocate (tstar_ens        (0:DEF_DA_ENS_NUM,numpatch)); tstar_ens        (:,:) = spval
+            allocate (fm_ens           (0:DEF_DA_ENS_NUM,numpatch)); fm_ens           (:,:) = spval
+            allocate (fh_ens           (0:DEF_DA_ENS_NUM,numpatch)); fh_ens           (:,:) = spval
+            allocate (fq_ens           (0:DEF_DA_ENS_NUM,numpatch)); fq_ens           (:,:) = spval
          ENDIF
-#ifdef GridRiverLakeFlow
-         IF (numucat > 0) THEN
-            allocate (a_discharge_ol (numucat))
-            allocate (acctime_ucat_ol(numucat))
-            allocate (a_discharge_a  (numucat))
-            allocate (acctime_ucat_a (numucat))
-         ENDIF
-#endif
       ENDIF
 
-   END SUBROUTINE allocate_1D_DAAccFluxes
+   END SUBROUTINE allocate_1D_DAFluxes
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE deallocate_1D_DAAccFluxes ()
+   SUBROUTINE deallocate_1D_DAFluxes()
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
 
-!-----------------------------------------------------------------------------
       IF (p_is_worker) THEN
          IF (numpatch > 0) THEN
-            IF (allocated(a_hx_ol))    deallocate (a_hx_ol   )
-            IF (allocated(a_hx_f_ens)) deallocate (a_hx_f_ens)
-            IF (allocated(a_hx_a_ens)) deallocate (a_hx_a_ens)
-            IF (allocated(a_hx_f))     deallocate (a_hx_f    )
-            IF (allocated(a_hx_a))     deallocate (a_hx_a    )
-            deallocate (a_wliq_soisno_ol )
-            deallocate (a_wliq_soisno_f  )
-            deallocate (a_wliq_soisno_a  )
-            deallocate (a_wliq_soisno_ens)
-            deallocate (a_t_soisno_ol    )
-            deallocate (a_t_soisno_f     )
-            deallocate (a_t_soisno_a     )
+            deallocate (fsena_ens       )
+            deallocate (lfevpa_ens      )
+            deallocate (fevpa_ens       )
+            deallocate (rsur_ens        )
+            deallocate (rnof_ens        )
+            deallocate (trad_ens        )
+            deallocate (tref_ens        )
+            deallocate (tref_ens_f      )
+            deallocate (tref_ens_a      )
+            deallocate (tref_f          )
+            deallocate (tref_a          )
+            deallocate (qref_ens        )
+            deallocate (qref_ens_f      )
+            deallocate (qref_ens_a      )
+            deallocate (qref_f          )
+            deallocate (qref_a          )
+            deallocate (rhref_ens       )
+            deallocate (rhref_ens_f     )
+            deallocate (rhref_ens_a     )
+            deallocate (ustar_ens       )
+            deallocate (qstar_ens       )
+            deallocate (tstar_ens       )
+            deallocate (fm_ens          )
+            deallocate (fh_ens          )
+            deallocate (fq_ens          )
          ENDIF
-#ifdef GridRiverLakeFlow
-         IF (allocated(a_discharge_ol )) deallocate (a_discharge_ol )
-         IF (allocated(acctime_ucat_ol)) deallocate (acctime_ucat_ol)
-         IF (allocated(a_discharge_a  )) deallocate (a_discharge_a  )
-         IF (allocated(acctime_ucat_a )) deallocate (acctime_ucat_a )
-#endif
       ENDIF
 
-   END SUBROUTINE deallocate_1D_DAAccFluxes
+   END SUBROUTINE deallocate_1D_DAFluxes
 
 !-----------------------------------------------------------------------------
-
-   SUBROUTINE flush_1D_DAAccFluxes ()
-
-!-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
-!-----------------------------------------------------------------------------
-      IF (p_is_worker) THEN
-         IF (numpatch > 0) THEN
-            IF (allocated(a_hx_ol))    a_hx_ol   (:,:)   = spval
-            IF (allocated(a_hx_f_ens)) a_hx_f_ens(:,:,:) = spval
-            IF (allocated(a_hx_a_ens)) a_hx_a_ens(:,:,:) = spval
-            IF (allocated(a_hx_f))     a_hx_f    (:,:)   = spval
-            IF (allocated(a_hx_a))     a_hx_a    (:,:)   = spval
-            a_wliq_soisno_ol (:,:)   = spval
-            a_wliq_soisno_f  (:,:)   = spval
-            a_wliq_soisno_a  (:,:)   = spval
-            a_wliq_soisno_ens(:,:,:) = spval
-            a_t_soisno_ol    (:,:)   = spval
-            a_t_soisno_f     (:,:)   = spval
-            a_t_soisno_a     (:,:)   = spval
-         ENDIF
-#ifdef GridRiverLakeFlow
-         IF (allocated(a_discharge_ol )) a_discharge_ol  (:) = spval
-         IF (allocated(acctime_ucat_ol)) acctime_ucat_ol (:) = spval
-         IF (allocated(a_discharge_a  )) a_discharge_a   (:) = 0.
-         IF (allocated(acctime_ucat_a )) acctime_ucat_a  (:) = 0.
-#endif
-      ENDIF
-
-   END SUBROUTINE flush_1D_DAAccFluxes
-
-!-----------------------------------------------------------------------------
-
-   SUBROUTINE accumulate_1D_DAAccFluxes ()
-
-!-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
-!-----------------------------------------------------------------------------
-      IF (allocated(hx_f_ens) .and. allocated(a_hx_f_ens)) THEN
-         CALL acc2d_DA (hx_ol   , a_hx_ol   )
-         CALL acc3d_DA (hx_f_ens, a_hx_f_ens)
-         CALL acc3d_DA (hx_a_ens, a_hx_a_ens)
-         CALL acc2d_DA (hx_f    , a_hx_f    )
-         CALL acc2d_DA (hx_a    , a_hx_a    )
-      ENDIF
-      CALL acc2d_DA (wliq_soisno_ol, a_wliq_soisno_ol)
-      CALL acc2d_DA (wliq_soisno_f , a_wliq_soisno_f )
-      CALL acc2d_DA (wliq_soisno_a , a_wliq_soisno_a )
-      CALL acc3d_DA (wliq_soisno_ens(:,1:DEF_DA_ENS_NUM,:), a_wliq_soisno_ens)
-      CALL acc2d_DA (t_soisno_ol   , a_t_soisno_ol   )
-      CALL acc2d_DA (t_soisno_f    , a_t_soisno_f    )
-      CALL acc2d_DA (t_soisno_a    , a_t_soisno_a    )
-
-   END SUBROUTINE accumulate_1D_DAAccFluxes
-
-!-----------------------------------------------------------------------------
-
-   SUBROUTINE acc2d_DA (var, s)
-
-!-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
-      real(r8), intent(in)    :: var(:,:)
-      real(r8), intent(inout) :: s  (:,:)
-
-      integer :: i1, i2
-
-!-----------------------------------------------------------------------------
-      DO i2 = lbound(var,2), ubound(var,2)
-         DO i1 = lbound(var,1), ubound(var,1)
-            IF (var(i1,i2) /= spval) THEN
-               IF (s(i1,i2) /= spval) THEN
-                  s(i1,i2) = s(i1,i2) + var(i1,i2)
-               ELSE
-                  s(i1,i2) = var(i1,i2)
-               ENDIF
-            ENDIF
-         ENDDO
-      ENDDO
-
-   END SUBROUTINE acc2d_DA
-
-!-----------------------------------------------------------------------------
-
-   SUBROUTINE acc3d_DA (var, s)
-
-!-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
-      real(r8), intent(in)    :: var(:,:,:)
-      real(r8), intent(inout) :: s  (:,:,:)
-
-      integer :: i1, i2, i3
-
-!-----------------------------------------------------------------------------
-      DO i3 = lbound(var,3), ubound(var,3)
-         DO i2 = lbound(var,2), ubound(var,2)
-            DO i1 = lbound(var,1), ubound(var,1)
-               IF (var(i1,i2,i3) /= spval) THEN
-                  IF (s(i1,i2,i3) /= spval) THEN
-                     s(i1,i2,i3) = s(i1,i2,i3) + var(i1,i2,i3)
-                  ELSE
-                     s(i1,i2,i3) = var(i1,i2,i3)
-                  ENDIF
-               ENDIF
-            ENDDO
-         ENDDO
-      ENDDO
-
-   END SUBROUTINE acc3d_DA
-
-!-----------------------------------------------------------------------------
-END MODULE MOD_DA_Vars_1DAccFluxes
+END MODULE MOD_DA_Vars_1DFluxes
 #endif

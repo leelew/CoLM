@@ -399,8 +399,7 @@ PROGRAM CoLM
       CALL ParaOpt_init (jdate, lc_year)
 
 #ifdef DataAssimilation
-      ! initialize data assimilation
-      CALL init_DA (sdate)
+      CALL init_DA ()
 #endif
 
       ! ======================================================================

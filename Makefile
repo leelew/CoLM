@@ -141,12 +141,13 @@ OBJS_BASIC =    \
 				 MOD_Urban_Vars_TimeVariables.o  \
 				 MOD_Urban_Vars_TimeInvariants.o \
 				 MOD_Vars_TimeInvariants.o       \
-				 MOD_DA_Vars_TimeVariables.o     \
-				 MOD_DA_Vars_1DAccFluxes.o       \
 				 MOD_Vars_TimeVariables.o        \
 				 MOD_Vars_1DPFTFluxes.o          \
 				 MOD_Vars_1DFluxes.o             \
 				 MOD_Vars_1DForcing.o            \
+				 MOD_DA_Vars_1DFluxes.o          \
+				 MOD_DA_Vars_TimeVariables.o     \
+				 MOD_DA_Vars_1DAccFluxes.o       \
 				 MOD_Hydro_SoilFunction.o        \
 				 MOD_Hydro_SoilWater.o           \
 				 MOD_Eroot.o                     \
@@ -315,6 +316,7 @@ OBJS_MAIN = \
 				MOD_DA_Obs_ST.o                           \
 				MOD_DA_Obs_SYNOP.o                        \
 				MOD_DA_Assim_2MTQ.o                       \
+				MOD_DA_Assim_DISC.o                       \
 				MOD_DA_Assim_SM.o                         \
 				MOD_DA_Assim_ST.o                         \
 				MOD_Opt_Baseflow.o                        \
@@ -392,15 +394,19 @@ $(OBJS_MAIN) : %.o : %.F90 ${HEADER} ${OBJS_SHARED} ${OBJS_BASIC}
 	${FF} -c ${FOPTS} $(INCLUDE_DIR) -o .bld/$@ $< ${MOD_CMD}.bld
 
 # DA module dependencies.
+MOD_DA_Vars_1DFluxes.o: MOD_Precision.o MOD_Namelist.o MOD_Vars_Global.o MOD_SPMD_Task.o MOD_LandPatch.o
+MOD_DA_Vars_TimeVariables.o: MOD_DA_Vars_1DFluxes.o
+MOD_DA_Vars_1DAccFluxes.o: MOD_DA_Vars_TimeVariables.o
 MOD_DA_Obs_PM.o: MOD_DA_Obs_GridType.o MOD_DA_Operator_RTM.o
 MOD_DA_Obs_ANA2MTQ.o: MOD_DA_Obs_PseudoType.o MOD_DA_Vars_TimeVariables.o
 MOD_DA_Obs_SM.o: MOD_DA_Obs_PM.o MOD_DA_Obs_ANA2MTQ.o
 MOD_DA_Obs_ST.o: MOD_DA_Obs_PM.o
 MOD_DA_Obs_SYNOP.o: MOD_DA_Obs_SiteType.o
 MOD_DA_Assim_2MTQ.o: MOD_DA_Obs_SYNOP.o MOD_DA_EnKF.o
+MOD_DA_Assim_DISC.o: MOD_Grid_RiverLakeFlow.o MOD_DA_Vars_TimeVariables.o MOD_DA_Vars_1DAccFluxes.o
 MOD_DA_Assim_SM.o: MOD_DA_Obs_SM.o MOD_DA_EnKF.o
 MOD_DA_Assim_ST.o: MOD_DA_Obs_ST.o MOD_DA_EnKF.o
-MOD_DA_Main.o: MOD_DA_Assim_2MTQ.o MOD_DA_Assim_SM.o MOD_DA_Assim_ST.o MOD_DA_Ens.o
+MOD_DA_Main.o: MOD_DA_Assim_DISC.o MOD_DA_Assim_2MTQ.o MOD_DA_Assim_SM.o MOD_DA_Assim_ST.o MOD_DA_Ens.o
 
 MOD_Urban_Thermal.o: MOD_Urban_Flux.o
 MOD_LeafTemperature.o MOD_LeafTemperaturePC.o: MOD_LeafInterception.o
