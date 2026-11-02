@@ -98,7 +98,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
       ! calculate y and H(x) at y locations from different sources
-      CALL st%calcg(idate, deltim)
+      CALL st%calc_obs(idate, deltim)
       CALL st%save(.false.)
 
       IF (p_is_worker .and. numpatch > 0) THEN
@@ -144,7 +144,7 @@ CONTAINS
          IF (p_is_worker .and. numpatch > 0) THEN
             t_soisno_a(:,:) = sum(t_soisno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2) / DEF_DA_ENS_NUM
          ENDIF
-         CALL st%calcp()
+         CALL st%calc_model()
          CALL st%save(.true.)
       ENDIF
       CALL st%clear()

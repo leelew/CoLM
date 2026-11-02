@@ -63,21 +63,21 @@ MODULE MOD_DA_Obs_PM
       real(r8)              :: fghz
 
       ! Intermediate H(x) on local patches, retained for patch-level diagnostic output.
-      real(r8), allocatable :: hx_pset(:,:)  ! [ens, patch]
+      real(r8), allocatable :: hx_pset(:,:)             ! [ens, patch]
 
       ! Actual observations and metadata at the locations read for this time step.
-      type(grid_obs_type)   :: y             ! [nobs,]
+      type(grid_obs_type)   :: y                        ! [nobs,]
 
       ! Simulated observations mapped from hx_pset to the locations indexed by y.
       ! Entries without a valid mapping remain spval.
-      real(r8), allocatable :: hx(:,:)       ! [nobs, ens]
+      real(r8), allocatable :: hx(:,:)                  ! [nobs, ens]
 
    CONTAINS
 
-      procedure, PUBLIC :: init     => PM_init           ! initialize the obs type (grid info, mapping, etc.)
-      procedure, PUBLIC :: calcp    => PM_calc_on_pset   ! calculate H(x) on local patches only
-      procedure, PUBLIC :: calcg    => PM_calc_on_grid   ! read observations, calculate H(x) and y at y locations
-      procedure, PUBLIC :: clear    => PM_clear          ! clear obs data for this time step (keep init info)
+      procedure, PUBLIC :: init       => PM_init        ! initialize the obs type (grid info, mapping, etc.)
+      procedure, PUBLIC :: calc_model => PM_calc_model  ! Compute model-space H(x) on local patches
+      procedure, PUBLIC :: calc_obs   => PM_calc_obs    ! Read y, compute model-space H(x), and map to observation space
+      procedure, PUBLIC :: clear      => PM_clear       ! clear obs data for this time step (keep init info)
 
    END type PM_type
 
@@ -97,25 +97,25 @@ MODULE MOD_DA_Obs_PM
    type :: PM_set_type
 
       ! Each stream represents one source/sensor/variable configuration.
-      integer :: nsensor                            ! Number of configured observation streams
-      type(PM_type), allocatable :: sensors(:)      ! Stream objects [nsensor]
-      type(PM_config_type), allocatable :: cfgs(:)  ! Corresponding stream configurations [nsensor]
+      integer :: nsensor                                    ! Number of configured observation streams
+      type(PM_type), allocatable :: sensors(:)              ! Stream objects [nsensor]
+      type(PM_config_type), allocatable :: cfgs(:)          ! Corresponding stream configurations [nsensor]
 
       ! Current time-step data concatenated in stream order for assimilation.
-      integer :: nobs                        ! Total number of observations across streams in the combined arrays
-      real(r8), allocatable :: lat(:)        ! Observation latitude [nobs], degrees
-      real(r8), allocatable :: lon(:)        ! Observation longitude [nobs], degrees
-      real(r8), allocatable :: y(:)          ! Actual observation values [nobs]
-      real(r8), allocatable :: r(:)          ! Observation error variances [nobs]
-      real(r8), allocatable :: hx(:,:)       ! Simulated observations at y locations [nobs, ens]
+      integer :: nobs                                       ! Total number of observations across streams in the combined arrays
+      real(r8), allocatable :: lat(:)                       ! Observation latitude [nobs], degrees
+      real(r8), allocatable :: lon(:)                       ! Observation longitude [nobs], degrees
+      real(r8), allocatable :: y(:)                         ! Actual observation values [nobs]
+      real(r8), allocatable :: r(:)                         ! Observation error variances [nobs]
+      real(r8), allocatable :: hx(:,:)                      ! Simulated observations at y locations [nobs, ens]
 
    CONTAINS
 
-      procedure, PUBLIC :: init     => PM_set_init          ! Initialize all streams from their configurations
-      procedure, PUBLIC :: calcp    => PM_set_calc_on_pset  ! Recompute patch-space H(x) for all streams
-      procedure, PUBLIC :: concat   => PM_set_concat        ! Combine stream data into the set-level arrays
-      procedure, PUBLIC :: calcg    => PM_set_calc_on_grid  ! Read observations, compute H(x), and concatenate streams
-      procedure, PUBLIC :: clear    => PM_set_clear         ! Clear time-step data while retaining stream configurations
+      procedure, PUBLIC :: init       => PM_set_init        ! Initialize all streams from their configurations
+      procedure, PUBLIC :: calc_model => PM_set_calc_model  ! Recompute model-space H(x) for all streams
+      procedure, PUBLIC :: concat     => PM_set_concat      ! Combine stream data into the set-level arrays
+      procedure, PUBLIC :: calc_obs   => PM_set_calc_obs    ! Prepare observation-space y and H(x), then combine streams
+      procedure, PUBLIC :: clear      => PM_set_clear       ! Clear time-step data while retaining stream configurations
 
    END type PM_set_type
 
@@ -147,7 +147,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE PM_calc_on_pset (this)
+   SUBROUTINE PM_calc_model (this)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -274,11 +274,11 @@ CONTAINS
          IF (allocated(theta_wgrid%blk)) deallocate(theta_wgrid%blk)
       ENDIF
 
-   END SUBROUTINE PM_calc_on_pset
+   END SUBROUTINE PM_calc_model
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE PM_calc_on_grid (this, idate, deltim)
+   SUBROUTINE PM_calc_obs (this, idate, deltim)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -316,7 +316,7 @@ CONTAINS
       CALL this%y%read(idate, deltim)
 
       ! forward operator and map H(x) to y locations
-      CALL this%calcp()
+      CALL this%calc_model()
       IF (this%y%nobs == 0) RETURN
 
       ! Keep the mapped numerator and area denominator on the same valid patches.
@@ -403,7 +403,7 @@ CONTAINS
       CALL mpi_bcast(this%hx, this%y%nobs*DEF_DA_ENS_NUM, MPI_REAL8, p_address_master, p_comm_glb, p_err)
 #endif
 
-   END SUBROUTINE PM_calc_on_grid
+   END SUBROUTINE PM_calc_obs
 
 !-----------------------------------------------------------------------------
 
@@ -535,7 +535,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE PM_set_calc_on_grid(this, idate, deltim)
+   SUBROUTINE PM_set_calc_obs(this, idate, deltim)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -550,16 +550,16 @@ CONTAINS
       CALL this%clear()
 
       DO is = 1, this%nsensor
-         CALL this%sensors(is)%calcg(idate, deltim)
+         CALL this%sensors(is)%calc_obs(idate, deltim)
       ENDDO
 
       CALL this%concat()
 
-   END SUBROUTINE PM_set_calc_on_grid
+   END SUBROUTINE PM_set_calc_obs
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE PM_set_calc_on_pset(this)
+   SUBROUTINE PM_set_calc_model(this)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -569,10 +569,10 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
       DO is = 1, this%nsensor
-         CALL this%sensors(is)%calcp()
+         CALL this%sensors(is)%calc_model()
       ENDDO
 
-   END SUBROUTINE PM_set_calc_on_pset
+   END SUBROUTINE PM_set_calc_model
 
 !-----------------------------------------------------------------------------
 END MODULE MOD_DA_Obs_PM

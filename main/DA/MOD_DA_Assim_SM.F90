@@ -93,7 +93,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
       ! calculate y and H(x) at y locations from different sources
-      CALL sm%calcg(idate, deltim)
+      CALL sm%calc_obs(idate, deltim)
       CALL sm%save(.false.)
 
       IF (p_is_worker .and. numpatch > 0) THEN
@@ -161,7 +161,7 @@ CONTAINS
          IF (p_is_worker .and. numpatch > 0) THEN
             wliq_soisno_a(:,:) = sum(wliq_soisno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2) / DEF_DA_ENS_NUM
          ENDIF
-         CALL sm%calcp()
+         CALL sm%calc_model()
          CALL sm%save(.true.)
       ENDIF
       CALL sm%clear()

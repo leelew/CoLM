@@ -35,11 +35,11 @@ MODULE MOD_DA_Obs_ST
 
    type :: ST_config_type
 
-      character(len=16) :: source_name ! 'PM', 'MR', 'situ'
-      character(len=32) :: sensor_name ! 'SMAP', 'MODIS', 'FY3D', 'ISMN', etc.
-      character(len=16) :: var_name    ! 'TB_H', 'TB_V', 'LST'
-      real(r8) :: fghz                 ! frequency in GHz
-      integer  :: istream              ! index of this stream in the shared hx_* diagnostics
+      character(len=16) :: source_name  ! 'PM', 'MR', 'situ'
+      character(len=32) :: sensor_name  ! 'SMAP', 'MODIS', 'FY3D', 'ISMN', etc.
+      character(len=16) :: var_name     ! 'TB_H', 'TB_V', 'LST'
+      real(r8) :: fghz                  ! frequency in GHz
+      integer  :: istream               ! index of this stream in the shared hx_* diagnostics
 
    END type ST_config_type
 
@@ -51,9 +51,9 @@ MODULE MOD_DA_Obs_ST
       logical :: use_pm = .false.
 
       ! assimilation parameters
-      real(r8) :: dres      ! search radius for observations around a target patch [deg]
-      real(r8) :: locr      ! localization radius [km]
-      real(r8) :: infl      ! inflation factor for error covariance
+      real(r8) :: dres                               ! search radius for observations around a target patch [deg]
+      real(r8) :: locr                               ! localization radius [km]
+      real(r8) :: infl                               ! inflation factor for error covariance
 
       ! module-level data
       type(PM_set_type) :: pm
@@ -69,8 +69,8 @@ MODULE MOD_DA_Obs_ST
    CONTAINS
 
       procedure :: init       => ST_type_init
-      procedure :: calcg      => ST_type_calc_on_grid
-      procedure :: calcp      => ST_type_calc_on_pset
+      procedure :: calc_obs   => ST_type_calc_obs    ! Prepare observation-space y and H(x) from enabled sources
+      procedure :: calc_model => ST_type_calc_model  ! Recompute PM model-space H(x) after state updates
       procedure :: save       => ST_type_save
       procedure :: clear      => ST_type_clear
       procedure :: concat     => ST_type_concat
@@ -213,7 +213,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE ST_type_calc_on_grid(this, idate, deltim)
+   SUBROUTINE ST_type_calc_obs(this, idate, deltim)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -225,15 +225,15 @@ CONTAINS
 !-----------------------------------------------------------------------------
       CALL this%clear()
 
-      IF (this%use_pm) CALL this%pm%calcg(idate, deltim)
+      IF (this%use_pm) CALL this%pm%calc_obs(idate, deltim)
 
       CALL this%concat()
 
-   END SUBROUTINE ST_type_calc_on_grid
+   END SUBROUTINE ST_type_calc_obs
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE ST_type_calc_on_pset(this)
+   SUBROUTINE ST_type_calc_model(this)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -242,9 +242,9 @@ CONTAINS
       class(ST_type), intent(inout) :: this
 
 !-----------------------------------------------------------------------------
-      IF (this%use_pm) CALL this%pm%calcp()
+      IF (this%use_pm) CALL this%pm%calc_model()
 
-   END SUBROUTINE ST_type_calc_on_pset
+   END SUBROUTINE ST_type_calc_model
 
 !-----------------------------------------------------------------------------
 

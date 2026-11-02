@@ -48,11 +48,11 @@ MODULE MOD_DA_Obs_SM
 !-----------------------------------------------------------------------------
    type :: SM_config_type
 
-      character(len=16) :: source_name                    ! Observation source, e.g., 'PM' or 'ANA2MTQ'
-      character(len=32) :: sensor_name                    ! Sensor or dataset identifier used by the source module
-      character(len=16) :: var_name                       ! Observation variable, e.g., 'TB_H', 'TB_V' or 'SM' for PM
-      real(r8) :: fghz                                    ! Microwave frequency [GHz], used by the PM brightness temperature operator
-      integer  :: istream                                 ! Stream index in the shared hx_ol, hx_f* and hx_a* diagnostic arrays
+      character(len=16) :: source_name  ! Observation source, e.g., 'PM' or 'ANA2MTQ'
+      character(len=32) :: sensor_name  ! Sensor or dataset identifier used by the source module
+      character(len=16) :: var_name     ! Observation variable, e.g., 'TB_H', 'TB_V' or 'SM' for PM
+      real(r8) :: fghz                  ! Microwave frequency [GHz], used by the PM brightness temperature operator
+      integer  :: istream               ! Stream index in the shared hx_ol, hx_f* and hx_a* diagnostic arrays
 
    END type SM_config_type
 
@@ -88,8 +88,8 @@ MODULE MOD_DA_Obs_SM
    CONTAINS
 
       procedure :: init       => SM_type_init             ! Configure enabled sources and assimilation parameters
-      procedure :: calcg      => SM_type_calc_on_grid     ! Prepare source observations and H(x), then combine records
-      procedure :: calcp      => SM_type_calc_on_pset     ! Recompute PM H(x) on local patches after state updates
+      procedure :: calc_obs   => SM_type_calc_obs         ! Prepare observation-space y and H(x) from enabled sources
+      procedure :: calc_model => SM_type_calc_model       ! Recompute PM model-space H(x) after state updates
       procedure :: save       => SM_type_save             ! Copy PM patch H(x) into forecast or analysis diagnostics
       procedure :: clear      => SM_type_clear            ! Deallocate combined records and clear source observations
       procedure :: concat     => SM_type_concat           ! Combine enabled sources in matching y, hx and r order
@@ -121,7 +121,6 @@ CONTAINS
 !-----------------------------------------------------------------------------
       CALL this%clear()
       this%use_pm = .false.
-      this%use_gnos = .false.
       this%use_ana2mtq = .false.
 
       IF (allocated(this%cfgs)) deallocate(this%cfgs)
@@ -161,8 +160,7 @@ CONTAINS
 
       this%use_ana2mtq = any(configs%source_name == 'ANA2MTQ')
       IF (this%use_ana2mtq) THEN
-         IF (.not. any(DEF_DA_OBS_SOURCE == 'SYNOP' .and. &
-                      (DEF_DA_OBS_TARGET == '2MT' .or. DEF_DA_OBS_TARGET == '2MQ'))) &
+         IF (.not. any(DEF_DA_OBS_SOURCE == 'SYNOP')) &
             ERROR STOP 'ANA2MTQ requires a SYNOP 2MT or 2MQ screen level analysis'
          CALL this%ana2mtq%init()
       ENDIF
@@ -183,9 +181,9 @@ CONTAINS
       this%nobs = 0
       IF (allocated(this%lat))       deallocate(this%lat)
       IF (allocated(this%lon))       deallocate(this%lon)
-      IF (allocated(this%y))         deallocate(this%y)
-      IF (allocated(this%hx))        deallocate(this%hx)
-      IF (allocated(this%r))         deallocate(this%r)
+      IF (allocated(this%y  ))       deallocate(this%y  )
+      IF (allocated(this%hx ))       deallocate(this%hx )
+      IF (allocated(this%r  ))       deallocate(this%r  )
 
       CALL this%pm%clear()
       CALL this%ana2mtq%clear()
@@ -254,7 +252,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE SM_type_calc_on_grid(this, idate, deltim)
+   SUBROUTINE SM_type_calc_obs(this, idate, deltim)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -266,16 +264,16 @@ CONTAINS
 !-----------------------------------------------------------------------------
       CALL this%clear()
 
-      IF (this%use_pm) CALL this%pm%calcg(idate, deltim)
-      IF (this%use_ana2mtq) CALL this%ana2mtq%calcp()
+      IF (this%use_pm) CALL this%pm%calc_obs(idate, deltim)
+      IF (this%use_ana2mtq) CALL this%ana2mtq%calc_obs()
 
       CALL this%concat()
 
-   END SUBROUTINE SM_type_calc_on_grid
+   END SUBROUTINE SM_type_calc_obs
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE SM_type_calc_on_pset(this)
+   SUBROUTINE SM_type_calc_model(this)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -284,9 +282,9 @@ CONTAINS
       class(SM_type), intent(inout) :: this
 
 !-----------------------------------------------------------------------------
-      IF (this%use_pm) CALL this%pm%calcp()
+      IF (this%use_pm) CALL this%pm%calc_model()
 
-   END SUBROUTINE SM_type_calc_on_pset
+   END SUBROUTINE SM_type_calc_model
 
 !-----------------------------------------------------------------------------
 
@@ -350,6 +348,7 @@ CONTAINS
                      sum(this%pm%sensors(ipm)%hx_pset(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
                ENDDO
             ENDIF
+            
          ENDIF
       ENDDO
 

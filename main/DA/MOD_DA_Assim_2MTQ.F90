@@ -150,12 +150,15 @@ CONTAINS
          CALL synop_t%save(.false.)
       ENDIF
 
+      CALL SYNOP_calc_rh()
       IF (p_is_worker .and. numpatch > 0) THEN
          ! Preserve the complete prior ensemble before either screen-level analysis.
          tref_ens_f(:,:) = tref_ens
          qref_ens_f(:,:) = qref_ens
          tref_ens_a(:,:) = tref_ens_f
          qref_ens_a(:,:) = qref_ens_f
+         rhref_ens_f(:,:) = rhref_ens
+         rhref_ens_a(:,:) = rhref_ens_f
          tref_f(:) = sum(tref_ens(1:DEF_DA_ENS_NUM,:), dim=1) / DEF_DA_ENS_NUM
          qref_f(:) = sum(qref_ens(1:DEF_DA_ENS_NUM,:), dim=1) / DEF_DA_ENS_NUM
       ENDIF
@@ -256,10 +259,12 @@ CONTAINS
       ! diagnostics. The means of a disabled target stay at the prior means,
       ! so the ANA2MTQ products are always defined.
       IF (DEF_DA_ENS_NUM > 1) THEN
+         CALL SYNOP_calc_rh()
          IF (p_is_worker .and. numpatch > 0) THEN
             ! Store the final ensembles after temperature and saturation constraints.
             tref_ens_a(:,:) = tref_ens
             qref_ens_a(:,:) = qref_ens
+            rhref_ens_a(:,:) = rhref_ens
             IF (use_2mt) THEN
                tref_a(:) = sum(tref_ens(1:DEF_DA_ENS_NUM,:), dim=1) / DEF_DA_ENS_NUM
             ELSE
@@ -272,10 +277,7 @@ CONTAINS
             ENDIF
          ENDIF
          IF (use_2mt) CALL synop_t%save(.true.)
-         IF (use_2mq) THEN
-            CALL SYNOP_calc_rh()
-            CALL synop_q%save(.true.)
-         ENDIF
+         IF (use_2mq) CALL synop_q%save(.true.)
       ENDIF
       IF (use_2mt) CALL synop_t%clear()
       IF (use_2mq) CALL synop_q%clear()

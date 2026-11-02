@@ -21,26 +21,27 @@ MODULE MOD_DA_Obs_ANA2MTQ
 ! Patch-based pseudo-observations from SYNOP 2 m temperature and humidity analyses.
 ! Temperature and humidity select changed patches independently.
 ! Combined arrays store temperature records first, followed by humidity records.
+! Patches are both model and observation locations; no spatial mapping is needed.
 !-----------------------------------------------------------------------------
    type :: ANA2MTQ_type
 
-      type(pseudo_obs_type) :: tref      ! 2 m temperature pseudo-observations [K]
-      type(pseudo_obs_type) :: rhref     ! 2 m relative humidity pseudo-observations [0-1]
+      type(pseudo_obs_type) :: tref                       ! 2 m temperature pseudo-observations [K]
+      type(pseudo_obs_type) :: rhref                      ! 2 m relative humidity pseudo-observations [0-1]
 
       ! Combined records available on all ranks for land-surface assimilation.
-      integer :: nobs = 0                ! Total record count: tref%nobs + rhref%nobs
-      real(r8), allocatable :: lat(:)    ! Patch latitudes [nobs], degrees north
-      real(r8), allocatable :: lon(:)    ! Patch longitudes [nobs], degrees east in [-180, 180)
-      real(r8), allocatable :: y(:)      ! Analysis ensemble means [nobs]; K for T, fraction for RH
-      real(r8), allocatable :: r(:)      ! Error variances [nobs]; K^2 for T, fraction squared for RH
-      real(r8), allocatable :: hx(:,:)   ! Forecast values [nobs, DEF_DA_ENS_NUM]; same units as y
+      integer :: nobs = 0                                 ! Total record count: tref%nobs + rhref%nobs
+      real(r8), allocatable :: lat(:)                     ! Patch latitudes [nobs], degrees north
+      real(r8), allocatable :: lon(:)                     ! Patch longitudes [nobs], degrees east in [-180, 180)
+      real(r8), allocatable :: y(:)                       ! Analysis ensemble means [nobs]; K for T, fraction for RH
+      real(r8), allocatable :: r(:)                       ! Error variances [nobs]; K^2 for T, fraction squared for RH
+      real(r8), allocatable :: hx(:,:)                    ! Forecast values [nobs, DEF_DA_ENS_NUM]; same units as y
 
    CONTAINS
 
-      procedure, PUBLIC  :: init   => ANA2MTQ_init         ! Initialize empty temperature and humidity collections
-      procedure, PUBLIC  :: calcp  => ANA2MTQ_calc_on_pset ! Construct and communicate both collections, then combine
-      procedure, PUBLIC  :: clear  => ANA2MTQ_clear        ! Clear both collections and deallocate combined arrays
-      procedure, PRIVATE :: concat => ANA2MTQ_concat       ! Combine temperature and humidity records in this order
+      procedure, PUBLIC  :: init     => ANA2MTQ_init      ! Initialize empty temperature and humidity collections
+      procedure, PUBLIC  :: calc_obs => ANA2MTQ_calc_obs  ! Prepare patch-based observation-space y and H(x)
+      procedure, PUBLIC  :: clear    => ANA2MTQ_clear     ! Clear both collections and deallocate combined arrays
+      procedure, PRIVATE :: concat   => ANA2MTQ_concat    ! Combine temperature and humidity records in this order
 
    END type ANA2MTQ_type
 
@@ -66,7 +67,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE ANA2MTQ_calc_on_pset (this)
+   SUBROUTINE ANA2MTQ_calc_obs (this)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -77,10 +78,10 @@ CONTAINS
 !-----------------------------------------------------------------------------
       CALL this%clear()
       CALL this%tref%read(tref_ens_f, tref_ens_a, 1.0_r8)
-      CALL this%rhref%read(rhref_ens_f, rhref_ens_a, 0.04_r8**2)
+      CALL this%rhref%read(rhref_ens_f, rhref_ens_a, 0.04_r8)
       CALL this%concat()
 
-   END SUBROUTINE ANA2MTQ_calc_on_pset
+   END SUBROUTINE ANA2MTQ_calc_obs
 
 !-----------------------------------------------------------------------------
 
