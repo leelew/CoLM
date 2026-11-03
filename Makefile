@@ -141,12 +141,12 @@ OBJS_BASIC =    \
 				 MOD_Urban_Vars_TimeVariables.o  \
 				 MOD_Urban_Vars_TimeInvariants.o \
 				 MOD_Vars_TimeInvariants.o       \
+				 MOD_DA_Vars_1DFluxes.o          \
+				 MOD_DA_Vars_TimeVariables.o     \
 				 MOD_Vars_TimeVariables.o        \
 				 MOD_Vars_1DPFTFluxes.o          \
 				 MOD_Vars_1DFluxes.o             \
 				 MOD_Vars_1DForcing.o            \
-				 MOD_DA_Vars_1DFluxes.o          \
-				 MOD_DA_Vars_TimeVariables.o     \
 				 MOD_DA_Vars_1DAccFluxes.o       \
 				 MOD_Hydro_SoilFunction.o        \
 				 MOD_Hydro_SoilWater.o           \
