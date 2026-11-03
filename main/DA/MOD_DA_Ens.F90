@@ -442,7 +442,7 @@ CONTAINS
       IF (p_is_worker) THEN
          CALL load_member(0)
 
-         IF (DEF_DA_FEEDBACK) THEN
+         IF (DEF_DA_FEEDBACK .and. DEF_DA_ENS_NUM > 1) THEN
             ! Restart
             z_sno        = sum(z_sno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2)        / DEF_DA_ENS_NUM
             dz_sno       = sum(dz_sno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2)       / DEF_DA_ENS_NUM

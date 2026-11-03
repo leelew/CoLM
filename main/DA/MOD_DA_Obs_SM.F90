@@ -160,8 +160,9 @@ CONTAINS
 
       this%use_ana2mtq = any(configs%source_name == 'ANA2MTQ')
       IF (this%use_ana2mtq) THEN
-         IF (.not. any(DEF_DA_OBS_SOURCE == 'SYNOP')) &
-            ERROR STOP 'ANA2MTQ requires a SYNOP 2MT or 2MQ screen level analysis'
+         IF (.not. (any(DEF_DA_OBS_SOURCE == 'SYNOP' .and. DEF_DA_OBS_TARGET == '2MT') .and. &
+                    any(DEF_DA_OBS_SOURCE == 'SYNOP' .and. DEF_DA_OBS_TARGET == '2MQ'))) &
+            ERROR STOP 'ANA2MTQ requires SYNOP 2MT and 2MQ screen level analyses'
          CALL this%ana2mtq%init()
       ENDIF
 
@@ -310,6 +311,8 @@ CONTAINS
       IF (numpatch <= 0) RETURN
       IF (.not. allocated(hx_f_ens)) RETURN
 
+      ! ANA2MTQ is an SM observation; its analysis increment is not a
+      ! meaningful H(x) diagnostic, so its slot intentionally stays spval.
       DO istream = 1, size(this%cfgs)
          is = this%cfgs(istream)%istream
          IF (is_analysis) THEN
@@ -348,7 +351,7 @@ CONTAINS
                      sum(this%pm%sensors(ipm)%hx_pset(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
                ENDDO
             ENDIF
-            
+
          ENDIF
       ENDDO
 

@@ -631,10 +631,10 @@ MODULE MOD_Namelist
 ! DEF_DA_ENS_SM
 !    Enable ensemble perturbations or ensemble DA workflow for soil moisture.
 !
-! DEF_DA_Operation
-!    DA operation mode, either 'online' or 'offline'. The ensemble-mean state
-!    is written back to the model state (member 0) after the ensemble
-!    forecasts only when DEF_DA_Operation = 'online'.
+! DEF_DA_FEEDBACK
+!    Logical flag to write the analysis ensemble mean back to the model
+!    states and fluxes. If false, the open-loop trajectory is restored for
+!    diagnostic output.
 !
 ! DEF_DA_OPERATOR_RTM_DIEL
 !    Dielectric model option used by the radiative transfer observation operator.
@@ -691,12 +691,10 @@ MODULE MOD_Namelist
 
    integer            :: DEF_DA_ENS_NUM            = 20
    logical            :: DEF_DA_ENS_SM             = .false.  ! (optional)
-   character(len=16)  :: DEF_DA_Operation          = 'offline' ! (optional)
+   logical            :: DEF_DA_FEEDBACK           = .false. ! (optional)
 
    integer            :: DEF_DA_OPERATOR_RTM_DIEL  = 0
    integer            :: DEF_DA_OPERATOR_RTM_ROUGH = 0
-   integer            :: DEF_DA_OPERATOR_RTM_TEFF = 0
-   integer            :: DEF_DA_OPERATOR_RTM_VEG = 0
 
    real(r8)           :: DEF_DA_ASSIM_SM_DRES      = 0.4
    real(r8)           :: DEF_DA_ASSIM_SM_LOCR      = 40.0
@@ -1567,11 +1565,9 @@ CONTAINS
       DEF_DA_OBS_FGHZ,                        &
       DEF_DA_ENS_NUM,                         &
       DEF_DA_ENS_SM,                          &
-      DEF_DA_Operation,                       &
+      DEF_DA_FEEDBACK,                        &
       DEF_DA_OPERATOR_RTM_DIEL,               &
       DEF_DA_OPERATOR_RTM_ROUGH,              &
-      DEF_DA_OPERATOR_RTM_TEFF,               &
-      DEF_DA_OPERATOR_RTM_VEG,                &
       DEF_DA_ASSIM_SM_DRES,                   &
       DEF_DA_ASSIM_SM_LOCR,                   &
       DEF_DA_ASSIM_SM_INFL,                   &
@@ -1681,11 +1677,6 @@ CONTAINS
             write(*,'(A,I0,A)') 'ERROR: DEF_DA_ENS_NUM = ', DEF_DA_ENS_NUM, &
                ' must be even for Box-Muller ensemble sampling.'
             CALL CoLM_Stop ()
-         ENDIF
-         IF (trim(DEF_DA_Operation) /= 'online' .and. trim(DEF_DA_Operation) /= 'offline') THEN
-            write(*,*) '                  *****                  '
-            write(*,'(A,A)') 'ERROR: DEF_DA_Operation = ', trim(DEF_DA_Operation)
-            CALL CoLM_Stop ('DEF_DA_Operation must be either "online" or "offline".')
          ENDIF
 #endif
          IF (DEF_UnitCatchment_regional) THEN
@@ -2362,11 +2353,9 @@ ENDIF
       CALL mpi_bcast (DEF_DA_OBS_FGHZ                        ,10  ,mpi_real8     ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_ENS_NUM                         ,1   ,mpi_integer   ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_ENS_SM                          ,1   ,mpi_logical   ,p_address_master ,p_comm_glb ,p_err)
-      CALL mpi_bcast (DEF_DA_Operation                       ,16  ,mpi_character ,p_address_master ,p_comm_glb ,p_err)
+      CALL mpi_bcast (DEF_DA_FEEDBACK                        ,1   ,mpi_logical   ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_OPERATOR_RTM_DIEL               ,1   ,mpi_integer   ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_OPERATOR_RTM_ROUGH              ,1   ,mpi_integer   ,p_address_master ,p_comm_glb ,p_err)
-      CALL mpi_bcast (DEF_DA_OPERATOR_RTM_TEFF               ,1   ,mpi_integer   ,p_address_master ,p_comm_glb ,p_err)
-      CALL mpi_bcast (DEF_DA_OPERATOR_RTM_VEG                ,1   ,mpi_integer   ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_ASSIM_SM_DRES                   ,1   ,mpi_real8     ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_ASSIM_SM_LOCR                   ,1   ,mpi_real8     ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_ASSIM_SM_INFL                   ,1   ,mpi_real8     ,p_address_master ,p_comm_glb ,p_err)
