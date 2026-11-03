@@ -1,7 +1,7 @@
 #include <define.h>
 
 #ifdef DataAssimilation
-MODULE MOD_DA_Vars_TimeVariables
+MODULE MOD_DA_Vars_TimeVars
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
 !    Defines and manages the time-varying model variables required by the data
@@ -25,7 +25,7 @@ MODULE MOD_DA_Vars_TimeVariables
    USE MOD_SPMD_Task
    USE MOD_LandPatch
    USE MOD_NetCDFVector
-   USE MOD_DA_Vars_1DFluxes
+   USE MOD_DA_Vars_Fluxes
 #ifdef GridRiverLakeFlow
    USE MOD_DataType
    USE MOD_NetCDFSerial
@@ -39,12 +39,12 @@ MODULE MOD_DA_Vars_TimeVariables
    IMPLICIT NONE
    SAVE
 
-   PUBLIC :: allocate_DATimeVariables
-   PUBLIC :: deallocate_DATimeVariables
-   PUBLIC :: READ_DATimeVariables
-   PUBLIC :: WRITE_DATimeVariables
+   PUBLIC :: allocate_DA_TimeVars
+   PUBLIC :: deallocate_DA_TimeVars
+   PUBLIC :: READ_DA_TimeVars
+   PUBLIC :: WRITE_DA_TimeVars
 #ifdef RangeCheck
-   PUBLIC :: check_DATimeVariables
+   PUBLIC :: check_DA_TimeVars
 #endif
 
 !=============================================================================
@@ -91,6 +91,24 @@ MODULE MOD_DA_Vars_TimeVariables
    real(r8), allocatable :: savedtke1_ens    (:,:)      ! top level eddy conductivity                              [W/(m K)]
 
 !=============================================================================
+! ensemble land-atmosphere coupling state variables
+!=============================================================================
+   real(r8), allocatable :: trad_ens         (:,:)      ! surface radiative temperature                            [K]
+   real(r8), allocatable :: tref_ens         (:,:)      ! 2 m air temperature                                      [K]
+   real(r8), allocatable :: qref_ens         (:,:)      ! 2 m specific humidity                                    [kg/kg]
+   real(r8), allocatable :: rst_ens          (:,:)      ! canopy stomatal resistance                               [s/m]
+   real(r8), allocatable :: emis_ens         (:,:)      ! bulk surface emissivity                                  [-]
+   real(r8), allocatable :: z0m_ens          (:,:)      ! effective momentum roughness length                      [m]
+   real(r8), allocatable :: zol_ens          (:,:)      ! dimensionless height in Monin-Obukhov theory (z/L)       [-]
+   real(r8), allocatable :: rib_ens          (:,:)      ! bulk Richardson number in the surface layer              [-]
+   real(r8), allocatable :: ustar_ens        (:,:)      ! friction velocity in similarity theory                   [m/s]
+   real(r8), allocatable :: qstar_ens        (:,:)      ! humidity scale in similarity theory                      [kg/kg]
+   real(r8), allocatable :: tstar_ens        (:,:)      ! temperature scale in similarity theory                   [K]
+   real(r8), allocatable :: fm_ens           (:,:)      ! integrated momentum profile function                     [-]
+   real(r8), allocatable :: fh_ens           (:,:)      ! integrated heat profile function                         [-]
+   real(r8), allocatable :: fq_ens           (:,:)      ! integrated moisture profile function                     [-]
+
+!=============================================================================
 ! ensemble forcing variables
 !=============================================================================
    real(r8), allocatable :: forc_t_ens     (:,:)        ! temperature                                              [K]
@@ -132,7 +150,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE allocate_DATimeVariables()
+   SUBROUTINE allocate_DA_TimeVars()
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -188,6 +206,21 @@ CONTAINS
             allocate (lake_icefrac_ens        (nl_lake,0:DEF_DA_ENS_NUM,numpatch)); lake_icefrac_ens(:,:,:) = spval
             allocate (savedtke1_ens                   (0:DEF_DA_ENS_NUM,numpatch)); savedtke1_ens     (:,:) = spval
 
+            allocate (trad_ens                        (0:DEF_DA_ENS_NUM,numpatch)); trad_ens          (:,:) = spval
+            allocate (tref_ens                        (0:DEF_DA_ENS_NUM,numpatch)); tref_ens          (:,:) = spval
+            allocate (qref_ens                        (0:DEF_DA_ENS_NUM,numpatch)); qref_ens          (:,:) = spval
+            allocate (rst_ens                         (0:DEF_DA_ENS_NUM,numpatch)); rst_ens           (:,:) = spval
+            allocate (emis_ens                        (0:DEF_DA_ENS_NUM,numpatch)); emis_ens          (:,:) = spval
+            allocate (z0m_ens                         (0:DEF_DA_ENS_NUM,numpatch)); z0m_ens           (:,:) = spval
+            allocate (zol_ens                         (0:DEF_DA_ENS_NUM,numpatch)); zol_ens           (:,:) = spval
+            allocate (rib_ens                         (0:DEF_DA_ENS_NUM,numpatch)); rib_ens           (:,:) = spval
+            allocate (ustar_ens                       (0:DEF_DA_ENS_NUM,numpatch)); ustar_ens         (:,:) = spval
+            allocate (qstar_ens                       (0:DEF_DA_ENS_NUM,numpatch)); qstar_ens         (:,:) = spval
+            allocate (tstar_ens                       (0:DEF_DA_ENS_NUM,numpatch)); tstar_ens         (:,:) = spval
+            allocate (fm_ens                          (0:DEF_DA_ENS_NUM,numpatch)); fm_ens            (:,:) = spval
+            allocate (fh_ens                          (0:DEF_DA_ENS_NUM,numpatch)); fh_ens            (:,:) = spval
+            allocate (fq_ens                          (0:DEF_DA_ENS_NUM,numpatch)); fq_ens            (:,:) = spval
+
             ! Forcings
             allocate (forc_t_ens                      (0:DEF_DA_ENS_NUM,numpatch)); forc_t_ens        (:,:) = spval
             allocate (forc_frl_ens                    (0:DEF_DA_ENS_NUM,numpatch)); forc_frl_ens      (:,:) = spval
@@ -231,11 +264,11 @@ CONTAINS
 #endif
       ENDIF
 
-   END SUBROUTINE allocate_DATimeVariables
+   END SUBROUTINE allocate_DA_TimeVars
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE deallocate_DATimeVariables()
+   SUBROUTINE deallocate_DA_TimeVars()
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -282,6 +315,21 @@ CONTAINS
             deallocate (lake_icefrac_ens                 )
             deallocate (savedtke1_ens                    )
 
+            deallocate (trad_ens                         )
+            deallocate (tref_ens                         )
+            deallocate (qref_ens                         )
+            deallocate (rst_ens                          )
+            deallocate (emis_ens                         )
+            deallocate (z0m_ens                          )
+            deallocate (zol_ens                          )
+            deallocate (rib_ens                          )
+            deallocate (ustar_ens                        )
+            deallocate (qstar_ens                        )
+            deallocate (tstar_ens                        )
+            deallocate (fm_ens                           )
+            deallocate (fh_ens                           )
+            deallocate (fq_ens                           )
+
             deallocate (forc_t_ens                       )
             deallocate (forc_frl_ens                     )
             deallocate (forc_prc_ens                     )
@@ -315,11 +363,11 @@ CONTAINS
 #endif
       ENDIF
 
-   END SUBROUTINE deallocate_DATimeVariables
+   END SUBROUTINE deallocate_DA_TimeVars
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE WRITE_DATimeVariables (idate, lc_year, site, dir_restart)
+   SUBROUTINE WRITE_DA_TimeVars (idate, lc_year, site, dir_restart)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -404,6 +452,21 @@ CONTAINS
       CALL ncio_write_vector (file_restart, 'lake_icefrc', 'lake',     nl_lake,        'ens',      DEF_DA_ENS_NUM+1, 'patch', landpatch, lake_icefrac_ens, compress)
       CALL ncio_write_vector (file_restart, 'savedtke1',                               'ens',      DEF_DA_ENS_NUM+1, 'patch', landpatch, savedtke1_ens,    compress)
 
+      CALL ncio_write_vector (file_restart, 'trad '    ,                               'ens',      DEF_DA_ENS_NUM+1, 'patch', landpatch, trad_ens,         compress)
+      CALL ncio_write_vector (file_restart, 'tref '    ,                               'ens',      DEF_DA_ENS_NUM+1, 'patch', landpatch, tref_ens,         compress)
+      CALL ncio_write_vector (file_restart, 'qref '    ,                               'ens',      DEF_DA_ENS_NUM+1, 'patch', landpatch, qref_ens,         compress)
+      CALL ncio_write_vector (file_restart, 'rst  '    ,                               'ens',      DEF_DA_ENS_NUM+1, 'patch', landpatch, rst_ens,          compress)
+      CALL ncio_write_vector (file_restart, 'emis '    ,                               'ens',      DEF_DA_ENS_NUM+1, 'patch', landpatch, emis_ens,         compress)
+      CALL ncio_write_vector (file_restart, 'z0m  '    ,                               'ens',      DEF_DA_ENS_NUM+1, 'patch', landpatch, z0m_ens,          compress)
+      CALL ncio_write_vector (file_restart, 'zol  '    ,                               'ens',      DEF_DA_ENS_NUM+1, 'patch', landpatch, zol_ens,          compress)
+      CALL ncio_write_vector (file_restart, 'rib  '    ,                               'ens',      DEF_DA_ENS_NUM+1, 'patch', landpatch, rib_ens,          compress)
+      CALL ncio_write_vector (file_restart, 'ustar'    ,                               'ens',      DEF_DA_ENS_NUM+1, 'patch', landpatch, ustar_ens,        compress)
+      CALL ncio_write_vector (file_restart, 'qstar'    ,                               'ens',      DEF_DA_ENS_NUM+1, 'patch', landpatch, qstar_ens,        compress)
+      CALL ncio_write_vector (file_restart, 'tstar'    ,                               'ens',      DEF_DA_ENS_NUM+1, 'patch', landpatch, tstar_ens,        compress)
+      CALL ncio_write_vector (file_restart, 'fm   '    ,                               'ens',      DEF_DA_ENS_NUM+1, 'patch', landpatch, fm_ens,           compress)
+      CALL ncio_write_vector (file_restart, 'fh   '    ,                               'ens',      DEF_DA_ENS_NUM+1, 'patch', landpatch, fh_ens,           compress)
+      CALL ncio_write_vector (file_restart, 'fq   '    ,                               'ens',      DEF_DA_ENS_NUM+1, 'patch', landpatch, fq_ens,           compress)
+
 #ifdef GridRiverLakeFlow
       file_gridriver = trim(dir_restart)// '/'//trim(cdate)//'/' // trim(site) //'_restart_gridriver_'//trim(cdate)//'_lc'//trim(cyear)//'.nc'
 
@@ -416,11 +479,11 @@ CONTAINS
       ENDIF
 #endif
 
-   END SUBROUTINE WRITE_DATimeVariables
+   END SUBROUTINE WRITE_DA_TimeVars
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE READ_DATimeVariables (idate, lc_year, site, dir_restart)
+   SUBROUTINE READ_DA_TimeVars (idate, lc_year, site, dir_restart)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -491,6 +554,21 @@ CONTAINS
       CALL ncio_read_vector(file_restart, 'lake_icefrc', nl_lake,          DEF_DA_ENS_NUM+1, landpatch, lake_icefrac_ens)
       CALL ncio_read_vector(file_restart, 'savedtke1  ',                   DEF_DA_ENS_NUM+1, landpatch, savedtke1_ens   )
 
+      CALL ncio_read_vector(file_restart, 'trad '      ,                   DEF_DA_ENS_NUM+1, landpatch, trad_ens        )
+      CALL ncio_read_vector(file_restart, 'tref '      ,                   DEF_DA_ENS_NUM+1, landpatch, tref_ens        )
+      CALL ncio_read_vector(file_restart, 'qref '      ,                   DEF_DA_ENS_NUM+1, landpatch, qref_ens        )
+      CALL ncio_read_vector(file_restart, 'rst  '      ,                   DEF_DA_ENS_NUM+1, landpatch, rst_ens         )
+      CALL ncio_read_vector(file_restart, 'emis '      ,                   DEF_DA_ENS_NUM+1, landpatch, emis_ens        )
+      CALL ncio_read_vector(file_restart, 'z0m  '      ,                   DEF_DA_ENS_NUM+1, landpatch, z0m_ens         )
+      CALL ncio_read_vector(file_restart, 'zol  '      ,                   DEF_DA_ENS_NUM+1, landpatch, zol_ens         )
+      CALL ncio_read_vector(file_restart, 'rib  '      ,                   DEF_DA_ENS_NUM+1, landpatch, rib_ens         )
+      CALL ncio_read_vector(file_restart, 'ustar'      ,                   DEF_DA_ENS_NUM+1, landpatch, ustar_ens       )
+      CALL ncio_read_vector(file_restart, 'qstar'      ,                   DEF_DA_ENS_NUM+1, landpatch, qstar_ens       )
+      CALL ncio_read_vector(file_restart, 'tstar'      ,                   DEF_DA_ENS_NUM+1, landpatch, tstar_ens       )
+      CALL ncio_read_vector(file_restart, 'fm   '      ,                   DEF_DA_ENS_NUM+1, landpatch, fm_ens          )
+      CALL ncio_read_vector(file_restart, 'fh   '      ,                   DEF_DA_ENS_NUM+1, landpatch, fh_ens          )
+      CALL ncio_read_vector(file_restart, 'fq   '      ,                   DEF_DA_ENS_NUM+1, landpatch, fq_ens          )
+
 #ifdef GridRiverLakeFlow
       file_gridriver = trim(dir_restart)//'/'//trim(cdate)//'/'//trim(site)//'_restart_gridriver_'//trim(cdate)//'_lc'//trim(cyear)//'.nc'
 
@@ -518,19 +596,19 @@ CONTAINS
 #endif
 
 #ifdef RangeCheck
-      CALL check_DATimeVariables
+      CALL check_DA_TimeVars
 #endif
 
       IF (p_is_master) WRITE (*,'(A)') '[DA] Loading DA Time Variables done.'
 
-   END SUBROUTINE READ_DATimeVariables
+   END SUBROUTINE READ_DA_TimeVars
 
 !-----------------------------------------------------------------------
 
 #ifdef RangeCheck
 !-----------------------------------------------------------------------
 
-   SUBROUTINE check_DATimeVariables ()
+   SUBROUTINE check_DA_TimeVars ()
 
 !-----------------------------------------------------------------------
       IMPLICIT NONE
@@ -584,8 +662,8 @@ CONTAINS
       CALL mpi_barrier(p_comm_glb, p_err)
 #endif
 
-   END SUBROUTINE check_DATimeVariables
+   END SUBROUTINE check_DA_TimeVars
 #endif
 !-----------------------------------------------------------------------
-END MODULE MOD_DA_Vars_TimeVariables
+END MODULE MOD_DA_Vars_TimeVars
 #endif
