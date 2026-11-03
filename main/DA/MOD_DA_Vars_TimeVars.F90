@@ -1,7 +1,7 @@
 #include <define.h>
 
 #ifdef DataAssimilation
-MODULE MOD_DA_Vars_TimeVariables
+MODULE MOD_DA_Vars_TimeVars
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
 !    Defines and manages the time-varying model variables required by the data
@@ -25,7 +25,7 @@ MODULE MOD_DA_Vars_TimeVariables
    USE MOD_SPMD_Task
    USE MOD_LandPatch
    USE MOD_NetCDFVector
-   USE MOD_DA_Vars_1DFluxes
+   USE MOD_DA_Vars_Fluxes
 #ifdef GridRiverLakeFlow
    USE MOD_DataType
    USE MOD_NetCDFSerial
@@ -39,12 +39,12 @@ MODULE MOD_DA_Vars_TimeVariables
    IMPLICIT NONE
    SAVE
 
-   PUBLIC :: allocate_DATimeVariables
-   PUBLIC :: deallocate_DATimeVariables
-   PUBLIC :: READ_DATimeVariables
-   PUBLIC :: WRITE_DATimeVariables
+   PUBLIC :: allocate_DA_TimeVars
+   PUBLIC :: deallocate_DA_TimeVars
+   PUBLIC :: READ_DA_TimeVars
+   PUBLIC :: WRITE_DA_TimeVars
 #ifdef RangeCheck
-   PUBLIC :: check_DATimeVariables
+   PUBLIC :: check_DA_TimeVars
 #endif
 
 !=============================================================================
@@ -150,7 +150,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE allocate_DATimeVariables()
+   SUBROUTINE allocate_DA_TimeVars()
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -264,11 +264,11 @@ CONTAINS
 #endif
       ENDIF
 
-   END SUBROUTINE allocate_DATimeVariables
+   END SUBROUTINE allocate_DA_TimeVars
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE deallocate_DATimeVariables()
+   SUBROUTINE deallocate_DA_TimeVars()
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -363,11 +363,11 @@ CONTAINS
 #endif
       ENDIF
 
-   END SUBROUTINE deallocate_DATimeVariables
+   END SUBROUTINE deallocate_DA_TimeVars
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE WRITE_DATimeVariables (idate, lc_year, site, dir_restart)
+   SUBROUTINE WRITE_DA_TimeVars (idate, lc_year, site, dir_restart)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -479,11 +479,11 @@ CONTAINS
       ENDIF
 #endif
 
-   END SUBROUTINE WRITE_DATimeVariables
+   END SUBROUTINE WRITE_DA_TimeVars
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE READ_DATimeVariables (idate, lc_year, site, dir_restart)
+   SUBROUTINE READ_DA_TimeVars (idate, lc_year, site, dir_restart)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -596,19 +596,19 @@ CONTAINS
 #endif
 
 #ifdef RangeCheck
-      CALL check_DATimeVariables
+      CALL check_DA_TimeVars
 #endif
 
       IF (p_is_master) WRITE (*,'(A)') '[DA] Loading DA Time Variables done.'
 
-   END SUBROUTINE READ_DATimeVariables
+   END SUBROUTINE READ_DA_TimeVars
 
 !-----------------------------------------------------------------------
 
 #ifdef RangeCheck
 !-----------------------------------------------------------------------
 
-   SUBROUTINE check_DATimeVariables ()
+   SUBROUTINE check_DA_TimeVars ()
 
 !-----------------------------------------------------------------------
       IMPLICIT NONE
@@ -662,8 +662,8 @@ CONTAINS
       CALL mpi_barrier(p_comm_glb, p_err)
 #endif
 
-   END SUBROUTINE check_DATimeVariables
+   END SUBROUTINE check_DA_TimeVars
 #endif
 !-----------------------------------------------------------------------
-END MODULE MOD_DA_Vars_TimeVariables
+END MODULE MOD_DA_Vars_TimeVars
 #endif

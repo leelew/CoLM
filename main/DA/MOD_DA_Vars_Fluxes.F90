@@ -1,14 +1,14 @@
 #include <define.h>
 
 #ifdef DataAssimilation
-MODULE MOD_DA_Vars_1DFluxes
+MODULE MOD_DA_Vars_Fluxes
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
 !    Variables required for land-atmosphere coupling include restart state
 !    variables and land-atmosphere fluxes.
 !
 !    Ensemble state variables written to DA restart files are defined and
-!    managed in MOD_DA_Vars_TimeVariables. This module defines and manages
+!    managed in MOD_DA_Vars_TimeVars. This module defines and manages
 !    ensemble land-atmosphere fluxes and associated diagnostic variables.
 !
 ! HISTORY:
@@ -22,8 +22,8 @@ MODULE MOD_DA_Vars_1DFluxes
    IMPLICIT NONE
    SAVE
 
-   PUBLIC :: allocate_1D_DAFluxes
-   PUBLIC :: deallocate_1D_DAFluxes
+   PUBLIC :: allocate_DA_Fluxes
+   PUBLIC :: deallocate_DA_Fluxes
 
 !=============================================================================
 ! ensemble surface flux variables
@@ -84,7 +84,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE allocate_1D_DAFluxes()
+   SUBROUTINE allocate_DA_Fluxes()
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -143,11 +143,11 @@ CONTAINS
          ENDIF
       ENDIF
 
-   END SUBROUTINE allocate_1D_DAFluxes
+   END SUBROUTINE allocate_DA_Fluxes
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE deallocate_1D_DAFluxes()
+   SUBROUTINE deallocate_DA_Fluxes()
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -206,8 +206,8 @@ CONTAINS
          ENDIF
       ENDIF
 
-   END SUBROUTINE deallocate_1D_DAFluxes
+   END SUBROUTINE deallocate_DA_Fluxes
 
 !-----------------------------------------------------------------------------
-END MODULE MOD_DA_Vars_1DFluxes
+END MODULE MOD_DA_Vars_Fluxes
 #endif
