@@ -314,29 +314,80 @@ CONTAINS
 
          ! Forcings
          forc_t_ens      (    iens,:) = forc_t
+         forc_frl_ens    (    iens,:) = forc_frl
          forc_prc_ens    (    iens,:) = forc_prc
          forc_prl_ens    (    iens,:) = forc_prl
          forc_sols_ens   (    iens,:) = forc_sols
          forc_soll_ens   (    iens,:) = forc_soll
          forc_solsd_ens  (    iens,:) = forc_solsd
          forc_solld_ens  (    iens,:) = forc_solld
-         forc_frl_ens    (    iens,:) = forc_frl
 
-         ! Fluxes (save for land-atmosphere coupling assimilation)
+        ! Land-atmosphere coupling states
          trad_ens        (    iens,:) = trad
          tref_ens        (    iens,:) = tref
          qref_ens        (    iens,:) = qref
+         rst_ens         (    iens,:) = rst
+         emis_ens        (    iens,:) = emis
+         z0m_ens         (    iens,:) = z0m
+         zol_ens         (    iens,:) = zol
+         rib_ens         (    iens,:) = rib
          ustar_ens       (    iens,:) = ustar
          qstar_ens       (    iens,:) = qstar
          tstar_ens       (    iens,:) = tstar
          fm_ens          (    iens,:) = fm
          fh_ens          (    iens,:) = fh
          fq_ens          (    iens,:) = fq
+         
+         ! Surface fluxes
+         taux_ens        (    iens,:) = taux
+         tauy_ens        (    iens,:) = tauy
          fsena_ens       (    iens,:) = fsena
          lfevpa_ens      (    iens,:) = lfevpa
          fevpa_ens       (    iens,:) = fevpa
+         fsenl_ens       (    iens,:) = fsenl
+         fevpl_ens       (    iens,:) = fevpl
+         etr_ens         (    iens,:) = etr
+         fseng_ens       (    iens,:) = fseng
+         fevpg_ens       (    iens,:) = fevpg
+         fgrnd_ens       (    iens,:) = fgrnd
+         sabvsun_ens     (    iens,:) = sabvsun
+         sabvsha_ens     (    iens,:) = sabvsha
+         sabg_ens        (    iens,:) = sabg
+         sr_ens          (    iens,:) = sr
+         solvd_ens       (    iens,:) = solvd
+         solvi_ens       (    iens,:) = solvi
+         solnd_ens       (    iens,:) = solnd
+         solni_ens       (    iens,:) = solni
+         srvd_ens        (    iens,:) = srvd
+         srvi_ens        (    iens,:) = srvi
+         srnd_ens        (    iens,:) = srnd
+         srni_ens        (    iens,:) = srni
+         solvdln_ens     (    iens,:) = solvdln
+         solviln_ens     (    iens,:) = solviln
+         solndln_ens     (    iens,:) = solndln
+         solniln_ens     (    iens,:) = solniln
+         srvdln_ens      (    iens,:) = srvdln
+         srviln_ens      (    iens,:) = srviln
+         srndln_ens      (    iens,:) = srndln
+         srniln_ens      (    iens,:) = srniln
+         olrg_ens        (    iens,:) = olrg
+         rnet_ens        (    iens,:) = rnet
+         xerr_ens        (    iens,:) = xerr
+         zerr_ens        (    iens,:) = zerr
+         frcsat_ens      (    iens,:) = frcsat
          rsur_ens        (    iens,:) = rsur
+         rsur_se_ens     (    iens,:) = rsur_se
+         rsur_ie_ens     (    iens,:) = rsur_ie
+         rsub_ens        (    iens,:) = rsub
          rnof_ens        (    iens,:) = rnof
+         qintr_ens       (    iens,:) = qintr
+         qinfl_ens       (    iens,:) = qinfl
+         qdrip_ens       (    iens,:) = qdrip
+         assim_ens       (    iens,:) = assim
+         respc_ens       (    iens,:) = respc
+         qcharge_ens     (    iens,:) = qcharge
+         qlayer_ens      (  :,iens,:) = qlayer
+         lake_deficit_ens(    iens,:) = lake_deficit
       ENDIF
 
    END SUBROUTINE save_member
@@ -347,8 +398,8 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
-!    Load the restart states and forcing of ensemble member into the
-!    model variables before advancing that member.
+!    Load the states, forcing, and flux outputs of an ensemble member
+!    into the model variables.
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
       integer, intent(in) :: iens
@@ -397,29 +448,80 @@ CONTAINS
 
          ! Forcings
          forc_t       = forc_t_ens      (    iens,:)
+         forc_frl     = forc_frl_ens    (    iens,:)
          forc_prc     = forc_prc_ens    (    iens,:)
          forc_prl     = forc_prl_ens    (    iens,:)
          forc_sols    = forc_sols_ens   (    iens,:)
          forc_soll    = forc_soll_ens   (    iens,:)
          forc_solsd   = forc_solsd_ens  (    iens,:)
          forc_solld   = forc_solld_ens  (    iens,:)
-         forc_frl     = forc_frl_ens    (    iens,:)
 
-         ! Fluxes (save for land-atmosphere coupling assimilation)
+         ! Land-atmosphere coupling states
          trad         = trad_ens        (    iens,:)
          tref         = tref_ens        (    iens,:)
          qref         = qref_ens        (    iens,:)
+         rst          = rst_ens         (    iens,:)
+         emis         = emis_ens        (    iens,:)
+         z0m          = z0m_ens         (    iens,:)
+         zol          = zol_ens         (    iens,:)
+         rib          = rib_ens         (    iens,:)
          ustar        = ustar_ens       (    iens,:)
          qstar        = qstar_ens       (    iens,:)
          tstar        = tstar_ens       (    iens,:)
          fm           = fm_ens          (    iens,:)
          fh           = fh_ens          (    iens,:)
          fq           = fq_ens          (    iens,:)
+
+         ! Surface fluxes
+         taux         = taux_ens        (    iens,:)
+         tauy         = tauy_ens        (    iens,:)
          fsena        = fsena_ens       (    iens,:)
          lfevpa       = lfevpa_ens      (    iens,:)
          fevpa        = fevpa_ens       (    iens,:)
+         fsenl        = fsenl_ens       (    iens,:)
+         fevpl        = fevpl_ens       (    iens,:)
+         etr          = etr_ens         (    iens,:)
+         fseng        = fseng_ens       (    iens,:)
+         fevpg        = fevpg_ens       (    iens,:)
+         fgrnd        = fgrnd_ens       (    iens,:)
+         sabvsun      = sabvsun_ens     (    iens,:)
+         sabvsha      = sabvsha_ens     (    iens,:)
+         sabg         = sabg_ens        (    iens,:)
+         sr           = sr_ens          (    iens,:)
+         solvd        = solvd_ens       (    iens,:)
+         solvi        = solvi_ens       (    iens,:)
+         solnd        = solnd_ens       (    iens,:)
+         solni        = solni_ens       (    iens,:)
+         srvd         = srvd_ens        (    iens,:)
+         srvi         = srvi_ens        (    iens,:)
+         srnd         = srnd_ens        (    iens,:)
+         srni         = srni_ens        (    iens,:)
+         solvdln      = solvdln_ens     (    iens,:)
+         solviln      = solviln_ens     (    iens,:)
+         solndln      = solndln_ens     (    iens,:)
+         solniln      = solniln_ens     (    iens,:)
+         srvdln       = srvdln_ens      (    iens,:)
+         srviln       = srviln_ens      (    iens,:)
+         srndln       = srndln_ens      (    iens,:)
+         srniln       = srniln_ens      (    iens,:)
+         olrg         = olrg_ens        (    iens,:)
+         rnet         = rnet_ens        (    iens,:)
+         xerr         = xerr_ens        (    iens,:)
+         zerr         = zerr_ens        (    iens,:)
+         frcsat       = frcsat_ens      (    iens,:)
          rsur         = rsur_ens        (    iens,:)
+         rsur_se      = rsur_se_ens     (    iens,:)
+         rsur_ie      = rsur_ie_ens     (    iens,:)
+         rsub         = rsub_ens        (    iens,:)
          rnof         = rnof_ens        (    iens,:)
+         qintr        = qintr_ens       (    iens,:)
+         qinfl        = qinfl_ens       (    iens,:)
+         qdrip        = qdrip_ens       (    iens,:)
+         assim        = assim_ens       (    iens,:)
+         respc        = respc_ens       (    iens,:)
+         qcharge      = qcharge_ens     (    iens,:)
+         qlayer       = qlayer_ens      (  :,iens,:)
+         lake_deficit = lake_deficit_ens(    iens,:)
       ENDIF
 
    END SUBROUTINE load_member
@@ -443,7 +545,7 @@ CONTAINS
          CALL load_member(0)
 
          IF (DEF_DA_FEEDBACK) THEN
-            ! Restart
+            ! Restart states
             z_sno        = sum(z_sno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2)        / DEF_DA_ENS_NUM
             dz_sno       = sum(dz_sno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2)       / DEF_DA_ENS_NUM
             t_soisno     = sum(t_soisno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2)     / DEF_DA_ENS_NUM
@@ -484,21 +586,72 @@ CONTAINS
             lake_icefrac = sum(lake_icefrac_ens(:,1:DEF_DA_ENS_NUM,:), dim=2) / DEF_DA_ENS_NUM
             savedtke1    = sum(savedtke1_ens(1:DEF_DA_ENS_NUM,:), dim=1)      / DEF_DA_ENS_NUM
 
-            ! Fluxes
+            ! Land-atmosphere coupling states
             trad         = sum(trad_ens(1:DEF_DA_ENS_NUM,:), dim=1)           / DEF_DA_ENS_NUM
             tref         = sum(tref_ens(1:DEF_DA_ENS_NUM,:), dim=1)           / DEF_DA_ENS_NUM
             qref         = sum(qref_ens(1:DEF_DA_ENS_NUM,:), dim=1)           / DEF_DA_ENS_NUM
+            rst          = sum(rst_ens(1:DEF_DA_ENS_NUM,:), dim=1)            / DEF_DA_ENS_NUM
+            emis         = sum(emis_ens(1:DEF_DA_ENS_NUM,:), dim=1)           / DEF_DA_ENS_NUM
+            z0m          = sum(z0m_ens(1:DEF_DA_ENS_NUM,:), dim=1)            / DEF_DA_ENS_NUM
+            zol          = sum(zol_ens(1:DEF_DA_ENS_NUM,:), dim=1)            / DEF_DA_ENS_NUM
+            rib          = sum(rib_ens(1:DEF_DA_ENS_NUM,:), dim=1)            / DEF_DA_ENS_NUM
             ustar        = sum(ustar_ens(1:DEF_DA_ENS_NUM,:), dim=1)          / DEF_DA_ENS_NUM
             qstar        = sum(qstar_ens(1:DEF_DA_ENS_NUM,:), dim=1)          / DEF_DA_ENS_NUM
             tstar        = sum(tstar_ens(1:DEF_DA_ENS_NUM,:), dim=1)          / DEF_DA_ENS_NUM
             fm           = sum(fm_ens(1:DEF_DA_ENS_NUM,:), dim=1)             / DEF_DA_ENS_NUM
             fh           = sum(fh_ens(1:DEF_DA_ENS_NUM,:), dim=1)             / DEF_DA_ENS_NUM
             fq           = sum(fq_ens(1:DEF_DA_ENS_NUM,:), dim=1)             / DEF_DA_ENS_NUM
+
+            ! Surface fluxes
+            taux         = sum(taux_ens(1:DEF_DA_ENS_NUM,:), dim=1)           / DEF_DA_ENS_NUM
+            tauy         = sum(tauy_ens(1:DEF_DA_ENS_NUM,:), dim=1)           / DEF_DA_ENS_NUM
             fsena        = sum(fsena_ens(1:DEF_DA_ENS_NUM,:), dim=1)          / DEF_DA_ENS_NUM
             lfevpa       = sum(lfevpa_ens(1:DEF_DA_ENS_NUM,:), dim=1)         / DEF_DA_ENS_NUM
             fevpa        = sum(fevpa_ens(1:DEF_DA_ENS_NUM,:), dim=1)          / DEF_DA_ENS_NUM
+            fsenl        = sum(fsenl_ens(1:DEF_DA_ENS_NUM,:), dim=1)          / DEF_DA_ENS_NUM
+            fevpl        = sum(fevpl_ens(1:DEF_DA_ENS_NUM,:), dim=1)          / DEF_DA_ENS_NUM
+            etr          = sum(etr_ens(1:DEF_DA_ENS_NUM,:), dim=1)            / DEF_DA_ENS_NUM
+            fseng        = sum(fseng_ens(1:DEF_DA_ENS_NUM,:), dim=1)          / DEF_DA_ENS_NUM
+            fevpg        = sum(fevpg_ens(1:DEF_DA_ENS_NUM,:), dim=1)          / DEF_DA_ENS_NUM
+            fgrnd        = sum(fgrnd_ens(1:DEF_DA_ENS_NUM,:), dim=1)          / DEF_DA_ENS_NUM
+            sabvsun      = sum(sabvsun_ens(1:DEF_DA_ENS_NUM,:), dim=1)        / DEF_DA_ENS_NUM
+            sabvsha      = sum(sabvsha_ens(1:DEF_DA_ENS_NUM,:), dim=1)        / DEF_DA_ENS_NUM
+            sabg         = sum(sabg_ens(1:DEF_DA_ENS_NUM,:), dim=1)           / DEF_DA_ENS_NUM
+            sr           = sum(sr_ens(1:DEF_DA_ENS_NUM,:), dim=1)             / DEF_DA_ENS_NUM
+            solvd        = sum(solvd_ens(1:DEF_DA_ENS_NUM,:), dim=1)          / DEF_DA_ENS_NUM
+            solvi        = sum(solvi_ens(1:DEF_DA_ENS_NUM,:), dim=1)          / DEF_DA_ENS_NUM
+            solnd        = sum(solnd_ens(1:DEF_DA_ENS_NUM,:), dim=1)          / DEF_DA_ENS_NUM
+            solni        = sum(solni_ens(1:DEF_DA_ENS_NUM,:), dim=1)          / DEF_DA_ENS_NUM
+            srvd         = sum(srvd_ens(1:DEF_DA_ENS_NUM,:), dim=1)           / DEF_DA_ENS_NUM
+            srvi         = sum(srvi_ens(1:DEF_DA_ENS_NUM,:), dim=1)           / DEF_DA_ENS_NUM
+            srnd         = sum(srnd_ens(1:DEF_DA_ENS_NUM,:), dim=1)           / DEF_DA_ENS_NUM
+            srni         = sum(srni_ens(1:DEF_DA_ENS_NUM,:), dim=1)           / DEF_DA_ENS_NUM
+            solvdln      = sum(solvdln_ens(1:DEF_DA_ENS_NUM,:), dim=1)        / DEF_DA_ENS_NUM
+            solviln      = sum(solviln_ens(1:DEF_DA_ENS_NUM,:), dim=1)        / DEF_DA_ENS_NUM
+            solndln      = sum(solndln_ens(1:DEF_DA_ENS_NUM,:), dim=1)        / DEF_DA_ENS_NUM
+            solniln      = sum(solniln_ens(1:DEF_DA_ENS_NUM,:), dim=1)        / DEF_DA_ENS_NUM
+            srvdln       = sum(srvdln_ens(1:DEF_DA_ENS_NUM,:), dim=1)         / DEF_DA_ENS_NUM
+            srviln       = sum(srviln_ens(1:DEF_DA_ENS_NUM,:), dim=1)         / DEF_DA_ENS_NUM
+            srndln       = sum(srndln_ens(1:DEF_DA_ENS_NUM,:), dim=1)         / DEF_DA_ENS_NUM
+            srniln       = sum(srniln_ens(1:DEF_DA_ENS_NUM,:), dim=1)         / DEF_DA_ENS_NUM
+            olrg         = sum(olrg_ens(1:DEF_DA_ENS_NUM,:), dim=1)           / DEF_DA_ENS_NUM
+            rnet         = sum(rnet_ens(1:DEF_DA_ENS_NUM,:), dim=1)           / DEF_DA_ENS_NUM
+            xerr         = sum(xerr_ens(1:DEF_DA_ENS_NUM,:), dim=1)           / DEF_DA_ENS_NUM
+            zerr         = sum(zerr_ens(1:DEF_DA_ENS_NUM,:), dim=1)           / DEF_DA_ENS_NUM
+            frcsat       = sum(frcsat_ens(1:DEF_DA_ENS_NUM,:), dim=1)         / DEF_DA_ENS_NUM
             rsur         = sum(rsur_ens(1:DEF_DA_ENS_NUM,:), dim=1)           / DEF_DA_ENS_NUM
+            rsur_se      = sum(rsur_se_ens(1:DEF_DA_ENS_NUM,:), dim=1)        / DEF_DA_ENS_NUM
+            rsur_ie      = sum(rsur_ie_ens(1:DEF_DA_ENS_NUM,:), dim=1)        / DEF_DA_ENS_NUM
+            rsub         = sum(rsub_ens(1:DEF_DA_ENS_NUM,:), dim=1)           / DEF_DA_ENS_NUM
             rnof         = sum(rnof_ens(1:DEF_DA_ENS_NUM,:), dim=1)           / DEF_DA_ENS_NUM
+            qintr        = sum(qintr_ens(1:DEF_DA_ENS_NUM,:), dim=1)          / DEF_DA_ENS_NUM
+            qinfl        = sum(qinfl_ens(1:DEF_DA_ENS_NUM,:), dim=1)          / DEF_DA_ENS_NUM
+            qdrip        = sum(qdrip_ens(1:DEF_DA_ENS_NUM,:), dim=1)          / DEF_DA_ENS_NUM
+            assim        = sum(assim_ens(1:DEF_DA_ENS_NUM,:), dim=1)          / DEF_DA_ENS_NUM
+            respc        = sum(respc_ens(1:DEF_DA_ENS_NUM,:), dim=1)          / DEF_DA_ENS_NUM
+            qcharge      = sum(qcharge_ens(1:DEF_DA_ENS_NUM,:), dim=1)        / DEF_DA_ENS_NUM
+            qlayer       = sum(qlayer_ens(:,1:DEF_DA_ENS_NUM,:), dim=2)       / DEF_DA_ENS_NUM
+            lake_deficit = sum(lake_deficit_ens(1:DEF_DA_ENS_NUM,:), dim=1)   / DEF_DA_ENS_NUM
          ENDIF
       ENDIF
 

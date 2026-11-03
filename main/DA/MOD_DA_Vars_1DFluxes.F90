@@ -77,8 +77,6 @@ MODULE MOD_DA_Vars_1DFluxes
    real(r8), allocatable :: qcharge_ens         (:,:)   ! groundwater recharge                                     [mm/s]
    real(r8), allocatable :: qlayer_ens          (:,:,:) ! water flux between soil layers                           [mm/s]
    real(r8), allocatable :: lake_deficit_ens    (:,:)   ! lake water deficit due to evaporation                    [mm/s]
-   real(r8), allocatable :: oroflag_ens         (:,:)   ! surface flag: ocean (0), land (1), sea ice (2)           [-]
-   real(r8), allocatable :: sensors_ens         (:,:,:) ! user-defined sensor diagnostics                          [varies]
 
 !-----------------------------------------------------------------------------
 
@@ -142,7 +140,6 @@ CONTAINS
             allocate (qcharge_ens          (0:DEF_DA_ENS_NUM,numpatch)); qcharge_ens          (:,:) = spval
             allocate (qlayer_ens (0:nl_soil,0:DEF_DA_ENS_NUM,numpatch)); qlayer_ens         (:,:,:) = spval
             allocate (lake_deficit_ens     (0:DEF_DA_ENS_NUM,numpatch)); lake_deficit_ens     (:,:) = spval
-            allocate (oroflag_ens          (0:DEF_DA_ENS_NUM,numpatch)); oroflag_ens          (:,:) = 1.0_r8
          ENDIF
       ENDIF
 
@@ -206,7 +203,6 @@ CONTAINS
             deallocate (qcharge_ens                    )
             deallocate (qlayer_ens                     )
             deallocate (lake_deficit_ens               )
-            deallocate (oroflag_ens                    )
          ENDIF
       ENDIF
 
