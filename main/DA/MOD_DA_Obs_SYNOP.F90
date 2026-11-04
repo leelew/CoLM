@@ -42,8 +42,8 @@ MODULE MOD_DA_Obs_SYNOP
 !    SYNOP_set_type owns the observation workflow:
 !      1. read the 2 m temperature and/or relative humidity observations;
 !      2. derive rhref_ens from qref_ens, tref_ens, and surface pressure;
-!      3. gather tref_ens and/or rhref_ens to station locations through
-!         site_obs_type;
+!      3. extract tref_ens and/or rhref_ens at mapped station patches
+!         and share H(x) across MPI ranks;
 !      4. concatenate the enabled variables into one observation vector;
 !      5. prepare localized patch-level y, R, and H(x) arrays for LETKF.
 !
@@ -55,6 +55,7 @@ MODULE MOD_DA_Obs_SYNOP
 !-----------------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_DA_Obs_SiteType
+   USE MOD_LandPatch
    USE MOD_DA_Vars_TimeVariables
    USE MOD_Namelist
    USE MOD_Pixelset
@@ -65,6 +66,7 @@ MODULE MOD_DA_Obs_SYNOP
    IMPLICIT NONE
 
    PUBLIC :: SYNOP_calc_rh
+   PRIVATE :: SYNOP_gather_hx
 
    type :: SYNOP_config_type
 
@@ -264,6 +266,74 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
+   SUBROUTINE SYNOP_gather_hx (site, hx_pset, hx)
+
+!-----------------------------------------------------------------------------
+! Map a patch-space field to the observation locations.
+!
+! This is a collective operation: every MPI rank must call it. It returns the
+! same global (nobs,0:ens) array on all ranks. Observations whose site is not
+! owned by any worker, or whose patch falls outside the local patch range,
+! are set to spval.
+!-----------------------------------------------------------------------------
+      IMPLICIT NONE
+
+!------------------------ Dummy Arguments ------------------------------------
+      type(site_obs_type),   intent(in)    :: site         ! Site observations and patch mapping
+      real(r8), allocatable, intent(in)    :: hx_pset(:,:) ! H(x) on patches [0:ens, patch]
+      real(r8), allocatable, intent(out)   :: hx(:,:)      ! H(x) at obs [nobs, 0:ens]
+
+!------------------------ Local Variables ------------------------------------
+      integer :: iobs                                      ! Observation index
+      integer :: isite                                     ! Site-table index
+      integer :: np                                        ! Local patch index
+      integer :: nens                                      ! Number of ensemble members excluding the open loop
+      integer, allocatable :: owner(:)                     ! number of ranks that filled each obs
+
+!-----------------------------------------------------------------------------
+
+      nens = DEF_DA_ENS_NUM
+      allocate (hx(site%nobs, 0:nens))
+      hx(:,:) = spval
+      IF (site%nobs == 0) RETURN
+
+      allocate (owner(site%nobs))
+      owner(:) = 0
+      hx(:,:) = 0.0_r8
+
+      IF (p_is_worker .and. numpatch > 0 .and. allocated(hx_pset)) THEN
+         IF (size(hx_pset, 2) >= numpatch) THEN
+            DO iobs = 1, site%nobs
+               isite = site%isite(iobs)
+               IF (site%site_iworker(isite) == p_iam_glb) THEN
+                  np = site%site_iworker_ipatch(isite)
+                  IF (np >= 1 .and. np <= numpatch) THEN
+                     hx(iobs, 0:nens) = hx_pset(0:nens, np)
+                     owner(iobs) = 1
+                  ENDIF
+               ENDIF
+            ENDDO
+         ENDIF
+      ENDIF
+
+#ifdef USEMPI
+      CALL mpi_allreduce (MPI_IN_PLACE, hx, site%nobs*(nens+1), MPI_REAL8, &
+         MPI_SUM, p_comm_glb, p_err)
+      CALL mpi_allreduce (MPI_IN_PLACE, owner, site%nobs, MPI_INTEGER, &
+         MPI_SUM, p_comm_glb, p_err)
+#endif
+
+      DO iobs = 1, site%nobs
+         IF (owner(iobs) /= 1) hx(iobs, 0:nens) = spval
+      ENDDO
+
+      deallocate (owner)
+
+
+   END SUBROUTINE SYNOP_gather_hx
+
+!-----------------------------------------------------------------------------
+
    SUBROUTINE SYNOP_type_calc_on_grid (this, idate, deltim)
 
 !-----------------------------------------------------------------------------
@@ -289,11 +359,11 @@ CONTAINS
       DO i = 1, size(this%sensors)
          IF (this%cfgs(i)%use_t) THEN
             CALL this%sensors(i)%t%read(idate, deltim)
-            CALL this%sensors(i)%t%gather(tref_ens, this%sensors(i)%hx_t)
+            CALL SYNOP_gather_hx(this%sensors(i)%t, tref_ens, this%sensors(i)%hx_t)
          ENDIF
          IF (this%cfgs(i)%use_rh) THEN
             CALL this%sensors(i)%rh%read(idate, deltim)
-            CALL this%sensors(i)%rh%gather(rhref_ens, this%sensors(i)%hx_rh)
+            CALL SYNOP_gather_hx(this%sensors(i)%rh, rhref_ens, this%sensors(i)%hx_rh)
          ENDIF
       ENDDO
 
