@@ -245,7 +245,7 @@ CONTAINS
                ENDDO
 
                WHERE (sumarea > 0.0)
-                  this%hx_pset(:,np) = this%hx_pset(:,np) / sumarea(iens)
+                  this%hx_pset(:,np) = this%hx_pset(:,np) / sumarea
                ENDWHERE
 
 !-----------------------------------------------------------------------------
