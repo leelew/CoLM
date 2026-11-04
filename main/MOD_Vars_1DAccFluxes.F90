@@ -4,7 +4,7 @@ MODULE MOD_Vars_1DAccFluxes
 
    USE MOD_Precision
 #ifdef DataAssimilation
-   USE MOD_DA_Vars_1DAccFluxes
+   USE MOD_DA_Vars_AccVars
    USE MOD_Namelist
 #endif
 #ifdef EXTERNAL_LAKE
@@ -592,7 +592,7 @@ CONTAINS
    IMPLICIT NONE
 
 #ifdef DataAssimilation
-      CALL allocate_1D_DAAccFluxes ()
+      CALL allocate_DA_AccVars ()
 #endif
 
       IF (p_is_worker) THEN
@@ -1183,7 +1183,7 @@ CONTAINS
 
       IF (p_is_worker) THEN
 #ifdef DataAssimilation
-         CALL deallocate_1D_DAAccFluxes ()
+         CALL deallocate_DA_AccVars ()
 #endif
 
          IF (numpatch > 0) THEN
@@ -1875,7 +1875,7 @@ CONTAINS
             a_o3uptakesha(:) = spval
 
 #ifdef DataAssimilation
-            CALL flush_1D_DAAccFluxes ()
+            CALL flush_DA_AccVars ()
 #endif
 
 #ifdef URBAN_MODEL
@@ -2584,7 +2584,7 @@ CONTAINS
             ENDIF
 
 #ifdef DataAssimilation
-            CALL accumulate_1D_DAAccFluxes ()
+            CALL accumulate_DA_AccVars ()
 #endif
 
 #ifdef URBAN_MODEL

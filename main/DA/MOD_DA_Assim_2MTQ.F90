@@ -29,7 +29,7 @@ MODULE MOD_DA_Assim_2MTQ
    USE MOD_Precision
    USE MOD_DA_Obs_SYNOP
    USE MOD_DA_EnKF
-   USE MOD_DA_Vars_TimeVariables
+   USE MOD_DA_Vars_TimeVars
    USE MOD_LandPatch
    USE MOD_Namelist
    USE MOD_SPMD_Task

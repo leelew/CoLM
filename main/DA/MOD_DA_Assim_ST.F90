@@ -18,7 +18,7 @@ MODULE MOD_DA_Assim_ST
    USE MOD_Precision
    USE MOD_DA_Obs_ST
    USE MOD_DA_EnKF
-   USE MOD_DA_Vars_TimeVariables
+   USE MOD_DA_Vars_TimeVars
    USE MOD_Vars_TimeInvariants
    USE MOD_Vars_Global, ONLY: nl_soil
    USE MOD_LandPatch

@@ -16,18 +16,42 @@ MODULE MOD_DA_Vars_Hist
    USE MOD_NetCDFSerial
    USE MOD_LandPatch
    USE MOD_DataType
+   USE MOD_Block
    USE MOD_HistGridded
    USE MOD_Vars_TimeInvariants
    USE MOD_Forcing
+   USE MOD_Vars_1DAccFluxes, only: nac
 #ifdef GridRiverLakeFlow
    USE MOD_Vector_ReadWrite
    USE MOD_Grid_RiverLakeNetwork
 #endif
    USE MOD_DA_Vars_TimeVars
    USE MOD_DA_Vars_AccVars
-   USE MOD_DA_Vars_Utils
    IMPLICIT NONE
    SAVE
+
+!-----------------------------------------------------------------------------
+! NOTE (duplicated history pipeline):
+!   write_DA_hist_2d/3d below duplicate the normalization (nac or acc_num),
+!   patch-to-grid mapping, and area averaging implemented by
+!   MOD_Hist.F90:write_history_variable_3d/4d and
+!   MOD_HistGridded.F90:flux_map_and_write_3d/4d. The DA names omit the grid
+!   dimensions, so the 2d writer here corresponds to the 3d routines there,
+!   and the 3d writer to the 4d ones. The copy exists because those files
+!   are maintained outside the DA module: DA-only features (such as the
+!   per-source filter_3d mask and its per-source sumarea) are not wanted in
+!   the shared core, and threading them through it would couple the history
+!   core to DA.
+!
+!   If the shared routines are ever refactored or split so that the common
+!   steps can be called without this coupling, reduce write_DA_hist_2d/3d to
+!   thin wrappers around them. Until then, mirror any logic change in
+!   MOD_Hist.F90 / MOD_HistGridded.F90 here.
+!-----------------------------------------------------------------------------
+   INTERFACE write_DA_hist
+      MODULE PROCEDURE write_DA_hist_2d
+      MODULE PROCEDURE write_DA_hist_3d
+   END INTERFACE write_DA_hist
 
 !-----------------------------------------------------------------------------
 
@@ -171,6 +195,225 @@ CONTAINS
 #endif
 
    END SUBROUTINE save_DA_hist
+
+!-----------------------------------------------------------------------------
+
+   SUBROUTINE write_DA_hist_2d (HistForm, is_hist, &
+         acc_vec, file_hist, varname, itime_in_file, dim1name, lb1, ndim1, &
+         sumarea, filter, longname, units, filter_3d)
+
+!-----------------------------------------------------------------------------
+! DESCRIPTION:
+!    Normalize diagnostic sums, map patches to the history grid, and write
+!    the resulting field. Array rank excludes the history-grid dimensions.
+!-----------------------------------------------------------------------------
+      IMPLICIT NONE
+
+!------------------------ Dummy Arguments ------------------------------------
+      character(len=*), intent(in)           :: HistForm
+      logical, intent(in)                    :: is_hist
+      real(r8), intent(inout)                :: acc_vec(:,:)
+      character(len=*), intent(in)           :: file_hist
+      character(len=*), intent(in)           :: varname
+      integer, intent(in)                    :: itime_in_file
+      character(len=*), intent(in)           :: dim1name
+      integer, intent(in)                    :: lb1
+      integer, intent(in)                    :: ndim1
+      type(block_data_real8_2d), intent(in)  :: sumarea
+      logical, intent(in)                    :: filter(:)
+      character(len=*), intent(in)           :: longname
+      character(len=*), intent(in)           :: units
+      logical, intent(in), optional          :: filter_3d(:,:)
+
+!------------------------ Local Variables ------------------------------------
+      type(block_data_real8_3d)              :: flux_xy_3d
+      type(block_data_real8_3d)              :: sumarea_3d
+      type(block_data_real8_2d)              :: sumarea_one_source
+      integer                                :: iblkme
+      integer                                :: xblk
+      integer                                :: yblk
+      integer                                :: xloc
+      integer                                :: yloc
+      integer                                :: i1
+      integer                                :: compress
+      real(r8)                               :: area_den
+
+!-----------------------------------------------------------------------------
+      IF (.not. is_hist) RETURN
+      IF (HistForm /= 'Gridded') RETURN
+
+      IF (p_is_worker)  THEN
+         WHERE (acc_vec /= spval)  acc_vec = acc_vec / nac
+      ENDIF
+      IF (p_is_io) THEN
+         CALL allocate_block_data (ghist, flux_xy_3d, ndim1, lb1)
+         IF (present(filter_3d)) THEN
+            CALL allocate_block_data (ghist, sumarea_3d, ndim1, lb1)
+            CALL allocate_block_data (ghist, sumarea_one_source)
+         ENDIF
+      ENDIF
+
+      IF (present(filter_3d)) THEN
+         DO i1 = lb1, lb1 + ndim1 - 1
+            CALL mp2g_hist%get_sumarea(sumarea_one_source, filter_3d(i1,:))
+            IF (p_is_io) THEN
+               DO iblkme = 1, gblock%nblkme
+                  xblk = gblock%xblkme(iblkme)
+                  yblk = gblock%yblkme(iblkme)
+                  sumarea_3d%blk(xblk,yblk)%val(i1,:,:) = &
+                     sumarea_one_source%blk(xblk,yblk)%val(:,:)
+               ENDDO
+            ENDIF
+         ENDDO
+      ENDIF
+
+      CALL mp2g_hist%pset2grid (acc_vec, flux_xy_3d, spv = spval, msk = filter)
+
+      IF (p_is_io) THEN
+         DO iblkme = 1, gblock%nblkme
+            xblk = gblock%xblkme(iblkme)
+            yblk = gblock%yblkme(iblkme)
+
+            DO yloc = 1, ghist%ycnt(yblk)
+               DO xloc = 1, ghist%xcnt(xblk)
+
+                  IF (sumarea%blk(xblk,yblk)%val(xloc,yloc) > 0.00001) THEN
+                     DO i1 = flux_xy_3d%lb1, flux_xy_3d%ub1
+                        IF (flux_xy_3d%blk(xblk,yblk)%val(i1,xloc,yloc) /= spval) THEN
+                           IF (present(filter_3d)) THEN
+                              area_den = sumarea_3d%blk(xblk,yblk)%val(i1,xloc,yloc)
+                           ELSE
+                              area_den = sumarea%blk(xblk,yblk)%val(xloc,yloc)
+                           ENDIF
+
+                           IF (area_den > 0.00001_r8) THEN
+                              flux_xy_3d%blk(xblk,yblk)%val(i1,xloc,yloc) &
+                                 = flux_xy_3d%blk(xblk,yblk)%val(i1,xloc,yloc) &
+                                 / area_den
+                           ELSE
+                              flux_xy_3d%blk(xblk,yblk)%val(i1,xloc,yloc) = spval
+                           ENDIF
+                        ENDIF
+                     ENDDO
+                  ELSE
+                     flux_xy_3d%blk(xblk,yblk)%val(:,xloc,yloc) = spval
+                  ENDIF
+
+               ENDDO
+            ENDDO
+
+         ENDDO
+      ENDIF
+
+      compress = DEF_HIST_CompressLevel
+      CALL hist_write_var_real8_3d (file_hist, varname, dim1name, ghist, &
+         itime_in_file, flux_xy_3d, compress, longname, units)
+
+   END SUBROUTINE write_DA_hist_2d
+
+!-----------------------------------------------------------------------------
+
+   SUBROUTINE write_DA_hist_3d (HistForm, is_hist, &
+         acc_vec, file_hist, varname, itime_in_file, &
+         dim1name, lb1, ndim1, dim2name, lb2, ndim2, &
+         sumarea, filter, longname, units, acc_num)
+
+!-----------------------------------------------------------------------------
+! DESCRIPTION:
+!    Normalize diagnostic sums, map patches to the history grid, and write
+!    the resulting field. Array rank excludes the history-grid dimensions.
+!-----------------------------------------------------------------------------
+      IMPLICIT NONE
+
+!------------------------ Dummy Arguments ------------------------------------
+      character(len=*), intent(in)           :: HistForm
+      logical, intent(in)                    :: is_hist
+      real(r8), intent(inout)                :: acc_vec(:,:,:)
+      character(len=*), intent(in)           :: file_hist
+      character(len=*), intent(in)           :: varname
+      integer, intent(in)                    :: itime_in_file
+      character(len=*), intent(in)           :: dim1name
+      integer, intent(in)                    :: lb1
+      integer, intent(in)                    :: ndim1
+      character(len=*), intent(in)           :: dim2name
+      integer, intent(in)                    :: lb2
+      integer, intent(in)                    :: ndim2
+      type(block_data_real8_2d), intent(in)  :: sumarea
+      logical, intent(in)                    :: filter(:)
+      character(len=*), intent(in)           :: longname
+      character(len=*), intent(in)           :: units
+      real(r8), intent(in), optional         :: acc_num(:)
+
+!------------------------ Local Variables ------------------------------------
+      type(block_data_real8_4d)              :: flux_xy_4d
+      integer                                :: iblkme
+      integer                                :: xblk
+      integer                                :: yblk
+      integer                                :: xloc
+      integer                                :: yloc
+      integer                                :: i1
+      integer                                :: i2
+      integer                                :: compress
+
+!-----------------------------------------------------------------------------
+      IF (.not. is_hist) RETURN
+      IF (HistForm /= 'Gridded') RETURN
+
+      IF (.not. present(acc_num)) THEN
+         IF (p_is_worker) THEN
+            WHERE (acc_vec /= spval) acc_vec = acc_vec / nac
+         ENDIF
+      ELSE
+         IF (p_is_worker) THEN
+            DO i1 = lbound(acc_vec,1), ubound(acc_vec,1)
+               DO i2 = lbound(acc_vec,2), ubound(acc_vec,2)
+                  WHERE (acc_vec(i1,i2,:) /= spval .and. acc_num > 0)
+                     acc_vec(i1,i2,:) = acc_vec(i1,i2,:) / acc_num
+                  END WHERE
+               ENDDO
+            ENDDO
+         ENDIF
+      ENDIF
+
+      IF (p_is_io) THEN
+         CALL allocate_block_data (ghist, flux_xy_4d, ndim1, ndim2, lb1 = lb1, lb2 = lb2)
+      ENDIF
+
+      CALL mp2g_hist%pset2grid (acc_vec, flux_xy_4d, spv = spval, msk = filter)
+
+      IF (p_is_io) THEN
+         DO iblkme = 1, gblock%nblkme
+            xblk = gblock%xblkme(iblkme)
+            yblk = gblock%yblkme(iblkme)
+
+            DO yloc = 1, ghist%ycnt(yblk)
+               DO xloc = 1, ghist%xcnt(xblk)
+
+                  IF (sumarea%blk(xblk,yblk)%val(xloc,yloc) > 0.00001) THEN
+                     DO i1 = flux_xy_4d%lb1, flux_xy_4d%ub1
+                        DO i2 = flux_xy_4d%lb2, flux_xy_4d%ub2
+                           IF (flux_xy_4d%blk(xblk,yblk)%val(i1,i2,xloc,yloc) /= spval) THEN
+                              flux_xy_4d%blk(xblk,yblk)%val(i1,i2,xloc,yloc) &
+                                 = flux_xy_4d%blk(xblk,yblk)%val(i1,i2,xloc,yloc) &
+                                 / sumarea%blk(xblk,yblk)%val(xloc,yloc)
+                           ENDIF
+                        ENDDO
+                     ENDDO
+                  ELSE
+                     flux_xy_4d%blk(xblk,yblk)%val(:,:,xloc,yloc) = spval
+                  ENDIF
+
+               ENDDO
+            ENDDO
+
+         ENDDO
+      ENDIF
+
+      compress = DEF_HIST_CompressLevel
+      CALL hist_write_var_real8_4d (file_hist, varname, dim1name, dim2name, &
+         ghist, itime_in_file, flux_xy_4d, compress, longname, units)
+
+   END SUBROUTINE write_DA_hist_3d
 
 !-----------------------------------------------------------------------------
 END MODULE MOD_DA_Vars_Hist

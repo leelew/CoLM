@@ -24,7 +24,7 @@ MODULE MOD_DA_Ens
    USE MOD_Vars_1DForcing
    USE MOD_Vars_TimeVariables
    USE MOD_Vars_1DFluxes
-   USE MOD_DA_Vars_TimeVariables
+   USE MOD_DA_Vars_TimeVars
    IMPLICIT NONE
    SAVE
 

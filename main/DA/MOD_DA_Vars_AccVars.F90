@@ -24,7 +24,6 @@ MODULE MOD_DA_Vars_AccVars
    USE MOD_Grid_RiverLakeNetwork
 #endif
    USE MOD_DA_Vars_TimeVars
-   USE MOD_DA_Vars_Utils
    IMPLICIT NONE
    SAVE
 
@@ -32,6 +31,12 @@ MODULE MOD_DA_Vars_AccVars
    PUBLIC :: deallocate_DA_AccVars
    PUBLIC :: flush_DA_AccVars
    PUBLIC :: accumulate_DA_AccVars
+   PUBLIC :: acc_DA_hist
+
+   INTERFACE acc_DA_hist
+      MODULE PROCEDURE acc_DA_hist_2d
+      MODULE PROCEDURE acc_DA_hist_3d
+   END INTERFACE acc_DA_hist
 
 !=============================================================================
 ! diagnostic sample sums for history output
@@ -189,6 +194,59 @@ CONTAINS
       CALL acc_DA_hist (t_soisno_a                                 , a_t_soisno_a     )
 
    END SUBROUTINE accumulate_DA_AccVars
+
+!-----------------------------------------------------------------------------
+
+   SUBROUTINE acc_DA_hist_2d (var, s)
+
+!-----------------------------------------------------------------------------
+      IMPLICIT NONE
+      real(r8), intent(in)                   :: var(:,:)
+      real(r8), intent(inout)                :: s  (:,:)
+      integer                                :: i1
+      integer                                :: i2
+
+      DO i2 = lbound(var,2), ubound(var,2)
+         DO i1 = lbound(var,1), ubound(var,1)
+            IF (var(i1,i2) /= spval) THEN
+               IF (s(i1,i2) /= spval) THEN
+                  s(i1,i2) = s(i1,i2) + var(i1,i2)
+               ELSE
+                  s(i1,i2) = var(i1,i2)
+               ENDIF
+            ENDIF
+         ENDDO
+      ENDDO
+
+   END SUBROUTINE acc_DA_hist_2d
+
+!-----------------------------------------------------------------------------
+
+   SUBROUTINE acc_DA_hist_3d (var, s)
+
+!-----------------------------------------------------------------------------
+      IMPLICIT NONE
+      real(r8), intent(in)                   :: var(:,:,:)
+      real(r8), intent(inout)                :: s  (:,:,:)
+      integer                                :: i1
+      integer                                :: i2
+      integer                                :: i3
+
+      DO i3 = lbound(var,3), ubound(var,3)
+         DO i2 = lbound(var,2), ubound(var,2)
+            DO i1 = lbound(var,1), ubound(var,1)
+               IF (var(i1,i2,i3) /= spval) THEN
+                  IF (s(i1,i2,i3) /= spval) THEN
+                     s(i1,i2,i3) = s(i1,i2,i3) + var(i1,i2,i3)
+                  ELSE
+                     s(i1,i2,i3) = var(i1,i2,i3)
+                  ENDIF
+               ENDIF
+            ENDDO
+         ENDDO
+      ENDDO
+
+   END SUBROUTINE acc_DA_hist_3d
 
 !-----------------------------------------------------------------------------
 

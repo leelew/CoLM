@@ -36,7 +36,7 @@ MODULE MOD_DA_Obs_SM
    USE MOD_Precision
    USE MOD_DA_Obs_PM
    USE MOD_DA_Obs_ANA2MTQ
-   USE MOD_DA_Vars_TimeVariables
+   USE MOD_DA_Vars_TimeVars
    USE MOD_Namelist
    USE MOD_Pixelset
    USE MOD_Vars_Global
@@ -66,6 +66,7 @@ MODULE MOD_DA_Obs_SM
       type(SM_config_type), allocatable :: cfgs(:)        ! Configuration for each observation stream
 
       logical :: use_pm = .false.                         ! Include passive microwave observations
+      logical :: use_gnos = .false.                       ! Include GNOS observations
       logical :: use_ana2mtq = .false.                    ! Include 2 m temperature and RH analysis pseudo-observations
 
       ! Observation selection and LETKF parameters.

@@ -41,7 +41,7 @@ MODULE MOD_DA_Obs_PM
    USE MOD_DataType
    USE MOD_DA_Obs_GridType
    USE MOD_DA_Operator_RTM
-   USE MOD_DA_Vars_TimeVariables
+   USE MOD_DA_Vars_TimeVars
    USE MOD_Vars_TimeInvariants
    USE MOD_Vars_1DForcing
    USE MOD_Vars_Global

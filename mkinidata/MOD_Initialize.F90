@@ -43,7 +43,7 @@ CONTAINS
    USE MOD_Vars_PFTimeVariables
 #endif
 #ifdef DataAssimilation
-   USE MOD_DA_Vars_TimeVariables
+   USE MOD_DA_Vars_TimeVars
 #endif
    USE MOD_Const_LC
    USE MOD_Const_PFT

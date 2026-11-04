@@ -29,7 +29,7 @@ MODULE MOD_DA_Main
    USE MOD_Grid_RiverLakeFlow
    USE MOD_Grid_RiverLakeNetwork
    USE MOD_Grid_RiverLakeTimeVars
-   USE MOD_DA_Vars_1DAccFluxes
+   USE MOD_DA_Vars_AccVars
    USE MOD_Grid_RiverLakeHist
 #endif
    USE MOD_DA_Assim_2MTQ

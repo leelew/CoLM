@@ -55,7 +55,7 @@ MODULE MOD_DA_Obs_SYNOP
 !-----------------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_DA_Obs_SiteType
-   USE MOD_DA_Vars_TimeVariables
+   USE MOD_DA_Vars_TimeVars
    USE MOD_Namelist
    USE MOD_Pixelset
    USE MOD_Vars_Global
