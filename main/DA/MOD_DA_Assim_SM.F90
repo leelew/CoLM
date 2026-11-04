@@ -10,7 +10,7 @@ MODULE MOD_DA_Assim_SM
    USE MOD_Precision
    USE MOD_DA_Obs_SM
    USE MOD_DA_EnKF
-   USE MOD_DA_Vars_TimeVariables
+   USE MOD_DA_Vars_TimeVars
    USE MOD_Vars_TimeInvariants
    USE MOD_Vars_Global, ONLY: pi, nl_soil, dz_soi
    USE MOD_LandPatch
@@ -21,9 +21,9 @@ MODULE MOD_DA_Assim_SM
 
    type(SM_type) :: sm
 
-   PUBLIC :: init_assim_SM
-   PUBLIC :: run_assim_SM
-   PUBLIC :: end_assim_SM
+   PUBLIC :: init_DA_SM
+   PUBLIC :: run_DA_SM
+   PUBLIC :: end_DA_SM
 
 !-----------------------------------------------------------------------------
 
@@ -31,7 +31,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE init_assim_SM ()
+   SUBROUTINE init_DA_SM ()
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -65,11 +65,11 @@ CONTAINS
 
       deallocate(configs)
 
-   END SUBROUTINE init_assim_SM
+   END SUBROUTINE init_DA_SM
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE run_assim_SM (idate, deltim)
+   SUBROUTINE run_DA_SM (idate, deltim)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -166,11 +166,11 @@ CONTAINS
       ENDIF
       CALL sm%clear()
 
-   END SUBROUTINE run_assim_SM
+   END SUBROUTINE run_DA_SM
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE end_assim_SM()
+   SUBROUTINE end_DA_SM()
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -185,7 +185,7 @@ CONTAINS
       sm%use_gnos = .false.
       sm%use_ana2mtq = .false.
 
-   END SUBROUTINE end_assim_SM
+   END SUBROUTINE end_DA_SM
 
 !-----------------------------------------------------------------------------
 END MODULE MOD_DA_Assim_SM

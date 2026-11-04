@@ -18,7 +18,7 @@ MODULE MOD_DA_Assim_ST
    USE MOD_Precision
    USE MOD_DA_Obs_ST
    USE MOD_DA_EnKF
-   USE MOD_DA_Vars_TimeVariables
+   USE MOD_DA_Vars_TimeVars
    USE MOD_Vars_TimeInvariants
    USE MOD_Vars_Global, ONLY: nl_soil
    USE MOD_LandPatch
@@ -28,9 +28,9 @@ MODULE MOD_DA_Assim_ST
 
    type(ST_type) :: st
 
-   PUBLIC :: init_assim_ST
-   PUBLIC :: run_assim_ST
-   PUBLIC :: end_assim_ST
+   PUBLIC :: init_DA_ST
+   PUBLIC :: run_DA_ST
+   PUBLIC :: end_DA_ST
 
 !-----------------------------------------------------------------------------
 
@@ -38,7 +38,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE init_assim_ST ()
+   SUBROUTINE init_DA_ST ()
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -72,11 +72,11 @@ CONTAINS
 
       deallocate(configs)
 
-   END SUBROUTINE init_assim_ST
+   END SUBROUTINE init_DA_ST
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE run_assim_ST (idate, deltim)
+   SUBROUTINE run_DA_ST (idate, deltim)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -149,11 +149,11 @@ CONTAINS
       ENDIF
       CALL st%clear()
 
-   END SUBROUTINE run_assim_ST
+   END SUBROUTINE run_DA_ST
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE end_assim_ST()
+   SUBROUTINE end_DA_ST()
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -167,7 +167,7 @@ CONTAINS
       st%pm%nsensor = 0
       st%use_pm = .false.
 
-   END SUBROUTINE end_assim_ST
+   END SUBROUTINE end_DA_ST
 
 !-----------------------------------------------------------------------------
 END MODULE MOD_DA_Assim_ST

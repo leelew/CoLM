@@ -30,7 +30,7 @@ MODULE MOD_Hist
    USE MOD_Catch_Hist
 #endif
 #ifdef DataAssimilation
-   USE MOD_DA_Vars_Hist, only: hist_DA_history_out
+   USE MOD_DA_Vars_Hist, only: save_DA_hist
 #endif
 #ifdef GridRiverLakeFlow
    USE MOD_Grid_RiverLakeHist
@@ -147,7 +147,7 @@ CONTAINS
 #ifdef DataAssimilation
    USE MOD_DA_Assim_TWS, only: fslp_k_mon
    USE MOD_Vars_Global
-   USE MOD_DA_Vars_TimeVariables
+   USE MOD_DA_Vars_TimeVars
    USE MOD_Const_Physical, only: denh2o
 #endif
 
@@ -5086,7 +5086,7 @@ ENDIF
 #endif
 
 #ifdef DataAssimilation
-         CALL hist_DA_history_out (file_hist, HistForm, itime_in_file, idate, &
+         CALL save_DA_hist (file_hist, HistForm, itime_in_file, idate, &
             sumarea, filter)
 #endif
 

@@ -29,7 +29,7 @@ MODULE MOD_DA_Main
    USE MOD_Grid_RiverLakeFlow
    USE MOD_Grid_RiverLakeNetwork
    USE MOD_Grid_RiverLakeTimeVars
-   USE MOD_DA_Vars_1DAccFluxes
+   USE MOD_DA_Vars_AccVars
    USE MOD_Grid_RiverLakeHist
 #endif
    USE MOD_DA_Assim_2MTQ
@@ -67,9 +67,9 @@ CONTAINS
       use_assim_sm   = any(DEF_DA_OBS_TARGET == 'SM' )
       use_assim_st   = any(DEF_DA_OBS_TARGET == 'ST' )
 
-      IF (use_assim_2mt .or. use_assim_2mq) CALL init_assim_2MTQ ()
-      IF (use_assim_sm) CALL init_assim_SM ()
-      IF (use_assim_st) CALL init_assim_ST ()
+      IF (use_assim_2mt .or. use_assim_2mq) CALL init_DA_2MTQ ()
+      IF (use_assim_sm) CALL init_DA_SM ()
+      IF (use_assim_st) CALL init_DA_ST ()
 
    END SUBROUTINE init_DA
 
@@ -107,10 +107,10 @@ CONTAINS
       ! Run data assimilation
       IF (.not. is_spinup .and. DEF_DA_ENS_NUM > 1) THEN
          CALL mpi_barrier (p_comm_glb, p_err)
-         IF (use_assim_2mt .or. use_assim_2mq) CALL run_assim_2MTQ (idate, deltim)
-         IF (use_assim_sm) CALL run_assim_SM (idate, deltim)
-         IF (use_assim_st) CALL run_assim_ST (idate, deltim)
-         IF (use_assim_disc) CALL run_assim_DISC (idate, deltim)
+         IF (use_assim_2mt .or. use_assim_2mq) CALL run_DA_2MTQ (idate, deltim)
+         IF (use_assim_sm) CALL run_DA_SM (idate, deltim)
+         IF (use_assim_st) CALL run_DA_ST (idate, deltim)
+         IF (use_assim_disc) CALL run_DA_DISC (idate, deltim)
       ENDIF
 
       ! Restore open-loop (if offline) or analysis (if online) to model states
@@ -127,13 +127,13 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-      IF (use_assim_2mt .or. use_assim_2mq) CALL end_assim_2MTQ ()
+      IF (use_assim_2mt .or. use_assim_2mq) CALL end_DA_2MTQ ()
       use_assim_2mt  = .false.
       use_assim_2mq  = .false.
       use_assim_disc = .false.
-      IF (use_assim_sm) CALL end_assim_SM ()
+      IF (use_assim_sm) CALL end_DA_SM ()
       use_assim_sm   = .false.
-      IF (use_assim_st) CALL end_assim_ST ()
+      IF (use_assim_st) CALL end_DA_ST ()
       use_assim_st   = .false.
 
    END SUBROUTINE end_DA

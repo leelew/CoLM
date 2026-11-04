@@ -22,14 +22,14 @@ MODULE MOD_DA_Assim_DISC
    USE MOD_Grid_RiverLakeFlow, ONLY: grid_riverlake_flow
    USE MOD_Grid_RiverLakeTimeVars, ONLY: wdsrf_ucat, veloc_riv, volresv
    USE MOD_Grid_RiverLakeHistState, ONLY: a_discharge, acctime_ucat
-   USE MOD_DA_Vars_TimeVariables, ONLY: rnof_ens, wdsrf_ucat_a, veloc_riv_a, volresv_a, &
+   USE MOD_DA_Vars_TimeVars, ONLY: rnof_ens, wdsrf_ucat_a, veloc_riv_a, volresv_a, &
       wdsrf_ucat_ol, veloc_riv_ol, volresv_ol
-   USE MOD_DA_Vars_1DAccFluxes, ONLY: &
+   USE MOD_DA_Vars_AccVars, ONLY: &
       a_discharge_ol, acctime_ucat_ol, a_discharge_a, acctime_ucat_a
 #endif
    IMPLICIT NONE
    PRIVATE
-   PUBLIC :: run_assim_DISC
+   PUBLIC :: run_DA_DISC
 
 !-----------------------------------------------------------------------------
 
@@ -37,7 +37,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE run_assim_DISC (idate, deltim)
+   SUBROUTINE run_DA_DISC (idate, deltim)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -113,7 +113,7 @@ CONTAINS
       ENDIF
 #endif
 
-   END SUBROUTINE run_assim_DISC
+   END SUBROUTINE run_DA_DISC
 
 !-----------------------------------------------------------------------------
 END MODULE MOD_DA_Assim_DISC

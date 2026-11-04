@@ -19,7 +19,7 @@ MODULE MOD_Vars_1DFluxes
    USE MOD_Urban_Vars_1DFluxes
 #endif
 #ifdef DataAssimilation
-   USE MOD_DA_Vars_TimeVariables
+   USE MOD_DA_Vars_Fluxes, only: allocate_DA_Fluxes, deallocate_DA_Fluxes
 #endif
    IMPLICIT NONE
    SAVE
@@ -199,7 +199,7 @@ CONTAINS
 #endif
 
 #ifdef DataAssimilation
-      CALL allocate_1D_DAFluxes
+      CALL allocate_DA_Fluxes
 #endif
 
    END SUBROUTINE allocate_1D_Fluxes
@@ -296,7 +296,7 @@ CONTAINS
 #endif
 
 #ifdef DataAssimilation
-      CALL deallocate_1D_DAFluxes
+      CALL deallocate_DA_Fluxes
 #endif
 
    END SUBROUTINE deallocate_1D_Fluxes

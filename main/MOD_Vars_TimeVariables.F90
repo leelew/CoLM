@@ -460,7 +460,8 @@ MODULE MOD_Vars_TimeVariables
    USE MOD_Lake_TimeVars
 #endif
 #ifdef DataAssimilation
-   USE MOD_DA_Vars_TimeVariables
+   USE MOD_DA_Vars_TimeVars, only: allocate_DA_TimeVars, deallocate_DA_TimeVars, &
+      WRITE_DA_TimeVars, READ_DA_TimeVars, check_DA_TimeVars
 #endif
 
    IMPLICIT NONE
@@ -847,7 +848,7 @@ CONTAINS
 #endif
 
 #ifdef DataAssimilation
-      CALL allocate_DATimeVariables
+      CALL allocate_DA_TimeVars
 #endif
 
    END SUBROUTINE allocate_TimeVariables
@@ -1049,7 +1050,7 @@ CONTAINS
 #endif
 
 #ifdef DataAssimilation
-      CALL deallocate_DATimeVariables
+      CALL deallocate_DA_TimeVars
 #endif
 
    END SUBROUTINE deallocate_TimeVariables
@@ -1308,7 +1309,7 @@ ENDIF
 #endif
 
 #ifdef DataAssimilation
-      CALL WRITE_DATimeVariables (idate, lc_year, site, dir_restart)
+      CALL WRITE_DA_TimeVars (idate, lc_year, site, dir_restart)
 #endif
 
    END SUBROUTINE WRITE_TimeVariables
@@ -1507,7 +1508,7 @@ ENDIF
 #endif
 
 #ifdef DataAssimilation
-      CALL READ_DATimeVariables (idate, lc_year, site, dir_restart)
+      CALL READ_DA_TimeVars (idate, lc_year, site, dir_restart)
 #endif
 
 #ifdef RangeCheck
@@ -1655,7 +1656,7 @@ ENDIF
 #endif
 
 #ifdef DataAssimilation
-      CALL check_DATimeVariables
+      CALL check_DA_TimeVars
 #endif
 
 #ifdef USEMPI

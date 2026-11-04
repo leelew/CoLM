@@ -108,6 +108,18 @@ MODULE MOD_DA_Vars_TimeVars
    real(r8), allocatable :: fh_ens           (:,:)      ! integrated heat profile function                         [-]
    real(r8), allocatable :: fq_ens           (:,:)      ! integrated moisture profile function                     [-]
 
+   real(r8), allocatable :: tref_ens_f       (:,:)      ! prior 2 m air temperature                                [K]
+   real(r8), allocatable :: tref_ens_a       (:,:)      ! posterior 2 m air temperature                            [K]
+   real(r8), allocatable :: tref_f           (:)        ! ensemble-mean prior 2 m air temperature                  [K]
+   real(r8), allocatable :: tref_a           (:)        ! ensemble-mean posterior 2 m air temperature              [K]
+   real(r8), allocatable :: qref_ens_f       (:,:)      ! prior 2 m specific humidity                              [kg/kg]
+   real(r8), allocatable :: qref_ens_a       (:,:)      ! posterior 2 m specific humidity                          [kg/kg]
+   real(r8), allocatable :: qref_f           (:)        ! ensemble-mean prior 2 m specific humidity                [kg/kg]
+   real(r8), allocatable :: qref_a           (:)        ! ensemble-mean posterior 2 m specific humidity            [kg/kg]
+   real(r8), allocatable :: rhref_ens        (:,:)      ! 2 m relative humidity                                    [-]
+   real(r8), allocatable :: rhref_ens_f      (:,:)      ! prior 2 m relative humidity                              [-]
+   real(r8), allocatable :: rhref_ens_a      (:,:)      ! posterior 2 m relative humidity                          [-]
+
 !=============================================================================
 ! ensemble forcing variables
 !=============================================================================
@@ -221,6 +233,19 @@ CONTAINS
             allocate (fh_ens                          (0:DEF_DA_ENS_NUM,numpatch)); fh_ens            (:,:) = spval
             allocate (fq_ens                          (0:DEF_DA_ENS_NUM,numpatch)); fq_ens            (:,:) = spval
 
+            ! Screen-level analysis
+            allocate (tref_ens_f                      (0:DEF_DA_ENS_NUM,numpatch)); tref_ens_f        (:,:) = spval
+            allocate (tref_ens_a                      (0:DEF_DA_ENS_NUM,numpatch)); tref_ens_a        (:,:) = spval
+            allocate (tref_f                                   (numpatch)); tref_f            (:)   = spval
+            allocate (tref_a                                   (numpatch)); tref_a            (:)   = spval
+            allocate (qref_ens_f                      (0:DEF_DA_ENS_NUM,numpatch)); qref_ens_f        (:,:) = spval
+            allocate (qref_ens_a                      (0:DEF_DA_ENS_NUM,numpatch)); qref_ens_a        (:,:) = spval
+            allocate (qref_f                                   (numpatch)); qref_f            (:)   = spval
+            allocate (qref_a                                   (numpatch)); qref_a            (:)   = spval
+            allocate (rhref_ens                       (0:DEF_DA_ENS_NUM,numpatch)); rhref_ens         (:,:) = spval
+            allocate (rhref_ens_f                     (0:DEF_DA_ENS_NUM,numpatch)); rhref_ens_f       (:,:) = spval
+            allocate (rhref_ens_a                     (0:DEF_DA_ENS_NUM,numpatch)); rhref_ens_a       (:,:) = spval
+
             ! Forcings
             allocate (forc_t_ens                      (0:DEF_DA_ENS_NUM,numpatch)); forc_t_ens        (:,:) = spval
             allocate (forc_frl_ens                    (0:DEF_DA_ENS_NUM,numpatch)); forc_frl_ens      (:,:) = spval
@@ -235,7 +260,7 @@ CONTAINS
 
       ! diagnostic
       IF (p_is_worker) THEN
-         IF (numpatch > 0) THEN 
+         IF (numpatch > 0) THEN
             IF (nsource > 0) THEN
                allocate (hx_f_ens               (nsource,DEF_DA_ENS_NUM,numpatch)); hx_f_ens        (:,:,:) = spval
                allocate (hx_a_ens               (nsource,DEF_DA_ENS_NUM,numpatch)); hx_a_ens        (:,:,:) = spval
@@ -329,6 +354,18 @@ CONTAINS
             deallocate (fm_ens                           )
             deallocate (fh_ens                           )
             deallocate (fq_ens                           )
+
+            deallocate (tref_ens_f                       )
+            deallocate (tref_ens_a                       )
+            deallocate (tref_f                           )
+            deallocate (tref_a                           )
+            deallocate (qref_ens_f                       )
+            deallocate (qref_ens_a                       )
+            deallocate (qref_f                           )
+            deallocate (qref_a                           )
+            deallocate (rhref_ens                        )
+            deallocate (rhref_ens_f                      )
+            deallocate (rhref_ens_a                      )
 
             deallocate (forc_t_ens                       )
             deallocate (forc_frl_ens                     )

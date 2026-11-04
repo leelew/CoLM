@@ -4,7 +4,7 @@
 MODULE MOD_DA_Ens
 !-----------------------------------------------------------------------
 ! DESCRIPTION:
-!    Provide procedures for ensemble generation and management in data 
+!    Provide procedures for ensemble generation and management in data
 !    assimilation, including perturbation generation, member state exchange,
 !    and analysis feedback to the model.
 !
@@ -337,7 +337,7 @@ CONTAINS
          fm_ens          (    iens,:) = fm
          fh_ens          (    iens,:) = fh
          fq_ens          (    iens,:) = fq
-         
+
          ! Surface fluxes
          taux_ens        (    iens,:) = taux
          tauy_ens        (    iens,:) = tauy
@@ -534,7 +534,7 @@ CONTAINS
 ! DESCRIPTION:
 !    Set the final model states and outputs after data assimilation.
 !
-!    When land-atmosphere feedback is enabled, apply the analysis 
+!    When land-atmosphere feedback is enabled, apply the analysis
 !    ensemble means for restart states and fluxes.
 !
 !    Otherwise, restore the open-loop trajectory for diagnostic.
@@ -544,8 +544,9 @@ CONTAINS
       IF (p_is_worker) THEN
          CALL load_member(0)
 
-         IF (DEF_DA_FEEDBACK) THEN
+         IF (DEF_DA_FEEDBACK .and. DEF_DA_ENS_NUM > 1) THEN
             ! Restart states
+
             z_sno        = sum(z_sno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2)        / DEF_DA_ENS_NUM
             dz_sno       = sum(dz_sno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2)       / DEF_DA_ENS_NUM
             t_soisno     = sum(t_soisno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2)     / DEF_DA_ENS_NUM
