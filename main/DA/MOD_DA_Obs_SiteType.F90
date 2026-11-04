@@ -12,16 +12,13 @@ MODULE MOD_DA_Obs_SiteType
 !      2. the site-to-patch mapping, built once from pixel containment and
 !         the first patch found in the containing pixel;
 !      3. the per-timestep observation vectors read from
-!         <DEF_DA_OBS_DIR>/<sensor>/<var_name>_YYYY_MM_DD_HH.nc;
-!      4. a generic gather that maps a patch-space field, for example
-!         ensemble 2 m temperature, to the observation locations.
+!         <DEF_DA_OBS_DIR>/<sensor>/<var_name>_YYYY_MM_DD_HH.nc.
 !
-!    The source-specific observation operator, for example the SYNOP
-!    observation operator, stays in its own module. It supplies the
-!    patch-space H(x) field and calls gather to obtain H(x) at sites.
+!    Source-specific modules compute H(x), extract values at the mapped
+!    patches, and share the results across MPI ranks.
 !
 !    File conventions:
-!      sites.nc                         station table with 'latitude' and
+!      sites.nc                        station table with 'latitude' and
 !                                       'longitude'
 !      <var_name>_YYYY_MM_DD_HH.nc     per-timestep observations with
 !                                       'latitude', 'longitude', 'time',
@@ -35,13 +32,13 @@ MODULE MOD_DA_Obs_SiteType
 ! +--------+----------+----------------------+-------------------------------+
 ! | Source | Variable | Assimilated state    | Example datasets              |
 ! +--------+----------+----------------------+-------------------------------+
-! | situ   | tref     | 2 m air temperature  | SYNOP 2 m air temperature     |
+! | site   | tref     | 2 m air temperature  | SYNOP 2 m air temperature     |
 ! +--------+----------+----------------------+-------------------------------+
-! | situ   | qref     | 2 m specific humidity| SYNOP 2 m relative humidity   |
+! | site   | qref     | 2 m specific humidity| SYNOP 2 m relative humidity   |
 ! +--------+----------+----------------------+-------------------------------+
-! | situ   | SM       | Soil moisture        | ISMN soil moisture            |
+! | site   | SM       | Soil moisture        | ISMN soil moisture            |
 ! +--------+----------+----------------------+-------------------------------+
-! | situ   | ST       | Soil temperature     | ISMN soil temperature         |
+! | site   | SD       | snow depth           | ISMN soil temperature         |
 ! +--------+----------+----------------------+-------------------------------+
 !
 ! HISTORY:
@@ -54,50 +51,43 @@ MODULE MOD_DA_Obs_SiteType
     USE MOD_Pixelset
     USE MOD_Pixel
     USE MOD_Mesh
-    USE MOD_LandPatch, ONLY: numpatch
-    USE MOD_Vars_Global, ONLY: spval
+    USE MOD_Vars_Global
     USE MOD_TimeManager
     IMPLICIT NONE
 
+!-----------------------------------------------------------------------------
+! Site observation derived type
+!-----------------------------------------------------------------------------
     type :: site_obs_type
 
         ! initialize once
-        character(len=16) :: source_name = ''        ! "situ"
-        character(len=32) :: sensor_name = ''        ! sensor/subdirectory name, e.g., "SYNOP"
-        character(len=16) :: var_name    = ''        ! NetCDF variable name, e.g., "tref", "qref", "SM", "ST"
+        character(len=16) :: source_name = ''              ! "site"
+        character(len=32) :: sensor_name = ''              ! e.g., "SYNOP", "SNOTEL"
+        character(len=16) :: var_name    = ''              ! NetCDF variable name, e.g., "tref", "qref"
 
         ! site table (initialize once)
-        integer :: nsite = 0                         ! number of sites in sites.nc
-        real(r8), allocatable :: site_lat(:)         ! site latitude [deg]
-        real(r8), allocatable :: site_lon(:)         ! site longitude [deg]
-        integer,  allocatable :: site_worker(:)      ! global rank owning the site, -1 if unmapped
-        integer,  allocatable :: site_patch(:)       ! local patch index owning the site, -1 if unmapped
+        integer :: nsite = 0                               ! number of sites in sites.nc
+        real(r8), allocatable :: site_lat(:)               ! site latitude [deg]
+        real(r8), allocatable :: site_lon(:)               ! site longitude [deg]
+        integer,  allocatable :: site_iworker(:)           ! global rank of worker owning the site, -1 if unmapped
+        integer,  allocatable :: site_iworker_ipatch(:)    ! local patch index on the owning worker, -1 if unmapped
 
         ! observations at this timestep
-        integer :: nobs = 0                          ! number of selected observations
-        integer,  allocatable :: isite(:)            ! row index in sites.nc for each observation
-        real(r8), allocatable :: lat(:)              ! latitude of each observation [deg]
-        real(r8), allocatable :: lon(:)              ! longitude of each observation [deg]
-        real(r8), allocatable :: time(:)             ! UTC time of each observation [s since begin of current day]
-        real(r8), allocatable :: y(:)                ! observed value
-        real(r8), allocatable :: r(:)                ! observation error standard deviation
+        integer :: nobs = 0                                ! number of selected observations
+        integer,  allocatable :: isite(:)                  ! row index in sites.nc for each observation
+        real(r8), allocatable :: lat(:)                    ! latitude of each observation [deg]
+        real(r8), allocatable :: lon(:)                    ! longitude of each observation [deg]
+        real(r8), allocatable :: time(:)                   ! UTC time of each observation [s since begin of current day]
+        real(r8), allocatable :: y(:)                      ! observed value
+        real(r8), allocatable :: r(:)                      ! observation error standard deviation
 
     CONTAINS
 
-        procedure, PUBLIC :: init   => site_obs_init   ! read sites and build site-to-patch map
-        procedure, PUBLIC :: read   => site_obs_read   ! read observations for this time step
-        procedure, PUBLIC :: gather => site_obs_gather ! map a patch-space field to site locations
-        procedure, PUBLIC :: clear  => site_obs_clear  ! clear per-timestep data (keep site table)
+        procedure, PUBLIC :: init   => site_obs_init       ! read sites and build site-to-patch map
+        procedure, PUBLIC :: read   => site_obs_read       ! read observations for this time step
+        procedure, PUBLIC :: clear  => site_obs_clear      ! clear per-timestep data (keep site table)
 
     END type site_obs_type
-
-    ! Per-pixel-latitude lists of pixel longitude indices and the patch that
-    ! contains each pixel. Used only while building the site-to-patch map.
-    type :: site_pixel_index_type
-        integer, allocatable :: ilon(:)
-        integer, allocatable :: ipatch(:)
-    END type site_pixel_index_type
-
 
 !-----------------------------------------------------------------------------
 
@@ -111,197 +101,113 @@ CONTAINS
         IMPLICIT NONE
 
 !------------------------ Dummy Arguments ------------------------------------
-        class(site_obs_type), intent(inout) :: this
-        type(pixelset_type),  intent(in)    :: pixelset
-        character(len=*),     intent(in)    :: source_name
-        character(len=*),     intent(in)    :: sensor_name
-        character(len=*),     intent(in)    :: var_name
+        class(site_obs_type), intent(inout) :: this        ! Site observation collection
+        type(pixelset_type),  intent(in)    :: pixelset    ! Local pixel sets used for site-to-patch mapping
+        character(len=*),     intent(in)    :: source_name ! Observation source name
+        character(len=*),     intent(in)    :: sensor_name ! Sensor or station network name
+        character(len=*),     intent(in)    :: var_name    ! Observation variable name
 
 !------------------------ Local Variables ------------------------------------
-        character(len=256) :: site_file_name   ! full path of the site table
-        logical :: exists_site                 ! whether the site table exists
-        integer :: i, j, np, ie, ipxl          ! loop indices
-        integer :: ipxstt, ipxend              ! local pixel range of a patch
-        integer :: ilat, ilon                  ! pixel indices of a site or patch
-        integer :: numpxl_lat, numpxl_lon      ! number of containing pixel rows and columns
-        integer, allocatable :: ilat_site(:)   ! pixel latitude index of each site, -1 if invalid
-        integer, allocatable :: ilon_site(:)   ! pixel longitude index of each site, -1 if invalid
-        integer, allocatable :: counter(:)     ! number of patches attached to each pixel row
-        integer, allocatable :: lut_worker(:)  ! global rank owning each site
-        integer, allocatable :: lut_patch(:)   ! local patch owning each site
-        type(site_pixel_index_type), allocatable :: idx(:)
+        character(len=256) :: site_file_name               ! Path to sites.nc
+        integer :: i                                       ! Site index
+        integer :: np                                      ! Local patch index
+        integer :: ie                                      ! Local mesh element index
+        integer :: ipxl                                    ! Pixel index within the mesh element
+        integer :: ipxstt                                  ! First pixel index of the patch in the mesh element
+        integer :: ipxend                                  ! Last pixel index of the patch in the mesh element
+        integer :: ilat                                    ! Latitude index in the shared pixel grid
+        integer :: ilon                                    ! Longitude index in the shared pixel grid
+        integer, allocatable :: site_pixel_ilat(:)         ! Site pixel latitude indices; -1 if not found
+        integer, allocatable :: site_pixel_ilon(:)         ! Site pixel longitude indices; -1 if not found
 
 !-----------------------------------------------------------------------------
-
+        ! Reset the site table and patch mapping.
         this%source_name = source_name
         this%sensor_name = sensor_name
         this%var_name = var_name
-
-        IF (allocated(this%site_lat))    deallocate(this%site_lat)
-        IF (allocated(this%site_lon))    deallocate(this%site_lon)
-        IF (allocated(this%site_worker)) deallocate(this%site_worker)
-        IF (allocated(this%site_patch))  deallocate(this%site_patch)
         this%nsite = 0
+        this%nobs = 0
+        IF (allocated(this%site_lat           )) deallocate(this%site_lat           )
+        IF (allocated(this%site_lon           )) deallocate(this%site_lon           )
+        IF (allocated(this%site_iworker       )) deallocate(this%site_iworker       )
+        IF (allocated(this%site_iworker_ipatch)) deallocate(this%site_iworker_ipatch)
 
+        ! Read and broadcast site coordinates.
         site_file_name = trim(DEF_DA_OBS_DIR)//'/'//trim(this%sensor_name)//'/sites.nc'
-        exists_site = .false.
-        IF (p_is_master) THEN
-            exists_site = ncio_var_exist(site_file_name, 'latitude', .false.)
-        ENDIF
-#ifdef USEMPI
-        CALL mpi_bcast (exists_site, 1, MPI_LOGICAL, p_address_master, p_comm_glb, p_err)
-#endif
-        IF (.not. exists_site) THEN
-            IF (p_is_master) WRITE (*,'(A)') '[CoLM-DA] site table not found: '//trim(site_file_name)
-            RETURN
-        ENDIF
-
-        CALL ncio_read_bcast_serial(site_file_name, 'latitude', this%site_lat)
+        CALL ncio_read_bcast_serial(site_file_name, 'latitude',  this%site_lat)
         CALL ncio_read_bcast_serial(site_file_name, 'longitude', this%site_lon)
         this%nsite = size(this%site_lat)
         IF (this%nsite == 0) RETURN
 
-        allocate (this%site_worker(this%nsite))
-        allocate (this%site_patch(this%nsite))
-        this%site_worker(:) = -1
-        this%site_patch(:) = -1
+        allocate (this%site_iworker        (this%nsite))
+        allocate (this%site_iworker_ipatch (this%nsite))
+        this%site_iworker        (:) = -1
+        this%site_iworker_ipatch (:) = -1
 
-        ! Find the pixel row and column that contain each site. A site is
-        ! usable only when it falls inside exactly one pixel row and one
-        ! pixel column.
-        allocate (ilat_site(this%nsite))
-        allocate (ilon_site(this%nsite))
-        ilat_site(:) = -1
-        ilon_site(:) = -1
+        ! Locate each site in the shared pixel grid.
+        allocate (site_pixel_ilat(this%nsite))
+        allocate (site_pixel_ilon(this%nsite))
+        site_pixel_ilat(:) = -1
+        site_pixel_ilon(:) = -1
 
         IF (p_is_master) THEN
             DO i = 1, this%nsite
-                numpxl_lat = 0
                 DO ilat = 1, pixel%nlat
                     IF (pixel%lat_s(ilat) <= this%site_lat(i) .and. &
                         pixel%lat_n(ilat) >  this%site_lat(i)) THEN
-                        numpxl_lat = numpxl_lat + 1
-                        ilat_site(i) = ilat
+                        site_pixel_ilat(i) = ilat
                     ENDIF
                 ENDDO
-                IF (numpxl_lat /= 1) ilat_site(i) = -1
 
-                numpxl_lon = 0
                 DO ilon = 1, pixel%nlon
                     IF (pixel%lon_w(ilon) <= this%site_lon(i) .and. &
                         pixel%lon_e(ilon) >  this%site_lon(i)) THEN
-                        numpxl_lon = numpxl_lon + 1
-                        ilon_site(i) = ilon
+                        site_pixel_ilon(i) = ilon
                     ENDIF
                 ENDDO
-                IF (numpxl_lon /= 1) ilon_site(i) = -1
             ENDDO
         ENDIF
 #ifdef USEMPI
-        CALL mpi_bcast (ilat_site, this%nsite, MPI_INTEGER, p_address_master, p_comm_glb, p_err)
-        CALL mpi_bcast (ilon_site, this%nsite, MPI_INTEGER, p_address_master, p_comm_glb, p_err)
+        CALL mpi_bcast (site_pixel_ilat, this%nsite, MPI_INTEGER, p_address_master, p_comm_glb, p_err)
+        CALL mpi_bcast (site_pixel_ilon, this%nsite, MPI_INTEGER, p_address_master, p_comm_glb, p_err)
 #endif
 
-        ! Build, on each worker, a list of (pixel longitude, patch) pairs for
-        ! every pixel row. This is the same lookup as the legacy SYNOP
-        ! implementation and gives the first patch in the containing pixel.
+        ! Find the first local patch containing each site's pixel.
         IF (p_is_worker .and. pixelset%nset > 0) THEN
-
-            allocate (counter(pixel%nlat))
-            counter(:) = 0
-
-            DO np = 1, pixelset%nset
-                ie = pixelset%ielm(np)
-                ipxstt = pixelset%ipxstt(np)
-                ipxend = pixelset%ipxend(np)
-
-                ! -1 means the set element covers the whole mesh element
-                IF (ipxstt == -1) THEN
-                    ipxstt = 1
-                    ipxend = mesh(ie)%npxl
-                ENDIF
-
-                DO ipxl = ipxstt, ipxend
-                    ilat = mesh(ie)%ilat(ipxl)
-                    counter(ilat) = counter(ilat) + 1
-                ENDDO
-            ENDDO
-
-            allocate (idx(pixel%nlat))
-            DO ilat = 1, pixel%nlat
-                IF (counter(ilat) > 0) THEN
-                    allocate (idx(ilat)%ilon(counter(ilat)))
-                    allocate (idx(ilat)%ipatch(counter(ilat)))
-                ENDIF
-            ENDDO
-
-            counter(:) = 0
-            DO np = 1, pixelset%nset
-                ie = pixelset%ielm(np)
-                ipxstt = pixelset%ipxstt(np)
-                ipxend = pixelset%ipxend(np)
-
-                IF (ipxstt == -1) THEN
-                    ipxstt = 1
-                    ipxend = mesh(ie)%npxl
-                ENDIF
-
-                DO ipxl = ipxstt, ipxend
-                    ilat = mesh(ie)%ilat(ipxl)
-                    ilon = mesh(ie)%ilon(ipxl)
-                    counter(ilat) = counter(ilat) + 1
-                    idx(ilat)%ilon(counter(ilat)) = ilon
-                    idx(ilat)%ipatch(counter(ilat)) = np
-                ENDDO
-            ENDDO
-
-            ! First patch whose pixel longitude matches the site pixel.
             DO i = 1, this%nsite
-                ilat = ilat_site(i)
-                ilon = ilon_site(i)
-                IF (ilat < 1 .or. ilon < 1) CYCLE
-                IF (.not. allocated(idx(ilat)%ilon)) CYCLE
+                IF (site_pixel_ilat(i) < 1 .or. site_pixel_ilon(i) < 1) CYCLE
 
-                DO j = 1, size(idx(ilat)%ilon)
-                    IF (idx(ilat)%ilon(j) == ilon) THEN
-                        this%site_worker(i) = p_iam_glb
-                        this%site_patch(i)  = idx(ilat)%ipatch(j)
-                        EXIT
+                patch_loop: DO np = 1, pixelset%nset
+                    ie = pixelset%ielm(np)
+                    ipxstt = pixelset%ipxstt(np)
+                    ipxend = pixelset%ipxend(np)
+
+                    IF (ipxstt == -1) THEN
+                        ipxstt = 1
+                        ipxend = mesh(ie)%npxl
                     ENDIF
-                ENDDO
-            ENDDO
 
-            deallocate (counter)
-            DO ilat = 1, pixel%nlat
-                IF (allocated(idx(ilat)%ilon))   deallocate(idx(ilat)%ilon)
-                IF (allocated(idx(ilat)%ipatch)) deallocate(idx(ilat)%ipatch)
-            ENDDO
-            deallocate (idx)
+                    DO ipxl = ipxstt, ipxend
+                        IF (mesh(ie)%ilat(ipxl) /= site_pixel_ilat(i)) CYCLE
+                        IF (mesh(ie)%ilon(ipxl) /= site_pixel_ilon(i)) CYCLE
 
+                        this%site_iworker(i)        = p_iam_glb
+                        this%site_iworker_ipatch(i) = np
+                        EXIT patch_loop
+                    ENDDO
+                ENDDO patch_loop
+            ENDDO
         ENDIF
 
-        ! Combine worker-local maps into one global site-to-patch table.
-        ! A site belongs to at most one worker, so MPI_MAX selects the owner.
-        allocate (lut_worker(this%nsite))
-        allocate (lut_patch(this%nsite))
-        lut_worker(:) = this%site_worker(:)
-        lut_patch(:)  = this%site_patch(:)
+        ! Share the site-to-patch mapping across all ranks.
 #ifdef USEMPI
-        CALL mpi_allreduce (MPI_IN_PLACE, lut_worker, this%nsite, MPI_INTEGER, &
+        CALL mpi_allreduce (MPI_IN_PLACE, this%site_iworker, this%nsite, MPI_INTEGER, &
             MPI_MAX, p_comm_glb, p_err)
-        CALL mpi_allreduce (MPI_IN_PLACE, lut_patch, this%nsite, MPI_INTEGER, &
+        CALL mpi_allreduce (MPI_IN_PLACE, this%site_iworker_ipatch, this%nsite, MPI_INTEGER, &
             MPI_MAX, p_comm_glb, p_err)
 #endif
-        this%site_worker(:) = lut_worker(:)
-        this%site_patch(:)  = lut_patch(:)
+        deallocate (site_pixel_ilat, site_pixel_ilon)
 
-        deallocate (lut_worker, lut_patch, ilat_site, ilon_site)
-
-        IF (p_is_master) THEN
-            WRITE (*,'(A,I0,A,I0,A)') '[CoLM-DA] sites: ', this%nsite, &
-                ', mapped: ', count(this%site_worker >= 0), &
-                ' ('//trim(site_file_name)//')'
-        ENDIF
 
     END SUBROUTINE site_obs_init
 
@@ -320,7 +226,6 @@ CONTAINS
         IF (allocated(this%time))  deallocate(this%time)
         IF (allocated(this%y))     deallocate(this%y)
         IF (allocated(this%r))     deallocate(this%r)
-
         this%nobs = 0
 
     END SUBROUTINE site_obs_clear
@@ -338,23 +243,22 @@ CONTAINS
         real(r8),             intent(in)    :: deltim
 
 !------------------------ Local Variables ------------------------------------
-        logical :: exists_file                 ! whether the expected obs file exists
-        integer :: i                           ! loop index
-        integer :: sdate(3)                    ! timestep start time adjusted to the beginning of step
-        integer :: month, mday, hour           ! calendar month, day of month, and UTC hour
-        character(len=4)   :: yearstr          ! YYYY string for file name
-        character(len=2)   :: monthstr         ! MM string for file name
-        character(len=2)   :: daystr           ! DD string for file name
-        character(len=2)   :: hourstr          ! HH string for file name
-        character(len=256) :: obs_file_name    ! full path of current timestep obs file
-        real(r8), allocatable :: lat(:)        ! raw obs latitudes read from file [deg]
-        real(r8), allocatable :: lon(:)        ! raw obs longitudes read from file [deg]
-        real(r8), allocatable :: time(:)       ! raw obs times read from file [s since current UTC day]
-        real(r8), allocatable :: y(:)          ! raw obs values for var
-        real(r8), allocatable :: r(:)          ! raw obs error standard deviation for var
-        integer,  allocatable :: id(:)         ! raw site row indices in sites.nc
-        logical,  allocatable :: valid(:)      ! full-length mask for selected observations
-        character(len=512) :: logmsg           ! log message buffer
+        logical :: exists_file                             ! whether the expected obs file exists
+        integer :: i                                       ! loop index
+        integer :: sdate(3)                                ! timestep start time adjusted to the beginning of step
+        integer :: month, mday, hour                       ! calendar month, day of month, and UTC hour
+        character(len=4)   :: yearstr                      ! YYYY string for file name
+        character(len=2)   :: monthstr                     ! MM string for file name
+        character(len=2)   :: daystr                       ! DD string for file name
+        character(len=2)   :: hourstr                      ! HH string for file name
+        character(len=256) :: obs_file_name                ! full path of current timestep obs file
+        real(r8), allocatable :: lat(:)                    ! raw obs latitudes read from file [deg]
+        real(r8), allocatable :: lon(:)                    ! raw obs longitudes read from file [deg]
+        real(r8), allocatable :: time(:)                   ! raw obs times read from file [s since current UTC day]
+        real(r8), allocatable :: y(:)                      ! raw obs values for var
+        real(r8), allocatable :: r(:)                      ! raw obs error standard deviation for var
+        integer,  allocatable :: id(:)                     ! raw site row indices in sites.nc
+        logical,  allocatable :: valid(:)                  ! full-length mask for selected observations
 
 !-----------------------------------------------------------------------------
 
@@ -362,7 +266,6 @@ CONTAINS
 
         IF (this%nsite == 0) RETURN
 
-        ! UTC begin time of the current DA window
         sdate = idate
         CALL backtime(deltim, sdate)
         CALL adj2begin(sdate)
@@ -395,10 +298,9 @@ CONTAINS
                     id   >= 1                 .and. &
                     id   <= this%nsite
 
-            ! drop sites that are not mapped to any local patch
             DO i = 1, size(valid)
                 IF (valid(i)) THEN
-                    valid(i) = this%site_worker(id(i)) >= 0
+                    valid(i) = this%site_iworker(id(i)) >= 0
                 ENDIF
             ENDDO
 
@@ -428,76 +330,16 @@ CONTAINS
             IF (allocated(id   )) deallocate(id   )
         ENDIF
 
-        write (logmsg,'(A,A,A,L1,A,I0)') 'site obs file=', trim(obs_file_name), &
-            ' exists=', exists_file, ' selected_nobs=', this%nobs
-        IF (p_is_master) WRITE (*,'(A)') '[CoLM-DA] '//trim(logmsg)
-
-    END SUBROUTINE site_obs_read
-
-!-----------------------------------------------------------------------------
-
-    SUBROUTINE site_obs_gather (this, hx_pset, hx)
-
-!-----------------------------------------------------------------------------
-! Map a patch-space field to the observation locations.
-!
-! This is a collective operation: every MPI rank must call it. It returns the
-! same global (nobs,0:ens) array on all ranks. Observations whose site is not
-! owned by any worker, or whose patch falls outside the local patch range,
-! are set to spval.
-!-----------------------------------------------------------------------------
-        IMPLICIT NONE
-
-!------------------------ Dummy Arguments ------------------------------------
-        class(site_obs_type),  intent(inout) :: this
-        real(r8), allocatable, intent(in)    :: hx_pset(:,:)  ! H(x) on patches [0:ens, patch]
-        real(r8), allocatable, intent(out)   :: hx(:,:)       ! H(x) at obs [nobs, 0:ens]
-
-!------------------------ Local Variables ------------------------------------
-        integer :: iobs, isite, np
-        integer :: nens
-        integer, allocatable :: owner(:)       ! number of ranks that filled each obs
-
-!-----------------------------------------------------------------------------
-
-        nens = DEF_DA_ENS_NUM
-        allocate (hx(this%nobs, 0:nens))
-        hx(:,:) = spval
-        IF (this%nobs == 0) RETURN
-
-        allocate (owner(this%nobs))
-        owner(:) = 0
-        hx(:,:) = 0.0_r8
-
-        IF (p_is_worker .and. numpatch > 0 .and. allocated(hx_pset)) THEN
-            IF (size(hx_pset, 2) >= numpatch) THEN
-                DO iobs = 1, this%nobs
-                    isite = this%isite(iobs)
-                    IF (this%site_worker(isite) == p_iam_glb) THEN
-                        np = this%site_patch(isite)
-                        IF (np >= 1 .and. np <= numpatch) THEN
-                            hx(iobs, 0:nens) = hx_pset(0:nens, np)
-                            owner(iobs) = 1
-                        ENDIF
-                    ENDIF
-                ENDDO
+        IF (p_is_master) THEN
+            IF (exists_file) THEN
+                WRITE (*,'(A,I0,2A)') '[DA] Selected ', this%nobs, &
+                    ' observations from ', trim(obs_file_name)
+            ELSE
+                WRITE (*,'(2A)') '[DA] Observation file not found: ', trim(obs_file_name)
             ENDIF
         ENDIF
 
-#ifdef USEMPI
-        CALL mpi_allreduce (MPI_IN_PLACE, hx, this%nobs*(nens+1), MPI_REAL8, &
-            MPI_SUM, p_comm_glb, p_err)
-        CALL mpi_allreduce (MPI_IN_PLACE, owner, this%nobs, MPI_INTEGER, &
-            MPI_SUM, p_comm_glb, p_err)
-#endif
-
-        DO iobs = 1, this%nobs
-            IF (owner(iobs) /= 1) hx(iobs, 0:nens) = spval
-        ENDDO
-
-        deallocate (owner)
-
-    END SUBROUTINE site_obs_gather
+    END SUBROUTINE site_obs_read
 
 !-----------------------------------------------------------------------------
 END MODULE MOD_DA_Obs_SiteType

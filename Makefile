@@ -314,6 +314,7 @@ OBJS_MAIN = \
 				MOD_DA_Obs_SM.o                           \
 				MOD_DA_Obs_ST.o                           \
 				MOD_DA_Obs_SYNOP.o                        \
+				MOD_DA_Obs_2MTQ.o                         \
 				MOD_DA_Assim_2MTQ.o                       \
 				MOD_DA_Assim_SM.o                         \
 				MOD_DA_Assim_ST.o                         \
@@ -403,6 +404,12 @@ MOD_Grid_RiverLakeHistRoute.o: MOD_Grid_RiverLakeHistShard.o MOD_Grid_Reservoir.
 MOD_Grid_RiverLakeTimeVars.o: MOD_Grid_RiverLakeBifurcation.o MOD_Grid_RiverLakeLevee.o
 MOD_Vars_TimeVariables.o: MOD_Grid_RiverLakeTimeVars.o
 MOD_Grid_RiverLakeFlow.o: MOD_Grid_RiverLakeHist.o
+
+# SYNOP analysis products are consumed by ANA2MTQ.
+MOD_DA_Obs_SYNOP.o: MOD_DA_Obs_SiteType.o
+MOD_DA_Obs_2MTQ.o: MOD_DA_Obs_SYNOP.o
+MOD_DA_Assim_2MTQ.o: MOD_DA_Obs_2MTQ.o MOD_DA_EnKF.o
+MOD_DA_Obs_ANA2MTQ.o: MOD_DA_Assim_2MTQ.o MOD_DA_Obs_PseudoType.o
 
 OBJS_MAIN_T = $(addprefix .bld/,${OBJS_MAIN})
 

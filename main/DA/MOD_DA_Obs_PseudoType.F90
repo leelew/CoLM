@@ -106,13 +106,15 @@ CONTAINS
          allocate(valid(numpatch), y_f(numpatch), y_a(numpatch))
          valid = .false.
 
-         DO np = 1, numpatch
-            IF (patchtype(np) >= 3) CYCLE
-            IF (any(hx_ens_f == spval) .or. any(hx_ens_a == spval)) CYCLE
-            y_f(np) = sum(hx_ens_f(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
-            y_a(np) = sum(hx_ens_a(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
-            valid(np) = y_a(np) /= y_f(np)
-         ENDDO
+         IF (allocated(hx_ens_f) .and. allocated(hx_ens_a)) THEN
+            DO np = 1, numpatch
+               IF (patchtype(np) >= 3) CYCLE
+               IF (any(hx_ens_f == spval) .or. any(hx_ens_a == spval)) CYCLE
+               y_f(np) = sum(hx_ens_f(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
+               y_a(np) = sum(hx_ens_a(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
+               valid(np) = y_a(np) /= y_f(np)
+            ENDDO
+         ENDIF
 
          nlocal = count(valid)
       ENDIF
@@ -142,8 +144,6 @@ CONTAINS
       CALL mpi_gather(nlocal, 1, MPI_INTEGER, counts, 1, MPI_INTEGER, p_address_master, p_comm_glb, p_err)
       IF (p_is_master) this%nobs = sum(counts)
       CALL mpi_bcast(this%nobs, 1, MPI_INTEGER, p_address_master, p_comm_glb, p_err)
-      IF (p_is_master) WRITE (*,'(A,I0)') &
-         '[CoLM-DA] pseudo observations selected: ', this%nobs
       IF (this%nobs == 0) RETURN
 
       ! Compute receive offsets in patch units and allocate receive buffers.

@@ -14,6 +14,7 @@ MODULE MOD_DA_Vars_AccVars
 !
 ! AUTHOR:
 !    Zhilong Fan, 10/2026
+!    Lu Li, Zhilong Fan, 11/2026: DA v1.0
 !-----------------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_Vars_Global
@@ -31,7 +32,6 @@ MODULE MOD_DA_Vars_AccVars
    PUBLIC :: deallocate_DA_AccVars
    PUBLIC :: flush_DA_AccVars
    PUBLIC :: accumulate_DA_AccVars
-   PUBLIC :: acc_DA_hist
 
    INTERFACE acc_DA_hist
       MODULE PROCEDURE acc_DA_hist_2d
@@ -41,23 +41,23 @@ MODULE MOD_DA_Vars_AccVars
 !=============================================================================
 ! diagnostic sample sums for history output
 !=============================================================================
-   real(r8), allocatable :: a_hx_ol           (:,:  )   ! sum of open-loop H(x)                                    [varies]
-   real(r8), allocatable :: a_hx_f_ens        (:,:,:)   ! sum of forecast H(x) for each ensemble member            [varies]
-   real(r8), allocatable :: a_hx_a_ens        (:,:,:)   ! sum of analysis H(x) for each ensemble member            [varies]
-   real(r8), allocatable :: a_hx_f            (:,:  )   ! sum of ensemble-mean forecast H(x)                       [varies]
-   real(r8), allocatable :: a_hx_a            (:,:  )   ! sum of ensemble-mean analysis H(x)                       [varies]
-   real(r8), allocatable :: a_wliq_soisno_ol  (:,:  )   ! sum of open-loop layer liquid water                      [kg/m2]
-   real(r8), allocatable :: a_wliq_soisno_f   (:,:  )   ! sum of ensemble-mean forecast layer liquid water         [kg/m2]
-   real(r8), allocatable :: a_wliq_soisno_a   (:,:  )   ! sum of ensemble-mean analysis layer liquid water         [kg/m2]
-   real(r8), allocatable :: a_wliq_soisno_ens (:,:,:)   ! sum of layer liquid water for each ensemble member       [kg/m2]
-   real(r8), allocatable :: a_t_soisno_ol     (:,:  )   ! sum of open-loop layer temperature                       [K]
-   real(r8), allocatable :: a_t_soisno_f      (:,:  )   ! sum of ensemble-mean forecast layer temperature          [K]
-   real(r8), allocatable :: a_t_soisno_a      (:,:  )   ! sum of ensemble-mean analysis layer temperature          [K]
+   real(r8), allocatable :: a_hx_ol           (  :,:)  ! sum of open-loop H(x)                                    [varies]
+   real(r8), allocatable :: a_hx_f_ens        (:,:,:)  ! sum of forecast H(x) for each ensemble member            [varies]
+   real(r8), allocatable :: a_hx_a_ens        (:,:,:)  ! sum of analysis H(x) for each ensemble member            [varies]
+   real(r8), allocatable :: a_hx_f            (  :,:)  ! sum of ensemble-mean forecast H(x)                       [varies]
+   real(r8), allocatable :: a_hx_a            (  :,:)  ! sum of ensemble-mean analysis H(x)                       [varies]
+   real(r8), allocatable :: a_wliq_soisno_ol  (  :,:)  ! sum of open-loop layer liquid water                      [kg/m2]
+   real(r8), allocatable :: a_wliq_soisno_f   (  :,:)  ! sum of ensemble-mean forecast layer liquid water         [kg/m2]
+   real(r8), allocatable :: a_wliq_soisno_a   (  :,:)  ! sum of ensemble-mean analysis layer liquid water         [kg/m2]
+   real(r8), allocatable :: a_wliq_soisno_ens (:,:,:)  ! sum of layer liquid water for each ensemble member       [kg/m2]
+   real(r8), allocatable :: a_t_soisno_ol     (  :,:)  ! sum of open-loop layer temperature                       [K]
+   real(r8), allocatable :: a_t_soisno_f      (  :,:)  ! sum of ensemble-mean forecast layer temperature          [K]
+   real(r8), allocatable :: a_t_soisno_a      (  :,:)  ! sum of ensemble-mean analysis layer temperature          [K]
 #ifdef GridRiverLakeFlow
-   real(r8), allocatable :: a_discharge_ol    (:    )   ! backup of the ordinary discharge integral                [m3]
-   real(r8), allocatable :: acctime_ucat_ol   (:    )   ! backup of the ordinary routing duration                  [s]
-   real(r8), allocatable :: a_discharge_a     (:    )   ! analysis discharge integral over the output interval     [m3]
-   real(r8), allocatable :: acctime_ucat_a    (:    )   ! analysis routing duration over the output interval       [s]
+   real(r8), allocatable :: a_discharge_ol    (    :)  ! backup of the ordinary discharge integral                [m3]
+   real(r8), allocatable :: acctime_ucat_ol   (    :)  ! backup of the ordinary routing duration                  [s]
+   real(r8), allocatable :: a_discharge_a     (    :)  ! analysis discharge integral over the output interval     [m3]
+   real(r8), allocatable :: acctime_ucat_a    (    :)  ! analysis routing duration over the output interval       [s]
 #endif
 
 !-----------------------------------------------------------------------------
@@ -81,26 +81,26 @@ CONTAINS
       IF (p_is_worker) THEN
          IF (numpatch > 0) THEN
             IF (nsource > 0) THEN
-               allocate (a_hx_ol           (        nsource,                numpatch))
-               allocate (a_hx_f_ens        (        nsource, DEF_DA_ENS_NUM,numpatch))
-               allocate (a_hx_a_ens        (        nsource, DEF_DA_ENS_NUM,numpatch))
-               allocate (a_hx_f            (        nsource,                numpatch))
-               allocate (a_hx_a            (        nsource,                numpatch))
+               allocate (a_hx_ol        (                          nsource,numpatch))
+               allocate (a_hx_f_ens     (         nsource,  DEF_DA_ENS_NUM,numpatch))
+               allocate (a_hx_a_ens     (         nsource,  DEF_DA_ENS_NUM,numpatch))
+               allocate (a_hx_f         (                          nsource,numpatch))
+               allocate (a_hx_a         (                          nsource,numpatch))
             ENDIF
-            allocate (a_wliq_soisno_ol  (  maxsnl+1:nl_soil,                numpatch))
-            allocate (a_wliq_soisno_f   (  maxsnl+1:nl_soil,                numpatch))
-            allocate (a_wliq_soisno_a   (  maxsnl+1:nl_soil,                numpatch))
-            allocate (a_wliq_soisno_ens (  maxsnl+1:nl_soil, DEF_DA_ENS_NUM,numpatch))
-            allocate (a_t_soisno_ol     (  maxsnl+1:nl_soil,                numpatch))
-            allocate (a_t_soisno_f      (  maxsnl+1:nl_soil,                numpatch))
-            allocate (a_t_soisno_a      (  maxsnl+1:nl_soil,                numpatch))
+            allocate (a_wliq_soisno_ol  (                 maxsnl+1:nl_soil,numpatch))
+            allocate (a_wliq_soisno_f   (                 maxsnl+1:nl_soil,numpatch))
+            allocate (a_wliq_soisno_a   (                 maxsnl+1:nl_soil,numpatch))
+            allocate (a_wliq_soisno_ens (maxsnl+1:nl_soil,  DEF_DA_ENS_NUM,numpatch))
+            allocate (a_t_soisno_ol     (                 maxsnl+1:nl_soil,numpatch))
+            allocate (a_t_soisno_f      (                 maxsnl+1:nl_soil,numpatch))
+            allocate (a_t_soisno_a      (                 maxsnl+1:nl_soil,numpatch))
          ENDIF
 #ifdef GridRiverLakeFlow
          IF (numucat > 0) THEN
-            allocate (a_discharge_ol    (numucat))
-            allocate (acctime_ucat_ol   (numucat))
-            allocate (a_discharge_a     (numucat))
-            allocate (acctime_ucat_a    (numucat))
+            allocate (a_discharge_ol    (                                   numucat))
+            allocate (acctime_ucat_ol   (                                   numucat))
+            allocate (a_discharge_a     (                                   numucat))
+            allocate (acctime_ucat_a    (                                   numucat))
          ENDIF
 #endif
       ENDIF
@@ -130,10 +130,10 @@ CONTAINS
             IF (allocated(a_t_soisno_a     )) deallocate (a_t_soisno_a     )
          ENDIF
 #ifdef GridRiverLakeFlow
-         IF (allocated(a_discharge_ol   )) deallocate (a_discharge_ol   )
-         IF (allocated(acctime_ucat_ol  )) deallocate (acctime_ucat_ol  )
-         IF (allocated(a_discharge_a    )) deallocate (a_discharge_a    )
-         IF (allocated(acctime_ucat_a   )) deallocate (acctime_ucat_a   )
+         IF (allocated(a_discharge_ol      )) deallocate (a_discharge_ol   )
+         IF (allocated(acctime_ucat_ol     )) deallocate (acctime_ucat_ol  )
+         IF (allocated(a_discharge_a       )) deallocate (a_discharge_a    )
+         IF (allocated(acctime_ucat_a      )) deallocate (acctime_ucat_a   )
 #endif
       ENDIF
 
@@ -148,24 +148,24 @@ CONTAINS
 
       IF (p_is_worker) THEN
          IF (numpatch > 0) THEN
-            IF (allocated(a_hx_ol          )) a_hx_ol           (:,:  ) = spval
+            IF (allocated(a_hx_ol          )) a_hx_ol           (  :,:) = spval
             IF (allocated(a_hx_f_ens       )) a_hx_f_ens        (:,:,:) = spval
             IF (allocated(a_hx_a_ens       )) a_hx_a_ens        (:,:,:) = spval
-            IF (allocated(a_hx_f           )) a_hx_f            (:,:  ) = spval
-            IF (allocated(a_hx_a           )) a_hx_a            (:,:  ) = spval
-            a_wliq_soisno_ol  (:,:  ) = spval
-            a_wliq_soisno_f   (:,:  ) = spval
-            a_wliq_soisno_a   (:,:  ) = spval
-            a_wliq_soisno_ens (:,:,:) = spval
-            a_t_soisno_ol     (:,:  ) = spval
-            a_t_soisno_f      (:,:  ) = spval
-            a_t_soisno_a      (:,:  ) = spval
+            IF (allocated(a_hx_f           )) a_hx_f            (  :,:) = spval
+            IF (allocated(a_hx_a           )) a_hx_a            (  :,:) = spval
+            IF (allocated(a_wliq_soisno_ol )) a_wliq_soisno_ol  (  :,:) = spval
+            IF (allocated(a_wliq_soisno_f  )) a_wliq_soisno_f   (  :,:) = spval
+            IF (allocated(a_wliq_soisno_a  )) a_wliq_soisno_a   (  :,:) = spval
+            IF (allocated(a_wliq_soisno_ens)) a_wliq_soisno_ens (:,:,:) = spval
+            IF (allocated(a_t_soisno_ol    )) a_t_soisno_ol     (  :,:) = spval
+            IF (allocated(a_t_soisno_f     )) a_t_soisno_f      (  :,:) = spval
+            IF (allocated(a_t_soisno_a     )) a_t_soisno_a      (  :,:) = spval
          ENDIF
 #ifdef GridRiverLakeFlow
-         IF (allocated(a_discharge_ol   )) a_discharge_ol    (:    ) = spval
-         IF (allocated(acctime_ucat_ol  )) acctime_ucat_ol   (:    ) = spval
-         IF (allocated(a_discharge_a    )) a_discharge_a     (:    ) = 0.
-         IF (allocated(acctime_ucat_a   )) acctime_ucat_a    (:    ) = 0.
+         IF (allocated(a_discharge_ol      )) a_discharge_ol    (    :) = spval
+         IF (allocated(acctime_ucat_ol     )) acctime_ucat_ol   (    :) = spval
+         IF (allocated(a_discharge_a       )) a_discharge_a     (    :) = spval
+         IF (allocated(acctime_ucat_a      )) acctime_ucat_a    (    :) = spval
 #endif
       ENDIF
 
@@ -179,32 +179,54 @@ CONTAINS
       IMPLICIT NONE
 
       IF (allocated(hx_f_ens) .and. allocated(a_hx_f_ens)) THEN
-         CALL acc_DA_hist (hx_ol                                   , a_hx_ol          )
-         CALL acc_DA_hist (hx_f_ens                                , a_hx_f_ens       )
-         CALL acc_DA_hist (hx_a_ens                                , a_hx_a_ens       )
-         CALL acc_DA_hist (hx_f                                    , a_hx_f           )
-         CALL acc_DA_hist (hx_a                                    , a_hx_a           )
+         CALL acc_DA_hist (hx_ol                              , a_hx_ol          )
+         CALL acc_DA_hist (hx_f_ens                           , a_hx_f_ens       )
+         CALL acc_DA_hist (hx_a_ens                           , a_hx_a_ens       )
+         CALL acc_DA_hist (hx_f                               , a_hx_f           )
+         CALL acc_DA_hist (hx_a                               , a_hx_a           )
       ENDIF
-      CALL acc_DA_hist (wliq_soisno_ol                             , a_wliq_soisno_ol )
-      CALL acc_DA_hist (wliq_soisno_f                              , a_wliq_soisno_f  )
-      CALL acc_DA_hist (wliq_soisno_a                              , a_wliq_soisno_a  )
-      CALL acc_DA_hist (wliq_soisno_ens(:,1:DEF_DA_ENS_NUM,:)      , a_wliq_soisno_ens)
-      CALL acc_DA_hist (t_soisno_ol                                , a_t_soisno_ol    )
-      CALL acc_DA_hist (t_soisno_f                                 , a_t_soisno_f     )
-      CALL acc_DA_hist (t_soisno_a                                 , a_t_soisno_a     )
+      CALL acc_DA_hist (wliq_soisno_ol                        , a_wliq_soisno_ol )
+      CALL acc_DA_hist (wliq_soisno_f                         , a_wliq_soisno_f  )
+      CALL acc_DA_hist (wliq_soisno_a                         , a_wliq_soisno_a  )
+      CALL acc_DA_hist (wliq_soisno_ens(:,1:DEF_DA_ENS_NUM,:) , a_wliq_soisno_ens)
+      CALL acc_DA_hist (t_soisno_ol                           , a_t_soisno_ol    )
+      CALL acc_DA_hist (t_soisno_f                            , a_t_soisno_f     )
+      CALL acc_DA_hist (t_soisno_a                            , a_t_soisno_a     )
 
    END SUBROUTINE accumulate_DA_AccVars
 
+
+
+
+
+
+
+
+
+
+
+!-----------------------------------------------------------------------------
+! WARNING (duplicated codes):
+!   Keep DA history definitions, accumulation, and output within DA modules
+!   without modifying the core model. Necessary utilities are included here
+!   to avoid circular module dependencies.
+!
+!   Remove these copies once the core utilities are moved to an independent
+!   module that DA can use directly.
 !-----------------------------------------------------------------------------
 
    SUBROUTINE acc_DA_hist_2d (var, s)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
-      real(r8), intent(in)                   :: var(:,:)
-      real(r8), intent(inout)                :: s  (:,:)
-      integer                                :: i1
-      integer                                :: i2
+
+      real(r8), intent(in)    :: var (  :,:)           
+      real(r8), intent(inout) :: s   (  :,:)           
+
+      integer :: i1                                   
+      integer :: i2                                 
+
+!-----------------------------------------------------------------------------
 
       DO i2 = lbound(var,2), ubound(var,2)
          DO i1 = lbound(var,1), ubound(var,1)
@@ -226,11 +248,15 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
-      real(r8), intent(in)                   :: var(:,:,:)
-      real(r8), intent(inout)                :: s  (:,:,:)
-      integer                                :: i1
-      integer                                :: i2
-      integer                                :: i3
+
+      real(r8), intent(in)    :: var (:,:,:)          
+      real(r8), intent(inout) :: s   (:,:,:)           
+
+      integer :: i1                                    
+      integer :: i2                                   
+      integer :: i3                                  
+
+!-----------------------------------------------------------------------------
 
       DO i3 = lbound(var,3), ubound(var,3)
          DO i2 = lbound(var,2), ubound(var,2)
@@ -249,6 +275,5 @@ CONTAINS
    END SUBROUTINE acc_DA_hist_3d
 
 !-----------------------------------------------------------------------------
-
 END MODULE MOD_DA_Vars_AccVars
 #endif

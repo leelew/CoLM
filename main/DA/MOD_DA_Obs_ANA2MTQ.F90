@@ -12,9 +12,9 @@ MODULE MOD_DA_Obs_ANA2MTQ
 !    Lu Li, 10/2026: First operational version
 !-----------------------------------------------------------------------------
    USE MOD_Precision
-   USE MOD_DA_Obs_PseudoType
    USE MOD_Namelist
-   USE MOD_DA_Vars_TimeVars
+   USE MOD_DA_Obs_PseudoType
+   USE MOD_DA_Assim_2MTQ
    IMPLICIT NONE
 
 !-----------------------------------------------------------------------------
@@ -30,11 +30,11 @@ MODULE MOD_DA_Obs_ANA2MTQ
 
       ! Combined records available on all ranks for land-surface assimilation.
       integer :: nobs = 0                                 ! Total record count: tref%nobs + rhref%nobs
-      real(r8), allocatable :: lat(:)                     ! Patch latitudes [nobs], degrees north
-      real(r8), allocatable :: lon(:)                     ! Patch longitudes [nobs], degrees east in [-180, 180)
-      real(r8), allocatable :: y(:)                       ! Analysis ensemble means [nobs]; K for T, fraction for RH
-      real(r8), allocatable :: r(:)                       ! Error variances [nobs]; K^2 for T, fraction squared for RH
-      real(r8), allocatable :: hx(:,:)                    ! Forecast values [nobs, DEF_DA_ENS_NUM]; same units as y
+      real(r8), allocatable :: lat(:)                     ! Patch latitudes [nobs]
+      real(r8), allocatable :: lon(:)                     ! Patch longitudes [nobs]
+      real(r8), allocatable :: y(:)                       ! Analysis ensemble means [nobs]
+      real(r8), allocatable :: r(:)                       ! Error variances [nobs]
+      real(r8), allocatable :: hx(:,:)                    ! Forecast values [nobs, nens]
 
    CONTAINS
 

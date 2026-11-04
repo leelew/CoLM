@@ -18,6 +18,7 @@ MODULE MOD_DA_Operator_Const
 !
 ! AUTHOR:
 !   Lu Li, 12/2024: Initial version
+!   Lu Li, Zhilong Fan, 11/2026: DA v1.0
 !-----------------------------------------------------------------------
 
    USE MOD_Precision
@@ -42,24 +43,24 @@ MODULE MOD_DA_Operator_Const
 
    ! MODIS IGBP Land Use/Land Cover System Legend
    !---------------------------
-   ! 0  Ocean                               !  海洋
-   ! 1  Evergreen Needleleaf Forests        !  常绿针叶林
-   ! 2  Evergreen Broadleaf Forests         !  常绿阔叶林
-   ! 3  Deciduous Needleleaf Forests        !  落叶针叶林
-   ! 4  Deciduous Broadleaf Forests         !  落叶阔叶林
-   ! 5  Mixed Forests                       !  混交林
-   ! 6  Closed Shrublands                   !  密闭灌丛
-   ! 7  Open Shrublands                     !  稀疏灌丛
-   ! 8  Woody Savannas                      !  木本稀树草原
-   ! 9  Savannas                            !  稀树草原
-   !10  Grasslands                          !  草地
-   !11  Permanent Wetlands                  !  永久性湿地
-   !12  Croplands                           !  农田
-   !13  Urban and Built-up Lands            !  城市与建成区
-   !14  Cropland/Natural Vegetation Mosaics !  农田-自然植被镶嵌区
-   !15  Permanent Snow and Ice              !  永久冰雪
-   !16  Barren                              !  裸地
-   !17  Water Bodies                        !  水体
+   ! 0  Ocean                               
+   ! 1  Evergreen Needleleaf Forests        
+   ! 2  Evergreen Broadleaf Forests         
+   ! 3  Deciduous Needleleaf Forests        
+   ! 4  Deciduous Broadleaf Forests         
+   ! 5  Mixed Forests                       
+   ! 6  Closed Shrublands                   
+   ! 7  Open Shrublands                   
+   ! 8  Woody Savannas                      
+   ! 9  Savannas                          
+   !10  Grasslands                          
+   !11  Permanent Wetlands                  
+   !12  Croplands                           
+   !13  Urban and Built-up Lands            
+   !14  Cropland/Natural Vegetation Mosaics 
+   !15  Permanent Snow and Ice              
+   !16  Barren                              
+   !17  Water Bodies                        
 
    ! empirical parameters to account for the dependence of optical depth on incidence angle [1]
    real(r8), parameter, dimension(N_land_classification) :: tth &

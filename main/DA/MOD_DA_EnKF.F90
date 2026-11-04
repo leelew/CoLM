@@ -9,6 +9,7 @@ MODULE MOD_DA_EnKF
 ! AUTHOR:
 !   Lu Li, 12/2024: Initial version
 !   Zhilong Fan, Lu Li, 03/2024: Debug and clean codes
+!   Lu Li, Zhilong Fan, 11/2026: DA v1.0
 !-----------------------------------------------------------------------------
     USE MOD_Precision
     USE MOD_SPMD_Task
@@ -30,40 +31,39 @@ CONTAINS
 ! Description:
 !   local transform ensemble Kalman filter
 !-----------------------------------------------------------------------------
-    USE MOD_Precision
-    IMPLICIT NONE
+        IMPLICIT NONE
 
 !------------------------ Dummy Arguments ------------------------------------
-    integer, intent(in)     :: num_ens                  ! ensemble size
-    integer, intent(in)     :: num_obs                  ! number of observations
-    real(r8), intent(in)    :: hx(num_obs, num_ens)     ! ensemble H(x) matrix
-    real(r8), intent(in)    :: y(num_obs)               ! observation vector
-    real(r8), intent(in)    :: R(num_obs)               ! observation error variance
-    real(r8), intent(in)    :: infl                     ! inflation factor
-    real(r8), intent(out)   :: trans(num_ens, num_ens)  ! transform matrix (k x k)
+        integer, intent(in)     :: num_ens                  ! ensemble size
+        integer, intent(in)     :: num_obs                  ! number of observations
+        real(r8), intent(in)    :: hx(num_obs, num_ens)     ! ensemble H(x) matrix
+        real(r8), intent(in)    :: y(num_obs)               ! observation vector
+        real(r8), intent(in)    :: R(num_obs)               ! observation error variance
+        real(r8), intent(in)    :: infl                     ! inflation factor
+        real(r8), intent(out)   :: trans(num_ens, num_ens)  ! transform matrix (k x k)
 
 !------------------------ Local Variables ------------------------------------
-    real(r8) :: hx_mean(num_obs)                        ! mean of ensemble H(x) (l)
-    real(r8) :: dhx(num_obs, num_ens)                   ! hx - mean(hx) (l x k)
-    real(r8) :: dhx_t(num_ens, num_obs)                 ! transpose of dhx (k x l)
-    real(r8) :: C(num_ens, num_obs)                     ! C = (dhx)^T * (R)^-1 (k x l)
-    real(r8) :: M1(num_ens, num_ens)                    ! C * dhx (k x k)
-    real(r8) :: pa_inv(num_ens, num_ens)                ! inverse of background error covariance matrix (k x k)
-    real(r8) :: eigval(num_ens)                         ! eigenvalues of pa_inv (k)
-    real(r8) :: eigvec(num_ens, num_ens)                ! eigenvectors of pa_inv (k x k)
-    integer  :: lwork
-    real(r8), allocatable :: work(:)
-    integer  :: err
-    real(r8) :: M2(num_ens, num_ens)                    ! M2 = eigvec * eigval^-1 (k x k)
-    real(r8) :: pa(num_ens, num_ens)                    ! background error covariance matrix (k x k)
-    real(r8) :: M3(num_ens, num_obs)                    ! M3 = pa * C (k x l)
-    real(r8) :: delta(num_obs)                          ! increment of observation (l)
-    real(r8) :: w_avg(num_ens)                          ! weight (k)
-    real(r8) :: M4(num_ens, num_ens)                    ! M4 = eigvec * sqrt((k-1)/eigval) (k x k)
-    real(r8) :: trans_pert(num_ens, num_ens)            ! perturbation transform matrix (k x k)
-    real(r8) :: I0(num_ens, num_ens)                    ! identity matrix (k x k)
-    real(r8) :: one_div_ens(num_ens)                    ! 1/num_ens
-    integer  :: i, j
+        real(r8) :: hx_mean(num_obs)                        ! mean of ensemble H(x) (l)
+        real(r8) :: dhx(num_obs, num_ens)                   ! hx - mean(hx) (l x k)
+        real(r8) :: dhx_t(num_ens, num_obs)                 ! transpose of dhx (k x l)
+        real(r8) :: C(num_ens, num_obs)                     ! C = (dhx)^T * (R)^-1 (k x l)
+        real(r8) :: M1(num_ens, num_ens)                    ! C * dhx (k x k)
+        real(r8) :: pa_inv(num_ens, num_ens)                ! inverse of background error covariance matrix (k x k)
+        real(r8) :: eigval(num_ens)                         ! eigenvalues of pa_inv (k)
+        real(r8) :: eigvec(num_ens, num_ens)                ! eigenvectors of pa_inv (k x k)
+        integer  :: lwork
+        real(r8), allocatable :: work(:)
+        integer  :: err
+        real(r8) :: M2(num_ens, num_ens)                    ! M2 = eigvec * eigval^-1 (k x k)
+        real(r8) :: pa(num_ens, num_ens)                    ! background error covariance matrix (k x k)
+        real(r8) :: M3(num_ens, num_obs)                    ! M3 = pa * C (k x l)
+        real(r8) :: delta(num_obs)                          ! increment of observation (l)
+        real(r8) :: w_avg(num_ens)                          ! weight (k)
+        real(r8) :: M4(num_ens, num_ens)                    ! M4 = eigvec * sqrt((k-1)/eigval) (k x k)
+        real(r8) :: trans_pert(num_ens, num_ens)            ! perturbation transform matrix (k x k)
+        real(r8) :: I0(num_ens, num_ens)                    ! identity matrix (k x k)
+        real(r8) :: one_div_ens(num_ens)                    ! 1/num_ens
+        integer  :: i, j
 
 !-----------------------------------------------------------------------------
 
