@@ -44,9 +44,9 @@ MODULE MOD_DA_Assim_2MTQ
    logical :: use_2mt = .false.      ! any '2MT' stream configured
    logical :: use_2mq = .false.      ! any '2MQ' stream configured
 
-   PUBLIC :: init_assim_2MTQ
-   PUBLIC :: run_assim_2MTQ
-   PUBLIC :: end_assim_2MTQ
+   PUBLIC :: init_DA_2MTQ
+   PUBLIC :: run_DA_2MTQ
+   PUBLIC :: end_DA_2MTQ
 
 !-----------------------------------------------------------------------------
 
@@ -54,7 +54,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE init_assim_2MTQ ()
+   SUBROUTINE init_DA_2MTQ ()
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -111,11 +111,11 @@ CONTAINS
          deallocate(configs)
       ENDIF
 
-   END SUBROUTINE init_assim_2MTQ
+   END SUBROUTINE init_DA_2MTQ
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE run_assim_2MTQ (idate, deltim)
+   SUBROUTINE run_DA_2MTQ (idate, deltim)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -275,11 +275,11 @@ CONTAINS
       IF (use_2mt) CALL synop_t%clear()
       IF (use_2mq) CALL synop_q%clear()
 
-   END SUBROUTINE run_assim_2MTQ
+   END SUBROUTINE run_DA_2MTQ
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE end_assim_2MTQ ()
+   SUBROUTINE end_DA_2MTQ ()
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -299,7 +299,7 @@ CONTAINS
       use_2mt = .false.
       use_2mq = .false.
 
-   END SUBROUTINE end_assim_2MTQ
+   END SUBROUTINE end_DA_2MTQ
 
 !-----------------------------------------------------------------------------
 END MODULE MOD_DA_Assim_2MTQ

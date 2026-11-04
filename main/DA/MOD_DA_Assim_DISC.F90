@@ -29,7 +29,7 @@ MODULE MOD_DA_Assim_DISC
 #endif
    IMPLICIT NONE
    PRIVATE
-   PUBLIC :: run_assim_DISC
+   PUBLIC :: run_DA_DISC
 
 !-----------------------------------------------------------------------------
 
@@ -37,7 +37,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE run_assim_DISC (idate, deltim)
+   SUBROUTINE run_DA_DISC (idate, deltim)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -113,7 +113,7 @@ CONTAINS
       ENDIF
 #endif
 
-   END SUBROUTINE run_assim_DISC
+   END SUBROUTINE run_DA_DISC
 
 !-----------------------------------------------------------------------------
 END MODULE MOD_DA_Assim_DISC
