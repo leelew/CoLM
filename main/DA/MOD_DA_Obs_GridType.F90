@@ -73,6 +73,8 @@ MODULE MOD_DA_Obs_GridType
         character(len=16) :: source_name = ''        ! e.g., "PM", "GNOS", "MR", "MR"
         character(len=32) :: sensor_name = ''        ! e.g., "SMAP_L1C_D", 
         character(len=16) :: var_name    = ''        ! e.g., "TB_H", "SM", "LST", "fSCA"
+
+        ! grid map (initialize once)
         type(grid_type)   :: grid                    ! grid info for obs
         type(spatial_mapping_type) :: mg2p           ! mapping from obs grid to patch
 

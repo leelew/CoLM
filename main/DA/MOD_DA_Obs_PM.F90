@@ -37,11 +37,8 @@ MODULE MOD_DA_Obs_PM
 !    Lu Li, Zhilong Fan, 10/2026: First operational version
 !-----------------------------------------------------------------------------
    USE MOD_Precision
-   USE MOD_Const_Physical, ONLY: denh2o
+   USE MOD_Const_Physical
    USE MOD_DataType
-   USE MOD_DA_Obs_GridType
-   USE MOD_DA_Operator_RTM
-   USE MOD_DA_Vars_TimeVars
    USE MOD_Vars_TimeInvariants
    USE MOD_Vars_1DForcing
    USE MOD_Vars_Global
@@ -52,6 +49,9 @@ MODULE MOD_DA_Obs_PM
    USE MOD_SPMD_Task
    USE MOD_Pixelset
    USE MOD_TimeManager
+   USE MOD_DA_Obs_GridType
+   USE MOD_DA_Operator_RTM
+   USE MOD_DA_Vars_TimeVars
    IMPLICIT NONE
 
 !-----------------------------------------------------------------------------
