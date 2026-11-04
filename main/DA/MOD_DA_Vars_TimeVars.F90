@@ -18,6 +18,7 @@ MODULE MOD_DA_Vars_TimeVars
 ! HISTORY:
 !    Lu Li, 12/2024, 05/2025: Initial DA ensemble storage
 !    Lu Li, 05/2026: Store open-loop member as ensemble index 0
+!    Lu Li, Zhilong Fan, 11/2026: DA v1.0
 !-----------------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_Namelist
@@ -50,99 +51,99 @@ MODULE MOD_DA_Vars_TimeVars
 !=============================================================================
 ! ensemble restart state variables
 !=============================================================================
-   real(r8), allocatable :: z_sno_ens        (:,:,:)    ! layer depth                                              [m]
-   real(r8), allocatable :: dz_sno_ens       (:,:,:)    ! snow layer thickness                                     [m]
-   real(r8), allocatable :: t_soisno_ens     (:,:,:)    ! snow & soil temperature                                  [K]
-   real(r8), allocatable :: wliq_soisno_ens  (:,:,:)    ! liquid water in layers                                   [kg/m2]
-   real(r8), allocatable :: wice_soisno_ens  (:,:,:)    ! ice in layers                                            [kg/m2]
-   real(r8), allocatable :: smp_ens          (:,:,:)    ! soil matrix potential                                    [mm]
-   real(r8), allocatable :: hk_ens           (:,:,:)    ! hydraulic conductivity                                   [mm h2o/s]
-   real(r8), allocatable :: t_grnd_ens       (:,:)      ! ground surface temperature                               [K]
-   real(r8), allocatable :: tleaf_ens        (:,:)      ! leaf temperature                                         [K]
-   real(r8), allocatable :: ldew_ens         (:,:)      ! depth of water on foliage                                [mm]
-   real(r8), allocatable :: ldew_rain_ens    (:,:)      ! depth of rain on foliage                                 [mm]
-   real(r8), allocatable :: ldew_snow_ens    (:,:)      ! depth of snow on foliage                                 [mm]
-   real(r8), allocatable :: fwet_snow_ens    (:,:)      ! vegetation snow fractional cover                         [-]
-   real(r8), allocatable :: sag_ens          (:,:)      ! non dimensional snow age                                 [-]
-   real(r8), allocatable :: scv_ens          (:,:)      ! snow water equivalent                                    [kg/m2]
-   real(r8), allocatable :: snowdp_ens       (:,:)      ! snow depth                                               [m]
-   real(r8), allocatable :: fveg_ens         (:,:)      ! fraction vegetation cover                                [-]
-   real(r8), allocatable :: fsno_ens         (:,:)      ! fraction snow cover                                      [-]
-   real(r8), allocatable :: sigf_ens         (:,:)      ! fraction of veg cover, excluding snow-covered veg        [-]
-   real(r8), allocatable :: green_ens        (:,:)      ! leaf greenness                                           [-]
-   real(r8), allocatable :: tlai_ens         (:,:)      ! leaf area index                                          [m2/m2]
-   real(r8), allocatable :: lai_ens          (:,:)      ! leaf area index                                          [m2/m2]
-   real(r8), allocatable :: tsai_ens         (:,:)      ! stem area index                                          [m2/m2]
-   real(r8), allocatable :: sai_ens          (:,:)      ! stem area index                                          [m2/m2]
+   real(r8), allocatable :: z_sno_ens        (  :,:,:)  ! layer depth                                              [m]
+   real(r8), allocatable :: dz_sno_ens       (  :,:,:)  ! snow layer thickness                                     [m]
+   real(r8), allocatable :: t_soisno_ens     (  :,:,:)  ! snow & soil temperature                                  [K]
+   real(r8), allocatable :: wliq_soisno_ens  (  :,:,:)  ! liquid water in layers                                   [kg/m2]
+   real(r8), allocatable :: wice_soisno_ens  (  :,:,:)  ! ice in layers                                            [kg/m2]
+   real(r8), allocatable :: smp_ens          (  :,:,:)  ! soil matrix potential                                    [mm]
+   real(r8), allocatable :: hk_ens           (  :,:,:)  ! hydraulic conductivity                                   [mm h2o/s]
+   real(r8), allocatable :: t_grnd_ens       (    :,:)  ! ground surface temperature                               [K]
+   real(r8), allocatable :: tleaf_ens        (    :,:)  ! leaf temperature                                         [K]
+   real(r8), allocatable :: ldew_ens         (    :,:)  ! depth of water on foliage                                [mm]
+   real(r8), allocatable :: ldew_rain_ens    (    :,:)  ! depth of rain on foliage                                 [mm]
+   real(r8), allocatable :: ldew_snow_ens    (    :,:)  ! depth of snow on foliage                                 [mm]
+   real(r8), allocatable :: fwet_snow_ens    (    :,:)  ! vegetation snow fractional cover                         [-]
+   real(r8), allocatable :: sag_ens          (    :,:)  ! non dimensional snow age                                 [-]
+   real(r8), allocatable :: scv_ens          (    :,:)  ! snow water equivalent                                    [kg/m2]
+   real(r8), allocatable :: snowdp_ens       (    :,:)  ! snow depth                                               [m]
+   real(r8), allocatable :: fveg_ens         (    :,:)  ! fraction vegetation cover                                [-]
+   real(r8), allocatable :: fsno_ens         (    :,:)  ! fraction snow cover                                      [-]
+   real(r8), allocatable :: sigf_ens         (    :,:)  ! fraction of veg cover, excluding snow-covered veg        [-]
+   real(r8), allocatable :: green_ens        (    :,:)  ! leaf greenness                                           [-]
+   real(r8), allocatable :: tlai_ens         (    :,:)  ! leaf area index                                          [m2/m2]
+   real(r8), allocatable :: lai_ens          (    :,:)  ! leaf area index                                          [m2/m2]
+   real(r8), allocatable :: tsai_ens         (    :,:)  ! stem area index                                          [m2/m2]
+   real(r8), allocatable :: sai_ens          (    :,:)  ! stem area index                                          [m2/m2]
    real(r8), allocatable :: alb_ens          (:,:,:,:)  ! averaged albedo                                          [-]
    real(r8), allocatable :: ssun_ens         (:,:,:,:)  ! sunlit canopy absorption for solar radiation (0-1)       [-]
    real(r8), allocatable :: ssha_ens         (:,:,:,:)  ! shaded canopy absorption for solar radiation (0-1)       [-]
    real(r8), allocatable :: ssoi_ens         (:,:,:,:)  ! soil absorption for solar radiation (0-1)                [-]
    real(r8), allocatable :: ssno_ens         (:,:,:,:)  ! snow absorption for solar radiation (0-1)                [-]
-   real(r8), allocatable :: thermk_ens       (:,:)      ! canopy gap fraction for tir radiation                    [-]
-   real(r8), allocatable :: extkb_ens        (:,:)      ! (k, g(mu)/mu) direct solar extinction coefficient        [-]
-   real(r8), allocatable :: extkd_ens        (:,:)      ! diffuse and scattered diffuse PAR extinction coefficient [-]
-   real(r8), allocatable :: zwt_ens          (:,:)      ! the depth to water table                                 [m]
-   real(r8), allocatable :: wdsrf_ens        (:,:)      ! depth of surface water                                   [mm]
-   real(r8), allocatable :: wa_ens           (:,:)      ! water storage in aquifer                                 [mm]
-   real(r8), allocatable :: wetwat_ens       (:,:)      ! water storage in wetland                                 [mm]
-   real(r8), allocatable :: t_lake_ens       (:,:,:)    ! lake layer temperature                                   [K]
-   real(r8), allocatable :: lake_icefrac_ens (:,:,:)    ! lake mass fraction of lake layer that is frozen          [-]
-   real(r8), allocatable :: savedtke1_ens    (:,:)      ! top level eddy conductivity                              [W/(m K)]
+   real(r8), allocatable :: thermk_ens       (    :,:)  ! canopy gap fraction for tir radiation                    [-]
+   real(r8), allocatable :: extkb_ens        (    :,:)  ! (k, g(mu)/mu) direct solar extinction coefficient        [-]
+   real(r8), allocatable :: extkd_ens        (    :,:)  ! diffuse and scattered diffuse PAR extinction coefficient [-]
+   real(r8), allocatable :: zwt_ens          (    :,:)  ! the depth to water table                                 [m]
+   real(r8), allocatable :: wdsrf_ens        (    :,:)  ! depth of surface water                                   [mm]
+   real(r8), allocatable :: wa_ens           (    :,:)  ! water storage in aquifer                                 [mm]
+   real(r8), allocatable :: wetwat_ens       (    :,:)  ! water storage in wetland                                 [mm]
+   real(r8), allocatable :: t_lake_ens       (  :,:,:)  ! lake layer temperature                                   [K]
+   real(r8), allocatable :: lake_icefrac_ens (  :,:,:)  ! lake mass fraction of lake layer that is frozen          [-]
+   real(r8), allocatable :: savedtke1_ens    (    :,:)  ! top level eddy conductivity                              [W/(m K)]
 
 !=============================================================================
 ! ensemble land-atmosphere coupling state variables
 !=============================================================================
-   real(r8), allocatable :: trad_ens         (:,:)      ! surface radiative temperature                            [K]
-   real(r8), allocatable :: tref_ens         (:,:)      ! 2 m air temperature                                      [K]
-   real(r8), allocatable :: qref_ens         (:,:)      ! 2 m specific humidity                                    [kg/kg]
-   real(r8), allocatable :: rhref_ens        (:,:)      ! 2 m relative humidity                                    [-]
-   real(r8), allocatable :: rst_ens          (:,:)      ! canopy stomatal resistance                               [s/m]
-   real(r8), allocatable :: emis_ens         (:,:)      ! bulk surface emissivity                                  [-]
-   real(r8), allocatable :: z0m_ens          (:,:)      ! effective momentum roughness length                      [m]
-   real(r8), allocatable :: zol_ens          (:,:)      ! dimensionless height in Monin-Obukhov theory (z/L)       [-]
-   real(r8), allocatable :: rib_ens          (:,:)      ! bulk Richardson number in the surface layer              [-]
-   real(r8), allocatable :: ustar_ens        (:,:)      ! friction velocity in similarity theory                   [m/s]
-   real(r8), allocatable :: qstar_ens        (:,:)      ! humidity scale in similarity theory                      [kg/kg]
-   real(r8), allocatable :: tstar_ens        (:,:)      ! temperature scale in similarity theory                   [K]
-   real(r8), allocatable :: fm_ens           (:,:)      ! integrated momentum profile function                     [-]
-   real(r8), allocatable :: fh_ens           (:,:)      ! integrated heat profile function                         [-]
-   real(r8), allocatable :: fq_ens           (:,:)      ! integrated moisture profile function                     [-]
+   real(r8), allocatable :: trad_ens         (    :,:)  ! surface radiative temperature                            [K]
+   real(r8), allocatable :: tref_ens         (    :,:)  ! 2 m air temperature                                      [K]
+   real(r8), allocatable :: qref_ens         (    :,:)  ! 2 m specific humidity                                    [kg/kg]
+   real(r8), allocatable :: rhref_ens        (    :,:)  ! 2 m relative humidity                                    [-]
+   real(r8), allocatable :: rst_ens          (    :,:)  ! canopy stomatal resistance                               [s/m]
+   real(r8), allocatable :: emis_ens         (    :,:)  ! bulk surface emissivity                                  [-]
+   real(r8), allocatable :: z0m_ens          (    :,:)  ! effective momentum roughness length                      [m]
+   real(r8), allocatable :: zol_ens          (    :,:)  ! dimensionless height in Monin-Obukhov theory (z/L)       [-]
+   real(r8), allocatable :: rib_ens          (    :,:)  ! bulk Richardson number in the surface layer              [-]
+   real(r8), allocatable :: ustar_ens        (    :,:)  ! friction velocity in similarity theory                   [m/s]
+   real(r8), allocatable :: qstar_ens        (    :,:)  ! humidity scale in similarity theory                      [kg/kg]
+   real(r8), allocatable :: tstar_ens        (    :,:)  ! temperature scale in similarity theory                   [K]
+   real(r8), allocatable :: fm_ens           (    :,:)  ! integrated momentum profile function                     [-]
+   real(r8), allocatable :: fh_ens           (    :,:)  ! integrated heat profile function                         [-]
+   real(r8), allocatable :: fq_ens           (    :,:)  ! integrated moisture profile function                     [-]
 
 !=============================================================================
 ! ensemble forcing variables
 !=============================================================================
-   real(r8), allocatable :: forc_t_ens     (:,:)        ! temperature                                              [K]
-   real(r8), allocatable :: forc_frl_ens   (:,:)        ! atmospheric infrared (longwave) radiation                [W/m2]
-   real(r8), allocatable :: forc_prc_ens   (:,:)        ! convective precipitation                                 [mm/s]
-   real(r8), allocatable :: forc_prl_ens   (:,:)        ! large scale precipitation                                [mm/s]
-   real(r8), allocatable :: forc_sols_ens  (:,:)        ! atm vis direct beam solar rad onto srf                   [W/m2]
-   real(r8), allocatable :: forc_soll_ens  (:,:)        ! atm nir direct beam solar rad onto srf                   [W/m2]
-   real(r8), allocatable :: forc_solsd_ens (:,:)        ! atm vis diffuse solar rad onto srf                       [W/m2]
-   real(r8), allocatable :: forc_solld_ens (:,:)        ! atm nir diffuse solar rad onto srf                       [W/m2]
+   real(r8), allocatable :: forc_t_ens       (    :,:)  ! temperature                                              [K]
+   real(r8), allocatable :: forc_frl_ens     (    :,:)  ! atmospheric infrared (longwave) radiation                [W/m2]
+   real(r8), allocatable :: forc_prc_ens     (    :,:)  ! convective precipitation                                 [mm/s]
+   real(r8), allocatable :: forc_prl_ens     (    :,:)  ! large scale precipitation                                [mm/s]
+   real(r8), allocatable :: forc_sols_ens    (    :,:)  ! atm vis direct beam solar rad onto srf                   [W/m2]
+   real(r8), allocatable :: forc_soll_ens    (    :,:)  ! atm nir direct beam solar rad onto srf                   [W/m2]
+   real(r8), allocatable :: forc_solsd_ens   (    :,:)  ! atm vis diffuse solar rad onto srf                       [W/m2]
+   real(r8), allocatable :: forc_solld_ens   (    :,:)  ! atm nir diffuse solar rad onto srf                       [W/m2]
 
 !=============================================================================
 ! diagnostic variables for output history
 !=============================================================================
    integer :: nsource = 0                               ! number of observation sources configured in namelist
-   real(r8), allocatable :: hx_f_ens       (:,:,:)      ! prior H(x_f)                                             [varies]
-   real(r8), allocatable :: hx_a_ens       (:,:,:)      ! posterior H(x_a)                                         [varies]
-   real(r8), allocatable :: hx_ol          (:,:)        ! open-loop H(x)                                           [varies]
-   real(r8), allocatable :: hx_f           (:,:)        ! ensemble-mean prior H(x_f)                               [varies]
-   real(r8), allocatable :: hx_a           (:,:)        ! ensemble-mean posterior H(x_a)                           [varies]
-   real(r8), allocatable :: wliq_soisno_ol (:,:)        ! open-loop liquid water in layers                         [kg/m2]
-   real(r8), allocatable :: wliq_soisno_f  (:,:)        ! ensemble-mean prior liquid water in layers               [kg/m2]
-   real(r8), allocatable :: wliq_soisno_a  (:,:)        ! ensemble-mean posterior liquid water in layers           [kg/m2]
-   real(r8), allocatable :: t_soisno_ol    (:,:)        ! open-loop temperature in layers                          [K]
-   real(r8), allocatable :: t_soisno_f     (:,:)        ! ensemble-mean prior temperature in layers                [K]
-   real(r8), allocatable :: t_soisno_a     (:,:)        ! ensemble-mean posterior temperature in layers            [K]
+   real(r8), allocatable :: hx_f_ens         (  :,:,:)  ! prior H(x_f)                                             [varies]
+   real(r8), allocatable :: hx_a_ens         (  :,:,:)  ! posterior H(x_a)                                         [varies]
+   real(r8), allocatable :: hx_ol            (    :,:)  ! open-loop H(x)                                           [varies]
+   real(r8), allocatable :: hx_f             (    :,:)  ! ensemble-mean prior H(x_f)                               [varies]
+   real(r8), allocatable :: hx_a             (    :,:)  ! ensemble-mean posterior H(x_a)                           [varies]
+   real(r8), allocatable :: wliq_soisno_ol   (    :,:)  ! open-loop liquid water in layers                         [kg/m2]
+   real(r8), allocatable :: wliq_soisno_f    (    :,:)  ! ensemble-mean prior liquid water in layers               [kg/m2]
+   real(r8), allocatable :: wliq_soisno_a    (    :,:)  ! ensemble-mean posterior liquid water in layers           [kg/m2]
+   real(r8), allocatable :: t_soisno_ol      (    :,:)  ! open-loop temperature in layers                          [K]
+   real(r8), allocatable :: t_soisno_f       (    :,:)  ! ensemble-mean prior temperature in layers                [K]
+   real(r8), allocatable :: t_soisno_a       (    :,:)  ! ensemble-mean posterior temperature in layers            [K]
 #ifdef GridRiverLakeFlow
-   real(r8), allocatable :: wdsrf_ucat_ol     (:)       ! open-loop river or lake water depth                      [m]
-   real(r8), allocatable :: wdsrf_ucat_a      (:)       ! prior & posterior river or lake water depth              [m]
-   real(r8), allocatable :: veloc_riv_ol      (:)       ! open-loop river velocity                                 [m/s]
-   real(r8), allocatable :: veloc_riv_a       (:)       ! prior & posterior river velocity                         [m/s]
-   real(r8), allocatable :: volresv_ol        (:)       ! open-loop reservoir water volume                         [m^3]
-   real(r8), allocatable :: volresv_a         (:)       ! prior & posterior reservoir water volume                 [m^3]
+   real(r8), allocatable :: wdsrf_ucat_ol    (      :)  ! open-loop river or lake water depth                      [m]
+   real(r8), allocatable :: wdsrf_ucat_a     (      :)  ! prior & posterior river or lake water depth              [m]
+   real(r8), allocatable :: veloc_riv_ol     (      :)  ! open-loop river velocity                                 [m/s]
+   real(r8), allocatable :: veloc_riv_a      (      :)  ! prior & posterior river velocity                         [m/s]
+   real(r8), allocatable :: volresv_ol       (      :)  ! open-loop reservoir water volume                         [m^3]
+   real(r8), allocatable :: volresv_a        (      :)  ! prior & posterior reservoir water volume                 [m^3]
 #endif
 
 !-----------------------------------------------------------------------------
@@ -167,73 +168,73 @@ CONTAINS
       IF (p_is_worker) THEN
          IF (numpatch > 0) THEN
             ! Restart
-            allocate (z_sno_ens      (maxsnl+1:0,      0:DEF_DA_ENS_NUM,numpatch)); z_sno_ens       (:,:,:) = spval
-            allocate (dz_sno_ens     (maxsnl+1:0,      0:DEF_DA_ENS_NUM,numpatch)); dz_sno_ens      (:,:,:) = spval
-            allocate (t_soisno_ens   (maxsnl+1:nl_soil,0:DEF_DA_ENS_NUM,numpatch)); t_soisno_ens    (:,:,:) = spval
-            allocate (wliq_soisno_ens(maxsnl+1:nl_soil,0:DEF_DA_ENS_NUM,numpatch)); wliq_soisno_ens (:,:,:) = spval
-            allocate (wice_soisno_ens(maxsnl+1:nl_soil,0:DEF_DA_ENS_NUM,numpatch)); wice_soisno_ens (:,:,:) = spval
-            allocate (smp_ens               (1:nl_soil,0:DEF_DA_ENS_NUM,numpatch)); smp_ens         (:,:,:) = spval
-            allocate (hk_ens                (1:nl_soil,0:DEF_DA_ENS_NUM,numpatch)); hk_ens          (:,:,:) = spval
-            allocate (t_grnd_ens                      (0:DEF_DA_ENS_NUM,numpatch)); t_grnd_ens        (:,:) = spval
-            allocate (tleaf_ens                       (0:DEF_DA_ENS_NUM,numpatch)); tleaf_ens         (:,:) = spval
-            allocate (ldew_ens                        (0:DEF_DA_ENS_NUM,numpatch)); ldew_ens          (:,:) = spval
-            allocate (ldew_rain_ens                   (0:DEF_DA_ENS_NUM,numpatch)); ldew_rain_ens     (:,:) = spval
-            allocate (ldew_snow_ens                   (0:DEF_DA_ENS_NUM,numpatch)); ldew_snow_ens     (:,:) = spval
-            allocate (fwet_snow_ens                   (0:DEF_DA_ENS_NUM,numpatch)); fwet_snow_ens     (:,:) = spval
-            allocate (sag_ens                         (0:DEF_DA_ENS_NUM,numpatch)); sag_ens           (:,:) = spval
-            allocate (scv_ens                         (0:DEF_DA_ENS_NUM,numpatch)); scv_ens           (:,:) = spval
-            allocate (snowdp_ens                      (0:DEF_DA_ENS_NUM,numpatch)); snowdp_ens        (:,:) = spval
-            allocate (fveg_ens                        (0:DEF_DA_ENS_NUM,numpatch)); fveg_ens          (:,:) = spval
-            allocate (fsno_ens                        (0:DEF_DA_ENS_NUM,numpatch)); fsno_ens          (:,:) = spval
-            allocate (sigf_ens                        (0:DEF_DA_ENS_NUM,numpatch)); sigf_ens          (:,:) = spval
-            allocate (green_ens                       (0:DEF_DA_ENS_NUM,numpatch)); green_ens         (:,:) = spval
-            allocate (tlai_ens                        (0:DEF_DA_ENS_NUM,numpatch)); tlai_ens          (:,:) = spval
-            allocate (lai_ens                         (0:DEF_DA_ENS_NUM,numpatch)); lai_ens           (:,:) = spval
-            allocate (tsai_ens                        (0:DEF_DA_ENS_NUM,numpatch)); tsai_ens          (:,:) = spval
-            allocate (sai_ens                         (0:DEF_DA_ENS_NUM,numpatch)); sai_ens           (:,:) = spval
-            allocate (alb_ens                     (2,2,0:DEF_DA_ENS_NUM,numpatch)); alb_ens       (:,:,:,:) = spval
-            allocate (ssun_ens                    (2,2,0:DEF_DA_ENS_NUM,numpatch)); ssun_ens      (:,:,:,:) = spval
-            allocate (ssha_ens                    (2,2,0:DEF_DA_ENS_NUM,numpatch)); ssha_ens      (:,:,:,:) = spval
-            allocate (ssoi_ens                    (2,2,0:DEF_DA_ENS_NUM,numpatch)); ssoi_ens      (:,:,:,:) = spval
-            allocate (ssno_ens                    (2,2,0:DEF_DA_ENS_NUM,numpatch)); ssno_ens      (:,:,:,:) = spval
-            allocate (thermk_ens                      (0:DEF_DA_ENS_NUM,numpatch)); thermk_ens        (:,:) = spval
-            allocate (extkb_ens                       (0:DEF_DA_ENS_NUM,numpatch)); extkb_ens         (:,:) = spval
-            allocate (extkd_ens                       (0:DEF_DA_ENS_NUM,numpatch)); extkd_ens         (:,:) = spval
-            allocate (zwt_ens                         (0:DEF_DA_ENS_NUM,numpatch)); zwt_ens           (:,:) = spval
-            allocate (wdsrf_ens                       (0:DEF_DA_ENS_NUM,numpatch)); wdsrf_ens         (:,:) = spval
-            allocate (wa_ens                          (0:DEF_DA_ENS_NUM,numpatch)); wa_ens            (:,:) = spval
-            allocate (wetwat_ens                      (0:DEF_DA_ENS_NUM,numpatch)); wetwat_ens        (:,:) = spval
-            allocate (t_lake_ens              (nl_lake,0:DEF_DA_ENS_NUM,numpatch)); t_lake_ens      (:,:,:) = spval
-            allocate (lake_icefrac_ens        (nl_lake,0:DEF_DA_ENS_NUM,numpatch)); lake_icefrac_ens(:,:,:) = spval
-            allocate (savedtke1_ens                   (0:DEF_DA_ENS_NUM,numpatch)); savedtke1_ens     (:,:) = spval
+            allocate (z_sno_ens        (        maxsnl+1:0,0:DEF_DA_ENS_NUM,numpatch)); z_sno_ens        (  :,:,:) = spval
+            allocate (dz_sno_ens       (        maxsnl+1:0,0:DEF_DA_ENS_NUM,numpatch)); dz_sno_ens       (  :,:,:) = spval
+            allocate (t_soisno_ens     (  maxsnl+1:nl_soil,0:DEF_DA_ENS_NUM,numpatch)); t_soisno_ens     (  :,:,:) = spval
+            allocate (wliq_soisno_ens  (  maxsnl+1:nl_soil,0:DEF_DA_ENS_NUM,numpatch)); wliq_soisno_ens  (  :,:,:) = spval
+            allocate (wice_soisno_ens  (  maxsnl+1:nl_soil,0:DEF_DA_ENS_NUM,numpatch)); wice_soisno_ens  (  :,:,:) = spval
+            allocate (smp_ens          (         1:nl_soil,0:DEF_DA_ENS_NUM,numpatch)); smp_ens          (  :,:,:) = spval
+            allocate (hk_ens           (         1:nl_soil,0:DEF_DA_ENS_NUM,numpatch)); hk_ens           (  :,:,:) = spval
+            allocate (t_grnd_ens       (                   0:DEF_DA_ENS_NUM,numpatch)); t_grnd_ens       (    :,:) = spval
+            allocate (tleaf_ens        (                   0:DEF_DA_ENS_NUM,numpatch)); tleaf_ens        (    :,:) = spval
+            allocate (ldew_ens         (                   0:DEF_DA_ENS_NUM,numpatch)); ldew_ens         (    :,:) = spval
+            allocate (ldew_rain_ens    (                   0:DEF_DA_ENS_NUM,numpatch)); ldew_rain_ens    (    :,:) = spval
+            allocate (ldew_snow_ens    (                   0:DEF_DA_ENS_NUM,numpatch)); ldew_snow_ens    (    :,:) = spval
+            allocate (fwet_snow_ens    (                   0:DEF_DA_ENS_NUM,numpatch)); fwet_snow_ens    (    :,:) = spval
+            allocate (sag_ens          (                   0:DEF_DA_ENS_NUM,numpatch)); sag_ens          (    :,:) = spval
+            allocate (scv_ens          (                   0:DEF_DA_ENS_NUM,numpatch)); scv_ens          (    :,:) = spval
+            allocate (snowdp_ens       (                   0:DEF_DA_ENS_NUM,numpatch)); snowdp_ens       (    :,:) = spval
+            allocate (fveg_ens         (                   0:DEF_DA_ENS_NUM,numpatch)); fveg_ens         (    :,:) = spval
+            allocate (fsno_ens         (                   0:DEF_DA_ENS_NUM,numpatch)); fsno_ens         (    :,:) = spval
+            allocate (sigf_ens         (                   0:DEF_DA_ENS_NUM,numpatch)); sigf_ens         (    :,:) = spval
+            allocate (green_ens        (                   0:DEF_DA_ENS_NUM,numpatch)); green_ens        (    :,:) = spval
+            allocate (tlai_ens         (                   0:DEF_DA_ENS_NUM,numpatch)); tlai_ens         (    :,:) = spval
+            allocate (lai_ens          (                   0:DEF_DA_ENS_NUM,numpatch)); lai_ens          (    :,:) = spval
+            allocate (tsai_ens         (                   0:DEF_DA_ENS_NUM,numpatch)); tsai_ens         (    :,:) = spval
+            allocate (sai_ens          (                   0:DEF_DA_ENS_NUM,numpatch)); sai_ens          (    :,:) = spval
+            allocate (alb_ens          (2,               2,0:DEF_DA_ENS_NUM,numpatch)); alb_ens          (:,:,:,:) = spval
+            allocate (ssun_ens         (2,               2,0:DEF_DA_ENS_NUM,numpatch)); ssun_ens         (:,:,:,:) = spval
+            allocate (ssha_ens         (2,               2,0:DEF_DA_ENS_NUM,numpatch)); ssha_ens         (:,:,:,:) = spval
+            allocate (ssoi_ens         (2,               2,0:DEF_DA_ENS_NUM,numpatch)); ssoi_ens         (:,:,:,:) = spval
+            allocate (ssno_ens         (2,               2,0:DEF_DA_ENS_NUM,numpatch)); ssno_ens         (:,:,:,:) = spval
+            allocate (thermk_ens       (                   0:DEF_DA_ENS_NUM,numpatch)); thermk_ens       (    :,:) = spval
+            allocate (extkb_ens        (                   0:DEF_DA_ENS_NUM,numpatch)); extkb_ens        (    :,:) = spval
+            allocate (extkd_ens        (                   0:DEF_DA_ENS_NUM,numpatch)); extkd_ens        (    :,:) = spval
+            allocate (zwt_ens          (                   0:DEF_DA_ENS_NUM,numpatch)); zwt_ens          (    :,:) = spval
+            allocate (wdsrf_ens        (                   0:DEF_DA_ENS_NUM,numpatch)); wdsrf_ens        (    :,:) = spval
+            allocate (wa_ens           (                   0:DEF_DA_ENS_NUM,numpatch)); wa_ens           (    :,:) = spval
+            allocate (wetwat_ens       (                   0:DEF_DA_ENS_NUM,numpatch)); wetwat_ens       (    :,:) = spval
+            allocate (t_lake_ens       (           nl_lake,0:DEF_DA_ENS_NUM,numpatch)); t_lake_ens       (  :,:,:) = spval
+            allocate (lake_icefrac_ens (           nl_lake,0:DEF_DA_ENS_NUM,numpatch)); lake_icefrac_ens (  :,:,:) = spval
+            allocate (savedtke1_ens    (                   0:DEF_DA_ENS_NUM,numpatch)); savedtke1_ens    (    :,:) = spval
 
-            allocate (trad_ens                        (0:DEF_DA_ENS_NUM,numpatch)); trad_ens          (:,:) = spval
-            allocate (tref_ens                        (0:DEF_DA_ENS_NUM,numpatch)); tref_ens          (:,:) = spval
-            allocate (qref_ens                        (0:DEF_DA_ENS_NUM,numpatch)); qref_ens          (:,:) = spval
-            allocate (rst_ens                         (0:DEF_DA_ENS_NUM,numpatch)); rst_ens           (:,:) = spval
-            allocate (emis_ens                        (0:DEF_DA_ENS_NUM,numpatch)); emis_ens          (:,:) = spval
-            allocate (z0m_ens                         (0:DEF_DA_ENS_NUM,numpatch)); z0m_ens           (:,:) = spval
-            allocate (zol_ens                         (0:DEF_DA_ENS_NUM,numpatch)); zol_ens           (:,:) = spval
-            allocate (rib_ens                         (0:DEF_DA_ENS_NUM,numpatch)); rib_ens           (:,:) = spval
-            allocate (ustar_ens                       (0:DEF_DA_ENS_NUM,numpatch)); ustar_ens         (:,:) = spval
-            allocate (qstar_ens                       (0:DEF_DA_ENS_NUM,numpatch)); qstar_ens         (:,:) = spval
-            allocate (tstar_ens                       (0:DEF_DA_ENS_NUM,numpatch)); tstar_ens         (:,:) = spval
-            allocate (fm_ens                          (0:DEF_DA_ENS_NUM,numpatch)); fm_ens            (:,:) = spval
-            allocate (fh_ens                          (0:DEF_DA_ENS_NUM,numpatch)); fh_ens            (:,:) = spval
-            allocate (fq_ens                          (0:DEF_DA_ENS_NUM,numpatch)); fq_ens            (:,:) = spval
+            allocate (trad_ens         (                   0:DEF_DA_ENS_NUM,numpatch)); trad_ens         (    :,:) = spval
+            allocate (tref_ens         (                   0:DEF_DA_ENS_NUM,numpatch)); tref_ens         (    :,:) = spval
+            allocate (qref_ens         (                   0:DEF_DA_ENS_NUM,numpatch)); qref_ens         (    :,:) = spval
+            allocate (rst_ens          (                   0:DEF_DA_ENS_NUM,numpatch)); rst_ens          (    :,:) = spval
+            allocate (emis_ens         (                   0:DEF_DA_ENS_NUM,numpatch)); emis_ens         (    :,:) = spval
+            allocate (z0m_ens          (                   0:DEF_DA_ENS_NUM,numpatch)); z0m_ens          (    :,:) = spval
+            allocate (zol_ens          (                   0:DEF_DA_ENS_NUM,numpatch)); zol_ens          (    :,:) = spval
+            allocate (rib_ens          (                   0:DEF_DA_ENS_NUM,numpatch)); rib_ens          (    :,:) = spval
+            allocate (ustar_ens        (                   0:DEF_DA_ENS_NUM,numpatch)); ustar_ens        (    :,:) = spval
+            allocate (qstar_ens        (                   0:DEF_DA_ENS_NUM,numpatch)); qstar_ens        (    :,:) = spval
+            allocate (tstar_ens        (                   0:DEF_DA_ENS_NUM,numpatch)); tstar_ens        (    :,:) = spval
+            allocate (fm_ens           (                   0:DEF_DA_ENS_NUM,numpatch)); fm_ens           (    :,:) = spval
+            allocate (fh_ens           (                   0:DEF_DA_ENS_NUM,numpatch)); fh_ens           (    :,:) = spval
+            allocate (fq_ens           (                   0:DEF_DA_ENS_NUM,numpatch)); fq_ens           (    :,:) = spval
 
             ! Screen-level analysis
-            allocate (rhref_ens                       (0:DEF_DA_ENS_NUM,numpatch)); rhref_ens         (:,:) = spval
+            allocate (rhref_ens        (                   0:DEF_DA_ENS_NUM,numpatch)); rhref_ens        (    :,:) = spval
 
             ! Forcings
-            allocate (forc_t_ens                      (0:DEF_DA_ENS_NUM,numpatch)); forc_t_ens        (:,:) = spval
-            allocate (forc_frl_ens                    (0:DEF_DA_ENS_NUM,numpatch)); forc_frl_ens      (:,:) = spval
-            allocate (forc_prc_ens                    (0:DEF_DA_ENS_NUM,numpatch)); forc_prc_ens      (:,:) = spval
-            allocate (forc_prl_ens                    (0:DEF_DA_ENS_NUM,numpatch)); forc_prl_ens      (:,:) = spval
-            allocate (forc_sols_ens                   (0:DEF_DA_ENS_NUM,numpatch)); forc_sols_ens     (:,:) = spval
-            allocate (forc_soll_ens                   (0:DEF_DA_ENS_NUM,numpatch)); forc_soll_ens     (:,:) = spval
-            allocate (forc_solsd_ens                  (0:DEF_DA_ENS_NUM,numpatch)); forc_solsd_ens    (:,:) = spval
-            allocate (forc_solld_ens                  (0:DEF_DA_ENS_NUM,numpatch)); forc_solld_ens    (:,:) = spval
+            allocate (forc_t_ens       (                   0:DEF_DA_ENS_NUM,numpatch)); forc_t_ens       (    :,:) = spval
+            allocate (forc_frl_ens     (                   0:DEF_DA_ENS_NUM,numpatch)); forc_frl_ens     (    :,:) = spval
+            allocate (forc_prc_ens     (                   0:DEF_DA_ENS_NUM,numpatch)); forc_prc_ens     (    :,:) = spval
+            allocate (forc_prl_ens     (                   0:DEF_DA_ENS_NUM,numpatch)); forc_prl_ens     (    :,:) = spval
+            allocate (forc_sols_ens    (                   0:DEF_DA_ENS_NUM,numpatch)); forc_sols_ens    (    :,:) = spval
+            allocate (forc_soll_ens    (                   0:DEF_DA_ENS_NUM,numpatch)); forc_soll_ens    (    :,:) = spval
+            allocate (forc_solsd_ens   (                   0:DEF_DA_ENS_NUM,numpatch)); forc_solsd_ens   (    :,:) = spval
+            allocate (forc_solld_ens   (                   0:DEF_DA_ENS_NUM,numpatch)); forc_solld_ens   (    :,:) = spval
          ENDIF
       ENDIF
 
@@ -241,29 +242,29 @@ CONTAINS
       IF (p_is_worker) THEN
          IF (numpatch > 0) THEN
             IF (nsource > 0) THEN
-               allocate (hx_f_ens               (nsource,DEF_DA_ENS_NUM,numpatch)); hx_f_ens        (:,:,:) = spval
-               allocate (hx_a_ens               (nsource,DEF_DA_ENS_NUM,numpatch)); hx_a_ens        (:,:,:) = spval
-               allocate (hx_ol                  (nsource,               numpatch)); hx_ol             (:,:) = spval
-               allocate (hx_f                   (nsource,               numpatch)); hx_f              (:,:) = spval
-               allocate (hx_a                   (nsource,               numpatch)); hx_a              (:,:) = spval
+               allocate (hx_f_ens      (           nsource,  DEF_DA_ENS_NUM,numpatch)); hx_f_ens         (  :,:,:) = spval
+               allocate (hx_a_ens      (           nsource,  DEF_DA_ENS_NUM,numpatch)); hx_a_ens         (  :,:,:) = spval
+               allocate (hx_ol         (                            nsource,numpatch)); hx_ol            (    :,:) = spval
+               allocate (hx_f          (                            nsource,numpatch)); hx_f             (    :,:) = spval
+               allocate (hx_a          (                            nsource,numpatch)); hx_a             (    :,:) = spval
             ENDIF
-            allocate (wliq_soisno_ol            (maxsnl+1:nl_soil,      numpatch)); wliq_soisno_ol    (:,:) = spval
-            allocate (wliq_soisno_f             (maxsnl+1:nl_soil,      numpatch)); wliq_soisno_f     (:,:) = spval
-            allocate (wliq_soisno_a             (maxsnl+1:nl_soil,      numpatch)); wliq_soisno_a     (:,:) = spval
-            allocate (t_soisno_ol               (maxsnl+1:nl_soil,      numpatch)); t_soisno_ol       (:,:) = spval
-            allocate (t_soisno_f                (maxsnl+1:nl_soil,      numpatch)); t_soisno_f        (:,:) = spval
-            allocate (t_soisno_a                (maxsnl+1:nl_soil,      numpatch)); t_soisno_a        (:,:) = spval
+            allocate (wliq_soisno_ol   (                   maxsnl+1:nl_soil,numpatch)); wliq_soisno_ol   (    :,:) = spval
+            allocate (wliq_soisno_f    (                   maxsnl+1:nl_soil,numpatch)); wliq_soisno_f    (    :,:) = spval
+            allocate (wliq_soisno_a    (                   maxsnl+1:nl_soil,numpatch)); wliq_soisno_a    (    :,:) = spval
+            allocate (t_soisno_ol      (                   maxsnl+1:nl_soil,numpatch)); t_soisno_ol      (    :,:) = spval
+            allocate (t_soisno_f       (                   maxsnl+1:nl_soil,numpatch)); t_soisno_f       (    :,:) = spval
+            allocate (t_soisno_a       (                   maxsnl+1:nl_soil,numpatch)); t_soisno_a       (    :,:) = spval
          ENDIF
 #ifdef GridRiverLakeFlow
          IF (numucat > 0) THEN
-            allocate (wdsrf_ucat_ol                                     (numucat)); wdsrf_ucat_ol      (:)  = spval
-            allocate (wdsrf_ucat_a                                      (numucat)); wdsrf_ucat_a       (:)  = spval
-            allocate (veloc_riv_ol                                      (numucat)); veloc_riv_ol       (:)  = spval
-            allocate (veloc_riv_a                                       (numucat)); veloc_riv_a        (:)  = spval
+            allocate (wdsrf_ucat_ol    (                                     numucat)); wdsrf_ucat_ol    (      :) = spval
+            allocate (wdsrf_ucat_a     (                                     numucat)); wdsrf_ucat_a     (      :) = spval
+            allocate (veloc_riv_ol     (                                     numucat)); veloc_riv_ol     (      :) = spval
+            allocate (veloc_riv_a      (                                     numucat)); veloc_riv_a      (      :) = spval
          ENDIF
          IF (numresv > 0) THEN
-            allocate (volresv_ol                                        (numresv)); volresv_ol         (:)  = spval
-            allocate (volresv_a                                         (numresv)); volresv_a          (:)  = spval
+            allocate (volresv_ol       (                                     numresv)); volresv_ol       (      :) = spval
+            allocate (volresv_a        (                                     numresv)); volresv_a        (      :) = spval
          ENDIF
 #endif
       ENDIF
@@ -406,7 +407,7 @@ CONTAINS
 
       file_restart = trim(dir_restart)// '/'//trim(cdate)//'/' // trim(site) //'_restart_DA_'//trim(cdate)//'_lc'//trim(cyear)//'.nc'
 
-      CALL ncio_create_file_vector      (file_restart, landpatch)
+      CALL ncio_create_file_vector (file_restart, landpatch)
 
       CALL ncio_define_dimension_vector (file_restart, landpatch, 'patch'                   )
       CALL ncio_define_dimension_vector (file_restart, landpatch, 'snow',     -maxsnl       )
@@ -476,8 +477,8 @@ CONTAINS
 #ifdef GridRiverLakeFlow
       file_gridriver = trim(dir_restart)// '/'//trim(cdate)//'/' // trim(site) //'_restart_gridriver_'//trim(cdate)//'_lc'//trim(cyear)//'.nc'
 
-      CALL vector_gather_and_write (wdsrf_ucat_a, numucat, totalnumucat, ucat_data_address, file_gridriver, 'wdsrf_ucat_a', 'ucatch', longname = 'ensemble mean river or lake water depth', units = 'm')
-      CALL vector_gather_and_write (veloc_riv_a, numucat, totalnumucat, ucat_data_address, file_gridriver, 'veloc_riv_a', 'ucatch', longname = 'ensemble mean river velocity', units = 'm/s')
+      CALL vector_gather_and_write (wdsrf_ucat_a, numucat, totalnumucat, ucat_data_address, file_gridriver, 'wdsrf_ucat_a', 'ucatch', longname = 'ensemble mean river or lake water depth', units = 'm'  )
+      CALL vector_gather_and_write (veloc_riv_a, numucat, totalnumucat, ucat_data_address, file_gridriver, 'veloc_riv_a', 'ucatch', longname = 'ensemble mean river velocity', units = 'm/s'             )
       IF (DEF_Reservoir_Method > 0) THEN
          IF (totalnumresv > 0) THEN
             CALL vector_gather_and_write (volresv_a, numresv, totalnumresv, resv_data_address, file_gridriver, 'volresv_a', 'reservoir', longname = 'ensemble mean reservoir water volume', units = 'm^3')
@@ -520,60 +521,60 @@ CONTAINS
 
       file_restart = trim(dir_restart)//'/'//trim(cdate)//'/'//trim(site)//'_restart_DA_'//trim(cdate)//'_lc'//trim(cyear)//'.nc'
 
-      CALL ncio_read_vector(file_restart, 'z_sno   '   , -maxsnl,          DEF_DA_ENS_NUM+1, landpatch, z_sno_ens       )
-      CALL ncio_read_vector(file_restart, 'dz_sno  '   , -maxsnl,          DEF_DA_ENS_NUM+1, landpatch, dz_sno_ens      )
-      CALL ncio_read_vector(file_restart, 't_soisno'   , nl_soil - maxsnl, DEF_DA_ENS_NUM+1, landpatch, t_soisno_ens    )
-      CALL ncio_read_vector(file_restart, 'wliq_soisno', nl_soil - maxsnl, DEF_DA_ENS_NUM+1, landpatch, wliq_soisno_ens )
-      CALL ncio_read_vector(file_restart, 'wice_soisno', nl_soil - maxsnl, DEF_DA_ENS_NUM+1, landpatch, wice_soisno_ens )
-      CALL ncio_read_vector(file_restart, 'smp'        , nl_soil,          DEF_DA_ENS_NUM+1, landpatch, smp_ens         )
-      CALL ncio_read_vector(file_restart, 'hk'         , nl_soil,          DEF_DA_ENS_NUM+1, landpatch, hk_ens          )
-      CALL ncio_read_vector(file_restart, 't_grnd  '   ,                   DEF_DA_ENS_NUM+1, landpatch, t_grnd_ens      )
-      CALL ncio_read_vector(file_restart, 'tleaf   '   ,                   DEF_DA_ENS_NUM+1, landpatch, tleaf_ens       )
-      CALL ncio_read_vector(file_restart, 'ldew    '   ,                   DEF_DA_ENS_NUM+1, landpatch, ldew_ens        )
-      CALL ncio_read_vector(file_restart, 'ldew_rain'  ,                   DEF_DA_ENS_NUM+1, landpatch, ldew_rain_ens   )
-      CALL ncio_read_vector(file_restart, 'ldew_snow'  ,                   DEF_DA_ENS_NUM+1, landpatch, ldew_snow_ens   )
-      CALL ncio_read_vector(file_restart, 'fwet_snow'  ,                   DEF_DA_ENS_NUM+1, landpatch, fwet_snow_ens   )
-      CALL ncio_read_vector(file_restart, 'sag     '   ,                   DEF_DA_ENS_NUM+1, landpatch, sag_ens         )
-      CALL ncio_read_vector(file_restart, 'scv     '   ,                   DEF_DA_ENS_NUM+1, landpatch, scv_ens         )
-      CALL ncio_read_vector(file_restart, 'snowdp  '   ,                   DEF_DA_ENS_NUM+1, landpatch, snowdp_ens      )
-      CALL ncio_read_vector(file_restart, 'fveg    '   ,                   DEF_DA_ENS_NUM+1, landpatch, fveg_ens        )
-      CALL ncio_read_vector(file_restart, 'fsno    '   ,                   DEF_DA_ENS_NUM+1, landpatch, fsno_ens        )
-      CALL ncio_read_vector(file_restart, 'sigf    '   ,                   DEF_DA_ENS_NUM+1, landpatch, sigf_ens        )
-      CALL ncio_read_vector(file_restart, 'green   '   ,                   DEF_DA_ENS_NUM+1, landpatch, green_ens       )
-      CALL ncio_read_vector(file_restart, 'tlai    '   ,                   DEF_DA_ENS_NUM+1, landpatch, tlai_ens        )
-      CALL ncio_read_vector(file_restart, 'lai     '   ,                   DEF_DA_ENS_NUM+1, landpatch, lai_ens         )
-      CALL ncio_read_vector(file_restart, 'tsai    '   ,                   DEF_DA_ENS_NUM+1, landpatch, tsai_ens        )
-      CALL ncio_read_vector(file_restart, 'sai     '   ,                   DEF_DA_ENS_NUM+1, landpatch, sai_ens         )
-      CALL ncio_read_vector(file_restart, 'alb     '   , 2, 2,             DEF_DA_ENS_NUM+1, landpatch, alb_ens         )
-      CALL ncio_read_vector(file_restart, 'ssun    '   , 2, 2,             DEF_DA_ENS_NUM+1, landpatch, ssun_ens        )
-      CALL ncio_read_vector(file_restart, 'ssha    '   , 2, 2,             DEF_DA_ENS_NUM+1, landpatch, ssha_ens        )
-      CALL ncio_read_vector(file_restart, 'ssoi    '   , 2, 2,             DEF_DA_ENS_NUM+1, landpatch, ssoi_ens        )
-      CALL ncio_read_vector(file_restart, 'ssno    '   , 2, 2,             DEF_DA_ENS_NUM+1, landpatch, ssno_ens        )
-      CALL ncio_read_vector(file_restart, 'thermk  '   ,                   DEF_DA_ENS_NUM+1, landpatch, thermk_ens      )
-      CALL ncio_read_vector(file_restart, 'extkb   '   ,                   DEF_DA_ENS_NUM+1, landpatch, extkb_ens       )
-      CALL ncio_read_vector(file_restart, 'extkd   '   ,                   DEF_DA_ENS_NUM+1, landpatch, extkd_ens       )
-      CALL ncio_read_vector(file_restart, 'zwt     '   ,                   DEF_DA_ENS_NUM+1, landpatch, zwt_ens         )
-      CALL ncio_read_vector(file_restart, 'wdsrf   '   ,                   DEF_DA_ENS_NUM+1, landpatch, wdsrf_ens       )
-      CALL ncio_read_vector(file_restart, 'wa      '   ,                   DEF_DA_ENS_NUM+1, landpatch, wa_ens          )
-      CALL ncio_read_vector(file_restart, 'wetwat  '   ,                   DEF_DA_ENS_NUM+1, landpatch, wetwat_ens      )
-      CALL ncio_read_vector(file_restart, 't_lake  '   , nl_lake,          DEF_DA_ENS_NUM+1, landpatch, t_lake_ens      )
-      CALL ncio_read_vector(file_restart, 'lake_icefrc', nl_lake,          DEF_DA_ENS_NUM+1, landpatch, lake_icefrac_ens)
-      CALL ncio_read_vector(file_restart, 'savedtke1  ',                   DEF_DA_ENS_NUM+1, landpatch, savedtke1_ens   )
+      CALL ncio_read_vector (file_restart, 'z_sno   '   , -maxsnl,          DEF_DA_ENS_NUM+1, landpatch, z_sno_ens       )
+      CALL ncio_read_vector (file_restart, 'dz_sno  '   , -maxsnl,          DEF_DA_ENS_NUM+1, landpatch, dz_sno_ens      )
+      CALL ncio_read_vector (file_restart, 't_soisno'   , nl_soil - maxsnl, DEF_DA_ENS_NUM+1, landpatch, t_soisno_ens    )
+      CALL ncio_read_vector (file_restart, 'wliq_soisno', nl_soil - maxsnl, DEF_DA_ENS_NUM+1, landpatch, wliq_soisno_ens )
+      CALL ncio_read_vector (file_restart, 'wice_soisno', nl_soil - maxsnl, DEF_DA_ENS_NUM+1, landpatch, wice_soisno_ens )
+      CALL ncio_read_vector (file_restart, 'smp'        , nl_soil,          DEF_DA_ENS_NUM+1, landpatch, smp_ens         )
+      CALL ncio_read_vector (file_restart, 'hk'         , nl_soil,          DEF_DA_ENS_NUM+1, landpatch, hk_ens          )
+      CALL ncio_read_vector (file_restart, 't_grnd  '   ,                   DEF_DA_ENS_NUM+1, landpatch, t_grnd_ens      )
+      CALL ncio_read_vector (file_restart, 'tleaf   '   ,                   DEF_DA_ENS_NUM+1, landpatch, tleaf_ens       )
+      CALL ncio_read_vector (file_restart, 'ldew    '   ,                   DEF_DA_ENS_NUM+1, landpatch, ldew_ens        )
+      CALL ncio_read_vector (file_restart, 'ldew_rain'  ,                   DEF_DA_ENS_NUM+1, landpatch, ldew_rain_ens   )
+      CALL ncio_read_vector (file_restart, 'ldew_snow'  ,                   DEF_DA_ENS_NUM+1, landpatch, ldew_snow_ens   )
+      CALL ncio_read_vector (file_restart, 'fwet_snow'  ,                   DEF_DA_ENS_NUM+1, landpatch, fwet_snow_ens   )
+      CALL ncio_read_vector (file_restart, 'sag     '   ,                   DEF_DA_ENS_NUM+1, landpatch, sag_ens         )
+      CALL ncio_read_vector (file_restart, 'scv     '   ,                   DEF_DA_ENS_NUM+1, landpatch, scv_ens         )
+      CALL ncio_read_vector (file_restart, 'snowdp  '   ,                   DEF_DA_ENS_NUM+1, landpatch, snowdp_ens      )
+      CALL ncio_read_vector (file_restart, 'fveg    '   ,                   DEF_DA_ENS_NUM+1, landpatch, fveg_ens        )
+      CALL ncio_read_vector (file_restart, 'fsno    '   ,                   DEF_DA_ENS_NUM+1, landpatch, fsno_ens        )
+      CALL ncio_read_vector (file_restart, 'sigf    '   ,                   DEF_DA_ENS_NUM+1, landpatch, sigf_ens        )
+      CALL ncio_read_vector (file_restart, 'green   '   ,                   DEF_DA_ENS_NUM+1, landpatch, green_ens       )
+      CALL ncio_read_vector (file_restart, 'tlai    '   ,                   DEF_DA_ENS_NUM+1, landpatch, tlai_ens        )
+      CALL ncio_read_vector (file_restart, 'lai     '   ,                   DEF_DA_ENS_NUM+1, landpatch, lai_ens         )
+      CALL ncio_read_vector (file_restart, 'tsai    '   ,                   DEF_DA_ENS_NUM+1, landpatch, tsai_ens        )
+      CALL ncio_read_vector (file_restart, 'sai     '   ,                   DEF_DA_ENS_NUM+1, landpatch, sai_ens         )
+      CALL ncio_read_vector (file_restart, 'alb     '   , 2, 2,             DEF_DA_ENS_NUM+1, landpatch, alb_ens         )
+      CALL ncio_read_vector (file_restart, 'ssun    '   , 2, 2,             DEF_DA_ENS_NUM+1, landpatch, ssun_ens        )
+      CALL ncio_read_vector (file_restart, 'ssha    '   , 2, 2,             DEF_DA_ENS_NUM+1, landpatch, ssha_ens        )
+      CALL ncio_read_vector (file_restart, 'ssoi    '   , 2, 2,             DEF_DA_ENS_NUM+1, landpatch, ssoi_ens        )
+      CALL ncio_read_vector (file_restart, 'ssno    '   , 2, 2,             DEF_DA_ENS_NUM+1, landpatch, ssno_ens        )
+      CALL ncio_read_vector (file_restart, 'thermk  '   ,                   DEF_DA_ENS_NUM+1, landpatch, thermk_ens      )
+      CALL ncio_read_vector (file_restart, 'extkb   '   ,                   DEF_DA_ENS_NUM+1, landpatch, extkb_ens       )
+      CALL ncio_read_vector (file_restart, 'extkd   '   ,                   DEF_DA_ENS_NUM+1, landpatch, extkd_ens       )
+      CALL ncio_read_vector (file_restart, 'zwt     '   ,                   DEF_DA_ENS_NUM+1, landpatch, zwt_ens         )
+      CALL ncio_read_vector (file_restart, 'wdsrf   '   ,                   DEF_DA_ENS_NUM+1, landpatch, wdsrf_ens       )
+      CALL ncio_read_vector (file_restart, 'wa      '   ,                   DEF_DA_ENS_NUM+1, landpatch, wa_ens          )
+      CALL ncio_read_vector (file_restart, 'wetwat  '   ,                   DEF_DA_ENS_NUM+1, landpatch, wetwat_ens      )
+      CALL ncio_read_vector (file_restart, 't_lake  '   , nl_lake,          DEF_DA_ENS_NUM+1, landpatch, t_lake_ens      )
+      CALL ncio_read_vector (file_restart, 'lake_icefrc', nl_lake,          DEF_DA_ENS_NUM+1, landpatch, lake_icefrac_ens)
+      CALL ncio_read_vector (file_restart, 'savedtke1  ',                   DEF_DA_ENS_NUM+1, landpatch, savedtke1_ens   )
 
-      CALL ncio_read_vector(file_restart, 'trad '      ,                   DEF_DA_ENS_NUM+1, landpatch, trad_ens        )
-      CALL ncio_read_vector(file_restart, 'tref '      ,                   DEF_DA_ENS_NUM+1, landpatch, tref_ens        )
-      CALL ncio_read_vector(file_restart, 'qref '      ,                   DEF_DA_ENS_NUM+1, landpatch, qref_ens        )
-      CALL ncio_read_vector(file_restart, 'rst  '      ,                   DEF_DA_ENS_NUM+1, landpatch, rst_ens         )
-      CALL ncio_read_vector(file_restart, 'emis '      ,                   DEF_DA_ENS_NUM+1, landpatch, emis_ens        )
-      CALL ncio_read_vector(file_restart, 'z0m  '      ,                   DEF_DA_ENS_NUM+1, landpatch, z0m_ens         )
-      CALL ncio_read_vector(file_restart, 'zol  '      ,                   DEF_DA_ENS_NUM+1, landpatch, zol_ens         )
-      CALL ncio_read_vector(file_restart, 'rib  '      ,                   DEF_DA_ENS_NUM+1, landpatch, rib_ens         )
-      CALL ncio_read_vector(file_restart, 'ustar'      ,                   DEF_DA_ENS_NUM+1, landpatch, ustar_ens       )
-      CALL ncio_read_vector(file_restart, 'qstar'      ,                   DEF_DA_ENS_NUM+1, landpatch, qstar_ens       )
-      CALL ncio_read_vector(file_restart, 'tstar'      ,                   DEF_DA_ENS_NUM+1, landpatch, tstar_ens       )
-      CALL ncio_read_vector(file_restart, 'fm   '      ,                   DEF_DA_ENS_NUM+1, landpatch, fm_ens          )
-      CALL ncio_read_vector(file_restart, 'fh   '      ,                   DEF_DA_ENS_NUM+1, landpatch, fh_ens          )
-      CALL ncio_read_vector(file_restart, 'fq   '      ,                   DEF_DA_ENS_NUM+1, landpatch, fq_ens          )
+      CALL ncio_read_vector (file_restart, 'trad '      ,                   DEF_DA_ENS_NUM+1, landpatch, trad_ens        )
+      CALL ncio_read_vector (file_restart, 'tref '      ,                   DEF_DA_ENS_NUM+1, landpatch, tref_ens        )
+      CALL ncio_read_vector (file_restart, 'qref '      ,                   DEF_DA_ENS_NUM+1, landpatch, qref_ens        )
+      CALL ncio_read_vector (file_restart, 'rst  '      ,                   DEF_DA_ENS_NUM+1, landpatch, rst_ens         )
+      CALL ncio_read_vector (file_restart, 'emis '      ,                   DEF_DA_ENS_NUM+1, landpatch, emis_ens        )
+      CALL ncio_read_vector (file_restart, 'z0m  '      ,                   DEF_DA_ENS_NUM+1, landpatch, z0m_ens         )
+      CALL ncio_read_vector (file_restart, 'zol  '      ,                   DEF_DA_ENS_NUM+1, landpatch, zol_ens         )
+      CALL ncio_read_vector (file_restart, 'rib  '      ,                   DEF_DA_ENS_NUM+1, landpatch, rib_ens         )
+      CALL ncio_read_vector (file_restart, 'ustar'      ,                   DEF_DA_ENS_NUM+1, landpatch, ustar_ens       )
+      CALL ncio_read_vector (file_restart, 'qstar'      ,                   DEF_DA_ENS_NUM+1, landpatch, qstar_ens       )
+      CALL ncio_read_vector (file_restart, 'tstar'      ,                   DEF_DA_ENS_NUM+1, landpatch, tstar_ens       )
+      CALL ncio_read_vector (file_restart, 'fm   '      ,                   DEF_DA_ENS_NUM+1, landpatch, fm_ens          )
+      CALL ncio_read_vector (file_restart, 'fh   '      ,                   DEF_DA_ENS_NUM+1, landpatch, fh_ens          )
+      CALL ncio_read_vector (file_restart, 'fq   '      ,                   DEF_DA_ENS_NUM+1, landpatch, fq_ens          )
 
 #ifdef GridRiverLakeFlow
       file_gridriver = trim(dir_restart)//'/'//trim(cdate)//'/'//trim(site)//'_restart_gridriver_'//trim(cdate)//'_lc'//trim(cyear)//'.nc'
@@ -596,7 +597,7 @@ CONTAINS
          CALL mpi_bcast (fexists, 1, MPI_LOGICAL, p_address_master, p_comm_glb, p_err)
 #endif
          IF (fexists) THEN
-            CALL vector_read_and_scatter (file_gridriver, volresv_a, numresv, 'volresv_a', resv_data_address)
+            CALL vector_read_and_scatter (file_gridriver, volresv_a, numresv, 'volresv_a', resv_data_address   )
          ENDIF
       ENDIF
 #endif

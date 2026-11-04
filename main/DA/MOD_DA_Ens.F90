@@ -15,6 +15,7 @@ MODULE MOD_DA_Ens
 ! AUTHOR:
 !   Lu Li, 12/2024: Initial version
 !   Lu Li, 10/2025: Consider correlation & AR(1) process
+!   Lu Li, Zhilong Fan, 11/2026: DA v1.0
 !-----------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_Namelist
@@ -322,7 +323,7 @@ CONTAINS
          forc_solsd_ens  (    iens,:) = forc_solsd
          forc_solld_ens  (    iens,:) = forc_solld
 
-        ! Land-atmosphere coupling states
+         ! Land-atmosphere coupling states
          trad_ens        (    iens,:) = trad
          tref_ens        (    iens,:) = tref
          qref_ens        (    iens,:) = qref
@@ -546,7 +547,6 @@ CONTAINS
 
          IF (DEF_DA_FEEDBACK .and. DEF_DA_ENS_NUM > 1) THEN
             ! Restart states
-
             z_sno        = sum(z_sno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2)        / DEF_DA_ENS_NUM
             dz_sno       = sum(dz_sno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2)       / DEF_DA_ENS_NUM
             t_soisno     = sum(t_soisno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2)     / DEF_DA_ENS_NUM
