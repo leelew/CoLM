@@ -61,31 +61,31 @@ MODULE MOD_DA_Obs_SiteType
     type :: site_obs_type
 
         ! initialize once
-        character(len=16) :: source_name = ''          ! "site"
-        character(len=32) :: sensor_name = ''          ! e.g., "SYNOP", "SNOTEL"
-        character(len=16) :: var_name    = ''          ! NetCDF variable name, e.g., "tref", "qref"
+        character(len=16) :: source_name = ''              ! "site"
+        character(len=32) :: sensor_name = ''              ! e.g., "SYNOP", "SNOTEL"
+        character(len=16) :: var_name    = ''              ! NetCDF variable name, e.g., "tref", "qref"
 
         ! site table (initialize once)
-        integer :: nsite = 0                           ! number of sites in sites.nc
-        real(r8), allocatable :: site_lat(:)            ! site latitude [deg]
-        real(r8), allocatable :: site_lon(:)            ! site longitude [deg]
-        integer,  allocatable :: site_iworker(:)        ! global rank of worker owning the site, -1 if unmapped
-        integer,  allocatable :: site_iworker_ipatch(:) ! local patch index on the owning worker, -1 if unmapped
+        integer :: nsite = 0                               ! number of sites in sites.nc
+        real(r8), allocatable :: site_lat(:)               ! site latitude [deg]
+        real(r8), allocatable :: site_lon(:)               ! site longitude [deg]
+        integer,  allocatable :: site_iworker(:)           ! global rank of worker owning the site, -1 if unmapped
+        integer,  allocatable :: site_iworker_ipatch(:)    ! local patch index on the owning worker, -1 if unmapped
 
         ! observations at this timestep
-        integer :: nobs = 0                            ! number of selected observations
-        integer,  allocatable :: isite(:)              ! row index in sites.nc for each observation
-        real(r8), allocatable :: lat(:)                ! latitude of each observation [deg]
-        real(r8), allocatable :: lon(:)                ! longitude of each observation [deg]
-        real(r8), allocatable :: time(:)               ! UTC time of each observation [s since begin of current day]
-        real(r8), allocatable :: y(:)                  ! observed value
-        real(r8), allocatable :: r(:)                  ! observation error standard deviation
+        integer :: nobs = 0                                ! number of selected observations
+        integer,  allocatable :: isite(:)                  ! row index in sites.nc for each observation
+        real(r8), allocatable :: lat(:)                    ! latitude of each observation [deg]
+        real(r8), allocatable :: lon(:)                    ! longitude of each observation [deg]
+        real(r8), allocatable :: time(:)                   ! UTC time of each observation [s since begin of current day]
+        real(r8), allocatable :: y(:)                      ! observed value
+        real(r8), allocatable :: r(:)                      ! observation error standard deviation
 
     CONTAINS
 
-        procedure, PUBLIC :: init   => site_obs_init   ! read sites and build site-to-patch map
-        procedure, PUBLIC :: read   => site_obs_read   ! read observations for this time step
-        procedure, PUBLIC :: clear  => site_obs_clear  ! clear per-timestep data (keep site table)
+        procedure, PUBLIC :: init   => site_obs_init       ! read sites and build site-to-patch map
+        procedure, PUBLIC :: read   => site_obs_read       ! read observations for this time step
+        procedure, PUBLIC :: clear  => site_obs_clear      ! clear per-timestep data (keep site table)
 
     END type site_obs_type
 
@@ -243,22 +243,22 @@ CONTAINS
         real(r8),             intent(in)    :: deltim
 
 !------------------------ Local Variables ------------------------------------
-        logical :: exists_file                 ! whether the expected obs file exists
-        integer :: i                           ! loop index
-        integer :: sdate(3)                    ! timestep start time adjusted to the beginning of step
-        integer :: month, mday, hour           ! calendar month, day of month, and UTC hour
-        character(len=4)   :: yearstr          ! YYYY string for file name
-        character(len=2)   :: monthstr         ! MM string for file name
-        character(len=2)   :: daystr           ! DD string for file name
-        character(len=2)   :: hourstr          ! HH string for file name
-        character(len=256) :: obs_file_name    ! full path of current timestep obs file
-        real(r8), allocatable :: lat(:)        ! raw obs latitudes read from file [deg]
-        real(r8), allocatable :: lon(:)        ! raw obs longitudes read from file [deg]
-        real(r8), allocatable :: time(:)       ! raw obs times read from file [s since current UTC day]
-        real(r8), allocatable :: y(:)          ! raw obs values for var
-        real(r8), allocatable :: r(:)          ! raw obs error standard deviation for var
-        integer,  allocatable :: id(:)         ! raw site row indices in sites.nc
-        logical,  allocatable :: valid(:)      ! full-length mask for selected observations
+        logical :: exists_file                             ! whether the expected obs file exists
+        integer :: i                                       ! loop index
+        integer :: sdate(3)                                ! timestep start time adjusted to the beginning of step
+        integer :: month, mday, hour                       ! calendar month, day of month, and UTC hour
+        character(len=4)   :: yearstr                      ! YYYY string for file name
+        character(len=2)   :: monthstr                     ! MM string for file name
+        character(len=2)   :: daystr                       ! DD string for file name
+        character(len=2)   :: hourstr                      ! HH string for file name
+        character(len=256) :: obs_file_name                ! full path of current timestep obs file
+        real(r8), allocatable :: lat(:)                    ! raw obs latitudes read from file [deg]
+        real(r8), allocatable :: lon(:)                    ! raw obs longitudes read from file [deg]
+        real(r8), allocatable :: time(:)                   ! raw obs times read from file [s since current UTC day]
+        real(r8), allocatable :: y(:)                      ! raw obs values for var
+        real(r8), allocatable :: r(:)                      ! raw obs error standard deviation for var
+        integer,  allocatable :: id(:)                     ! raw site row indices in sites.nc
+        logical,  allocatable :: valid(:)                  ! full-length mask for selected observations
 
 !-----------------------------------------------------------------------------
 

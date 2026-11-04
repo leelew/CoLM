@@ -106,13 +106,15 @@ CONTAINS
          allocate(valid(numpatch), y_f(numpatch), y_a(numpatch))
          valid = .false.
 
-         DO np = 1, numpatch
-            IF (patchtype(np) >= 3) CYCLE
-            IF (any(hx_ens_f == spval) .or. any(hx_ens_a == spval)) CYCLE
-            y_f(np) = sum(hx_ens_f(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
-            y_a(np) = sum(hx_ens_a(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
-            valid(np) = y_a(np) /= y_f(np)
-         ENDDO
+         IF (allocated(hx_ens_f) .and. allocated(hx_ens_a)) THEN
+            DO np = 1, numpatch
+               IF (patchtype(np) >= 3) CYCLE
+               IF (any(hx_ens_f == spval) .or. any(hx_ens_a == spval)) CYCLE
+               y_f(np) = sum(hx_ens_f(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
+               y_a(np) = sum(hx_ens_a(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
+               valid(np) = y_a(np) /= y_f(np)
+            ENDDO
+         ENDIF
 
          nlocal = count(valid)
       ENDIF

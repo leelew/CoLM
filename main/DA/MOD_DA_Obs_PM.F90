@@ -9,9 +9,9 @@ MODULE MOD_DA_Obs_PM
 !    This module defines one passive-microwave observation stream (PM_type)
 !    and a collection of streams (PM_set_type). A PM_type instance represents
 !    one source/sensor/variable configuration and owns the observation reader,
-!    part-space forward calculation, and mapping to observation-grid cells.
+!    patch-space forward calculation, and mapping to observation-grid cells.
 !
-!    The grid-level workflow is:
+!    The observation-space workflow is:
 !      1. clear time-step data and read current observations through
 !         grid_obs_type;
 !      2. map observation incidence angle from grid cells to patch-grid
@@ -21,16 +21,16 @@ MODULE MOD_DA_Obs_PM
 !         patch-space H(x);
 !      4. map patch-space H(x) to the observation grid;
 !      5. crop mapped H(x) to valid observation locations;
-!      6. gather IO-task results on the master and broadcast this%hx so all
+!      6. gather IO-task results on the master and broadcast this%hx_obs so all
 !         MPI tasks share the same observation-space H(x).
 !
 !    PM_set_type applies this workflow to all configured PM streams and
 !    concatenates their observation values, errors, metadata, and H(x) into
-!    set-level arrays for assimilation. 
+!    set-level arrays for assimilation.
 !
-!    PM observation operator supports both satellite brightness temperature 
-!    assimilation through microwave radiative transfer modeling and the direct 
-!    assimilation of retrieved soil moisture products. 
+!    PM observation operator supports both satellite brightness temperature
+!    assimilation through microwave radiative transfer modeling and the direct
+!    assimilation of retrieved soil moisture products.
 !
 ! HISTORY:
 !    Lu Li, 05/2026: First implementation
@@ -55,29 +55,28 @@ MODULE MOD_DA_Obs_PM
    IMPLICIT NONE
 
 !-----------------------------------------------------------------------------
-! Passive-microwave observation derived type (process one PM data)
+! One passive-microwave observation stream
 !-----------------------------------------------------------------------------
    type :: PM_type
 
-      ! metadata of specific passive microwave observation stream
+      ! Metadata for this observation stream.
       real(r8)              :: fghz
 
-      ! Intermediate H(x) on local patches, retained for patch-level diagnostic output.
-      real(r8), allocatable :: hx_pset(:,:)             ! [ens, patch]
+      ! Model-space H(x) on local patches, retained for diagnostic output.
+      real(r8), allocatable :: hx_model(:,:)               ! [0:ens, patch]
 
-      ! Actual observations and metadata at the locations read for this time step.
-      type(grid_obs_type)   :: y                        ! [nobs,]
+      ! Observations and metadata at the locations read for this time step.
+      type(grid_obs_type)   :: y                           ! Observation reader and grid mapping
 
-      ! Simulated observations mapped from hx_pset to the locations indexed by y.
-      ! Entries without a valid mapping remain spval.
-      real(r8), allocatable :: hx(:,:)                  ! [nobs, ens]
+      ! Model equivalents at observation locations; unmapped values are spval.
+      real(r8), allocatable :: hx_obs(:,:)                 ! [nobs, ens]
 
    CONTAINS
 
-      procedure, PUBLIC :: init       => PM_init        ! initialize the obs type (grid info, mapping, etc.)
-      procedure, PUBLIC :: calc_model => PM_calc_model  ! Compute model-space H(x) on local patches
-      procedure, PUBLIC :: calc_obs   => PM_calc_obs    ! Read y, compute model-space H(x), and map to observation space
-      procedure, PUBLIC :: clear      => PM_clear       ! clear obs data for this time step (keep init info)
+      procedure, PUBLIC :: init       => PM_init           ! Initialize the observation reader and grid mapping
+      procedure, PUBLIC :: calc_model => PM_calc_model     ! Compute model-space H(x) on local patches
+      procedure, PUBLIC :: calc_obs   => PM_calc_obs       ! Read y, compute model-space H(x), and map to observation space
+      procedure, PUBLIC :: clear      => PM_clear          ! Clear time-step data while retaining the mapping
 
    END type PM_type
 
@@ -97,25 +96,25 @@ MODULE MOD_DA_Obs_PM
    type :: PM_set_type
 
       ! Each stream represents one source/sensor/variable configuration.
-      integer :: nsensor                                    ! Number of configured observation streams
-      type(PM_type), allocatable :: sensors(:)              ! Stream objects [nsensor]
-      type(PM_config_type), allocatable :: cfgs(:)          ! Corresponding stream configurations [nsensor]
+      integer :: nsensor = 0                               ! Number of configured observation streams
+      type(PM_type), allocatable :: sensors(:)             ! Stream objects [nsensor]
+      type(PM_config_type), allocatable :: cfgs(:)         ! Corresponding stream configurations [nsensor]
 
       ! Current time-step data concatenated in stream order for assimilation.
-      integer :: nobs                                       ! Total number of observations across streams in the combined arrays
-      real(r8), allocatable :: lat(:)                       ! Observation latitude [nobs], degrees
-      real(r8), allocatable :: lon(:)                       ! Observation longitude [nobs], degrees
-      real(r8), allocatable :: y(:)                         ! Actual observation values [nobs]
-      real(r8), allocatable :: r(:)                         ! Observation error variances [nobs]
-      real(r8), allocatable :: hx(:,:)                      ! Simulated observations at y locations [nobs, ens]
+      integer :: nobs = 0                                  ! Total number of observations across streams in the combined arrays
+      real(r8), allocatable :: lat(:)                      ! Observation latitude [nobs], degrees
+      real(r8), allocatable :: lon(:)                      ! Observation longitude [nobs], degrees
+      real(r8), allocatable :: y(:)                        ! Actual observation values [nobs]
+      real(r8), allocatable :: r(:)                        ! Observation error standard deviations [nobs]
+      real(r8), allocatable :: hx_obs(:,:)                 ! Simulated observations at y locations [nobs, ens]
 
    CONTAINS
 
-      procedure, PUBLIC :: init       => PM_set_init        ! Initialize all streams from their configurations
-      procedure, PUBLIC :: calc_model => PM_set_calc_model  ! Recompute model-space H(x) for all streams
-      procedure, PUBLIC :: concat     => PM_set_concat      ! Combine stream data into the set-level arrays
-      procedure, PUBLIC :: calc_obs   => PM_set_calc_obs    ! Prepare observation-space y and H(x), then combine streams
-      procedure, PUBLIC :: clear      => PM_set_clear       ! Clear time-step data while retaining stream configurations
+      procedure, PUBLIC :: init       => PM_set_init       ! Initialize all streams from their configurations
+      procedure, PUBLIC :: calc_model => PM_set_calc_model ! Recompute model-space H(x) for all streams
+      procedure, PUBLIC :: concat     => PM_set_concat     ! Combine stream data into the set-level arrays
+      procedure, PUBLIC :: calc_obs   => PM_set_calc_obs   ! Prepare observation-space y and H(x), then combine streams
+      procedure, PUBLIC :: clear      => PM_set_clear      ! Clear time-step data while retaining stream configurations
 
    END type PM_set_type
 
@@ -133,11 +132,11 @@ CONTAINS
 
 !------------------------ Dummy Arguments ------------------------------------
       class(PM_type),      intent(inout) :: this
-      type(pixelset_type), intent(in)    :: pixelset     ! target pixel/patch set
-      character(len=*),    intent(in)    :: source_name  ! observation source class, e.g., "PM"
-      character(len=*),    intent(in)    :: sensor_name  ! sensor/subdirectory name
-      character(len=*),    intent(in)    :: var_name     ! observation variable/file prefix
-      real(r8),            intent(in)    :: fghz         ! frequency [GHz]
+      type(pixelset_type), intent(in)    :: pixelset       ! target pixel/patch set
+      character(len=*),    intent(in)    :: source_name    ! observation source class, e.g., "PM"
+      character(len=*),    intent(in)    :: sensor_name    ! sensor/subdirectory name
+      character(len=*),    intent(in)    :: var_name       ! observation variable/file prefix
+      real(r8),            intent(in)    :: fghz           ! frequency [GHz]
 
 !-----------------------------------------------------------------------------
       CALL this%y%init(pixelset, source_name, sensor_name, var_name)
@@ -173,9 +172,9 @@ CONTAINS
       type(pointer_real8_1d), allocatable :: theta_part(:) ! incidence angle on patch-grid parts
 
 !-----------------------------------------------------------------------------
-      IF (allocated(this%hx_pset)) deallocate(this%hx_pset)
-      allocate(this%hx_pset(0:DEF_DA_ENS_NUM, numpatch))
-      this%hx_pset = spval
+      IF (allocated(this%hx_model)) deallocate(this%hx_model)
+      allocate(this%hx_model(0:DEF_DA_ENS_NUM, numpatch))
+      this%hx_model = spval
 
       IF (this%y%nobs == 0 .or. numpatch == 0) RETURN
 
@@ -218,7 +217,7 @@ CONTAINS
                ipol = merge(2, 1, this%y%var_name == 'TB_V')
                sumarea(:) = 0.0_r8
 
-               ! TB is evaluated only where the obs file supplies theta, 
+               ! TB is evaluated only where the obs file supplies theta,
                ! so a domain-wide theta field gives domain-wide TB.
                DO ipart = 1, this%y%mg2p%npart(np)
                   IF (theta_part(np)%val(ipart) == spval) CYCLE
@@ -237,16 +236,17 @@ CONTAINS
                         hx_tmp(1), hx_tmp(2))
 
                      IF (hx_tmp(ipol) == spval) CYCLE
-                     IF (sumarea(iens) == 0) this%hx_pset(iens,np) = 0
+                     IF (sumarea(iens) == 0) this%hx_model(iens,np) = 0
                      sumarea(iens) = sumarea(iens) + this%y%mg2p%areapart(np)%val(ipart)
-                     this%hx_pset(iens,np) = this%hx_pset(iens,np) + &
+                     this%hx_model(iens,np) = this%hx_model(iens,np) + &
                         hx_tmp(ipol) * this%y%mg2p%areapart(np)%val(ipart)
                   ENDDO
                ENDDO
 
-               WHERE (sumarea > 0.0)
-                  this%hx_pset(:,np) = this%hx_pset(:,np) / sumarea(iens)
-               ENDWHERE
+               DO iens = 0, DEF_DA_ENS_NUM
+                  IF (sumarea(iens) > 0.0_r8) &
+                     this%hx_model(iens,np) = this%hx_model(iens,np) / sumarea(iens)
+               ENDDO
 
 !-----------------------------------------------------------------------------
 ! Retrieved soil moisture products from passive microwave observations.
@@ -255,7 +255,7 @@ CONTAINS
             CASE ('SM')
                DO iens = 0, DEF_DA_ENS_NUM
                   IF (wliq_soisno_ens(1,iens,np) == spval) CYCLE
-                  this%hx_pset(iens,np) = &
+                  this%hx_model(iens,np) = &
                      (wliq_soisno_ens(1,iens,np) + &
                       wliq_soisno_ens(2,iens,np) + &
                       wliq_soisno_ens(3,iens,np)*(0.05-0.0451)/(0.0906-0.0451)) / &
@@ -289,56 +289,56 @@ CONTAINS
       real(r8),            intent(in)    :: deltim
 
 !------------------------ Local Variables ------------------------------------
-      integer :: iobs                         ! observation index in this%y
-      integer :: ip                           ! IO task loop index on master
-      integer :: ib, jb                       ! block indices of an observation grid cell
-      integer :: il, jl                       ! local indices inside the block
+      integer :: iobs                                      ! observation index in this%y
+      integer :: ip                                        ! IO task loop index on master
+      integer :: ib, jb                                    ! block indices of an observation grid cell
+      integer :: il, jl                                    ! local indices inside the block
 
-      integer :: ndata                        ! valid obs count handled by one IO task
-      integer :: isrc                         ! MPI source rank for received obs data
-      integer :: smesg(2)                     ! IO-to-master message header: rank, ndata
-      integer :: rmesg(2)                     ! master receive message header: rank, ndata
+      integer :: ndata                                     ! valid obs count handled by one IO task
+      integer :: isrc                                      ! MPI source rank for received obs data
+      integer :: smesg(2)                                  ! IO-to-master message header: rank, ndata
+      integer :: rmesg(2)                                  ! master receive message header: rank, ndata
 
-      real(r8) :: area_obs                    ! mapped patch area in one observation grid cell
-      type(block_data_real8_2d) :: area_wgrid ! mapped patch area on obs world grid (this%y%grid)
-      type(block_data_real8_3d) :: hx_wgrid   ! ensemble H(x) mapped to obs world grid (this%y%grid)
+      real(r8) :: area_obs                                 ! mapped patch area in one observation grid cell
+      type(block_data_real8_2d) :: area_wgrid              ! mapped patch area on obs world grid (this%y%grid)
+      type(block_data_real8_3d) :: hx_wgrid                ! ensemble H(x) mapped to obs world grid (this%y%grid)
 
-      integer,  allocatable :: iloc(:)        ! obs indices handled by one IO task
-      integer,  allocatable :: tmp_idx(:)     ! obs indices received by master
-      real(r8), allocatable :: tmp_data(:,:)  ! H(x) values sent/received by MPI
-      logical,  allocatable :: filter(:)      ! local patch mask used for mapping
-      integer :: nvalid_patch                 ! debug count of patches with valid ensemble H(x)
+      integer,  allocatable :: iloc(:)                     ! obs indices handled by one IO task
+      integer,  allocatable :: tmp_idx(:)                  ! obs indices received by master
+      real(r8), allocatable :: tmp_data(:,:)               ! H(x) values sent/received by MPI
+      logical,  allocatable :: filter(:)                   ! local patch mask used for mapping
+      integer :: nvalid_patch                              ! debug count of patches with valid ensemble H(x)
 
 !-----------------------------------------------------------------------------
       CALL this%clear()
 
-      ! read obs
+      ! Read current observations.
       CALL this%y%read(idate, deltim)
 
-      ! forward operator and map H(x) to y locations
+      ! Compute model-space H(x).
       CALL this%calc_model()
       IF (this%y%nobs == 0) RETURN
 
       ! Keep the mapped numerator and area denominator on the same valid patches.
       allocate (filter(numpatch))
       IF (p_is_worker) filter(:) = patchtype(:) <= 2 .and. &
-         all(this%hx_pset(1:DEF_DA_ENS_NUM,:) /= spval, dim=1)
+         all(this%hx_model(1:DEF_DA_ENS_NUM,:) /= spval, dim=1)
 
-      ! mapping H(x) from patch to y grid
+      ! Map model-space H(x) to the observation grid.
       IF (p_is_io) THEN
          CALL allocate_block_data(this%y%grid, area_wgrid)
          CALL allocate_block_data(this%y%grid, hx_wgrid, DEF_DA_ENS_NUM)
       ENDIF
       CALL this%y%mg2p%get_sumarea(area_wgrid, filter)
-      CALL this%y%mg2p%pset2grid(this%hx_pset(1:DEF_DA_ENS_NUM,:), hx_wgrid, spv=spval, msk=filter)
+      CALL this%y%mg2p%pset2grid(this%hx_model(1:DEF_DA_ENS_NUM,:), hx_wgrid, spv=spval, msk=filter)
       deallocate (filter)
 
-      ! crop H(x) corresponding to valid y locations
-      allocate (this%hx(this%y%nobs, DEF_DA_ENS_NUM))
+      ! Extract H(x) at the current observation locations.
+      allocate (this%hx_obs(this%y%nobs, DEF_DA_ENS_NUM))
 
       IF (p_is_io) THEN
          allocate (iloc(this%y%nobs))
-         this%hx = spval
+         this%hx_obs = spval
 
          ndata = 0
          DO iobs = 1, this%y%nobs
@@ -354,7 +354,7 @@ CONTAINS
 #ifdef USEMPI
                      ndata = ndata + 1
                      iloc(ndata) = iobs
-                     this%hx(ndata,:) = hx_wgrid%blk(ib,jb)%val(:,il,jl) / area_obs
+                     this%hx_obs(ndata,:) = hx_wgrid%blk(ib,jb)%val(:,il,jl) / area_obs
 #endif
                   ENDIF
                ENDIF
@@ -368,7 +368,7 @@ CONTAINS
          IF (ndata > 0) THEN
             CALL mpi_send(iloc(1:ndata), ndata, MPI_INTEGER, p_address_master, mpi_tag_data, p_comm_glb, p_err)
             allocate (tmp_data(ndata, DEF_DA_ENS_NUM))
-            tmp_data = this%hx(1:ndata,:)
+            tmp_data = this%hx_obs(1:ndata,:)
             CALL mpi_send(tmp_data, ndata*DEF_DA_ENS_NUM, MPI_REAL8, p_address_master, mpi_tag_data+1, p_comm_glb, p_err)
             deallocate (tmp_data)
          ENDIF
@@ -380,7 +380,7 @@ CONTAINS
 
 #ifdef USEMPI
       IF (p_is_master) THEN
-         this%hx = spval
+         this%hx_obs = spval
 
          DO ip = 0, p_np_io - 1
             CALL mpi_recv(rmesg, 2, MPI_INTEGER, MPI_ANY_SOURCE, mpi_tag_mesg, p_comm_glb, p_stat, p_err)
@@ -393,14 +393,14 @@ CONTAINS
                isrc = rmesg(1)
                CALL mpi_recv(tmp_idx, ndata, MPI_INTEGER, isrc, mpi_tag_data, p_comm_glb, p_stat, p_err)
                CALL mpi_recv(tmp_data, ndata*DEF_DA_ENS_NUM, MPI_REAL8, isrc, mpi_tag_data+1, p_comm_glb, p_stat, p_err)
-               this%hx(tmp_idx,:) = tmp_data
+               this%hx_obs(tmp_idx,:) = tmp_data
 
                deallocate (tmp_idx)
                deallocate (tmp_data)
             ENDIF
          ENDDO
       ENDIF
-      CALL mpi_bcast(this%hx, this%y%nobs*DEF_DA_ENS_NUM, MPI_REAL8, p_address_master, p_comm_glb, p_err)
+      CALL mpi_bcast(this%hx_obs, this%y%nobs*DEF_DA_ENS_NUM, MPI_REAL8, p_address_master, p_comm_glb, p_err)
 #endif
 
    END SUBROUTINE PM_calc_obs
@@ -418,8 +418,8 @@ CONTAINS
 !-----------------------------------------------------------------------------
       CALL this%y%clear()
 
-      IF (allocated(this%hx_pset)) deallocate(this%hx_pset)
-      IF (allocated(this%hx))      deallocate(this%hx)
+      IF (allocated(this%hx_model)) deallocate(this%hx_model)
+      IF (allocated(this%hx_obs))      deallocate(this%hx_obs)
 
    END SUBROUTINE PM_clear
 
@@ -436,6 +436,7 @@ CONTAINS
 
       integer :: i
 
+      CALL this%clear()
       IF (allocated(this%sensors)) THEN
          DO i = 1, size(this%sensors)
             CALL this%sensors(i)%clear()
@@ -479,7 +480,7 @@ CONTAINS
       IF (allocated(this%lon))       deallocate(this%lon)
       IF (allocated(this%y))         deallocate(this%y)
       IF (allocated(this%r))         deallocate(this%r)
-      IF (allocated(this%hx))        deallocate(this%hx)
+      IF (allocated(this%hx_obs))        deallocate(this%hx_obs)
 
       IF (.not. allocated(this%sensors)) return
 
@@ -500,10 +501,18 @@ CONTAINS
       integer :: is, n, offset
 
 !-----------------------------------------------------------------------------
-      ! get total number of obs and allocate arrays
+      this%nobs = 0
+      IF (allocated(this%lat)) deallocate(this%lat)
+      IF (allocated(this%lon)) deallocate(this%lon)
+      IF (allocated(this%y)) deallocate(this%y)
+      IF (allocated(this%r)) deallocate(this%r)
+      IF (allocated(this%hx_obs)) deallocate(this%hx_obs)
+      IF (.not. allocated(this%sensors)) RETURN
+
+      ! Count observations with model equivalents and allocate combined arrays.
       DO is = 1, this%nsensor
          IF (this%sensors(is)%y%nobs == 0) CYCLE
-         IF (.not. allocated(this%sensors(is)%hx)) CYCLE
+         IF (.not. allocated(this%sensors(is)%hx_obs)) CYCLE
          this%nobs = this%nobs + this%sensors(is)%y%nobs
       ENDDO
       IF (this%nobs == 0) return
@@ -512,12 +521,12 @@ CONTAINS
       allocate(this%lon(this%nobs))
       allocate(this%y(this%nobs))
       allocate(this%r(this%nobs))
-      allocate(this%hx(this%nobs, DEF_DA_ENS_NUM))
+      allocate(this%hx_obs(this%nobs, DEF_DA_ENS_NUM))
 
-      ! concatenate H(x) and y from each sensor to the set-level arrays
+      ! Combine observations and H(x) in stream order.
       offset = 0
       DO is = 1, this%nsensor
-         IF (.not. allocated(this%sensors(is)%hx)) CYCLE
+         IF (.not. allocated(this%sensors(is)%hx_obs)) CYCLE
 
          n = this%sensors(is)%y%nobs
          IF (n == 0) CYCLE
@@ -526,7 +535,7 @@ CONTAINS
          this%lon(offset+1:offset+n) = this%sensors(is)%y%lon
          this%y(offset+1:offset+n) = this%sensors(is)%y%y
          this%r(offset+1:offset+n) = this%sensors(is)%y%r
-         this%hx(offset+1:offset+n,:) = this%sensors(is)%hx
+         this%hx_obs(offset+1:offset+n,:) = this%sensors(is)%hx_obs
 
          offset = offset + n
       ENDDO
@@ -548,6 +557,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
       CALL this%clear()
+      IF (.not. allocated(this%sensors)) RETURN
 
       DO is = 1, this%nsensor
          CALL this%sensors(is)%calc_obs(idate, deltim)
@@ -568,6 +578,7 @@ CONTAINS
       integer :: is
 
 !-----------------------------------------------------------------------------
+      IF (.not. allocated(this%sensors)) RETURN
       DO is = 1, this%nsensor
          CALL this%sensors(is)%calc_model()
       ENDDO

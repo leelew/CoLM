@@ -4,132 +4,104 @@
 MODULE MOD_DA_Obs_SYNOP
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
-!    SYNOP in-situ observation handling for 2 m temperature and humidity
-!    data assimilation. Temperature and humidity are assimilated by two
-!    independent streams, configured with
-!       DEF_DA_OBS_SOURCE = 'situ'
-!       DEF_DA_OBS_SENSOR = 'SYNOP'
-!       DEF_DA_OBS_VAR    = '2MT'
-!       DEF_DA_OBS_TARGET = '2MT'
-!    and
-!       DEF_DA_OBS_SOURCE = 'situ'
-!       DEF_DA_OBS_SENSOR = 'SYNOP'
-!       DEF_DA_OBS_VAR    = '2MQ'
-!       DEF_DA_OBS_TARGET = '2MQ'
+!    SYNOP observation handling for 2 m temperature and humidity assimilation.
 !
-!    DEF_DA_OBS_VAR is the observed variable and the hourly file variable
-!    name; DEF_DA_OBS_TARGET selects the analysis variable.
+!    SYNOP_type represents one source/sensor/variable stream. SYNOP_set_type
+!    applies the observation workflow to all configured streams and combines
+!    their observations, metadata, errors, and H(x) for assimilation.
 !
-!    The hourly files are
-!       <DEF_DA_OBS_DIR>/<sensor>/2MT_YYYY_MM_DD_HH.nc
-!       <DEF_DA_OBS_DIR>/<sensor>/2MQ_YYYY_MM_DD_HH.nc
-!    containing the station observations '2MT' (2 m air temperature [K])
-!    and '2MQ' (2 m relative humidity [0-1]) respectively, together with
-!    'latitude', 'longitude', 'time', and 'id'. The station table is
-!       <DEF_DA_OBS_DIR>/<sensor>/sites.nc
+!    The observation-space workflow is:
+!      1. clear time-step data and read observations through site_obs_type;
+!      2. compute model-space H(x) on local patches;
+!      3. extract H(x) at the mapped station patches;
+!      4. share observation-space H(x) across MPI ranks;
+!      5. concatenate SYNOP streams in configuration order.
 !
-!    Observation operators:
-!       H_T   = tref_ens
-!       H_RH  = RH(qref_ens, tref_ens, forc_psrf)
-!    where RH is calculated from the model 2 m specific humidity and
-!    temperature following the legacy SYNOP implementation. The analysis
-!    variables are the model 2 m air temperature and specific humidity,
-!    tref_ens and qref_ens. A '2MT' stream reads only the 2MT file and
-!    updates tref_ens; a '2MQ' stream reads only the 2MQ file and updates
-!    qref_ens. The 2MT analysis runs first, so H_RH for a '2MQ' stream is
-!    evaluated with the analyzed tref_ens.
+!    Temperature H(x) is tref_ens; humidity H(x) is relative humidity derived
+!    from qref_ens, tref_ens, and surface pressure. The assimilation driver
+!    analyzes temperature before humidity, so the humidity operator uses the
+!    updated temperature.
 !
-!    SYNOP_set_type owns the observation workflow:
-!      1. read the 2 m temperature and/or relative humidity observations;
-!      2. derive rhref_ens from qref_ens, tref_ens, and surface pressure;
-!      3. extract tref_ens and/or rhref_ens at mapped station patches
-!         and share H(x) across MPI ranks;
-!      4. concatenate the enabled variables into one observation vector;
-!      5. prepare localized patch-level y, R, and H(x) arrays for LETKF.
-!
-!    Observation errors 'r' are standard deviations: K for 2 m temperature
-!    and RH fraction for relative humidity.
+!    Station coordinates are read from <DEF_DA_OBS_DIR>/<sensor>/sites.nc.
+!    Hourly files <var_name>_YYYY_MM_DD_HH.nc contain 'latitude', 'longitude',
+!    'time', 'id', <var_name>, and 'r'. Variables '2MT' and '2MRH' denote
+!    temperature [K] and relative humidity [0-1]. Observation errors 'r' are
+!    standard deviations; the upper observation collection handles localization.
 !
 ! HISTORY:
 !    Lu Li, 05/2026: Initial implementation
 !-----------------------------------------------------------------------------
    USE MOD_Precision
-   USE MOD_DA_Obs_SiteType
    USE MOD_LandPatch
-   USE MOD_DA_Vars_TimeVariables
    USE MOD_Namelist
    USE MOD_Pixelset
    USE MOD_Vars_Global
-   USE MOD_Vars_TimeInvariants
-   USE MOD_Vars_1DForcing, ONLY: forc_psrf
+   USE MOD_Vars_1DForcing
    USE MOD_SPMD_Task
+   USE MOD_DA_Obs_SiteType
+   USE MOD_DA_Vars_TimeVars
    IMPLICIT NONE
 
-   PUBLIC :: SYNOP_calc_rh
-   PRIVATE :: SYNOP_gather_hx
+!-----------------------------------------------------------------------------
+! One SYNOP observation stream
+!-----------------------------------------------------------------------------
+   type :: SYNOP_type
 
-   type :: SYNOP_config_type
+      ! Model-space H(x) on local patches, retained for diagnostic output.
+      real(r8), allocatable :: hx_model(:,:)                  ! [0:ens, patch]
 
-      character(len=16) :: source_name ! 'situ'
-      character(len=32) :: sensor_name ! 'SYNOP'
-      character(len=16) :: var_name    ! observed variable: '2MT' / '2MQ'
-      integer  :: istream              ! namelist index of this stream; slot in the
-                                       ! shared hx_* diagnostics
-      logical  :: use_t  = .false.     ! assimilate the 2 m temperature variable
-      logical  :: use_rh = .false.     ! assimilate the 2 m relative humidity variable
+      ! Observations and metadata at the locations read for this time step.
+      type(site_obs_type) :: y
 
-   END type SYNOP_config_type
-
-
-   type :: SYNOP_sensor_type
-
-      character(len=32) :: sensor_name = ''
-      character(len=16) :: var_name    = ''
-
-      ! station observations of 2 m temperature and relative humidity
-      type(site_obs_type) :: t
-      type(site_obs_type) :: rh
-
-      ! ensemble H(x) gathered at the station locations [nobs, 0:ens]
-      real(r8), allocatable :: hx_t(:,:)
-      real(r8), allocatable :: hx_rh(:,:)
-
-   END type SYNOP_sensor_type
-
-
-   type :: SYNOP_set_type
-
-      type(SYNOP_config_type), allocatable :: cfgs(:)
-      type(SYNOP_sensor_type), allocatable :: sensors(:)
-
-      ! assimilation parameters
-      real(r8) :: dres      ! search radius for observations around a target patch [deg]
-      real(r8) :: locr      ! localization radius [km]
-      real(r8) :: infl      ! inflation factor for error covariance
-
-      ! enabled variables
-      logical  :: use_t  = .false.     ! any configured stream assimilates 2 m temperature
-      logical  :: use_rh = .false.     ! any configured stream assimilates 2 m relative humidity
-
-      ! outputs used for assimilation
-      integer :: nobs = 0
-      real(r8), allocatable :: lat(:)
-      real(r8), allocatable :: lon(:)
-      real(r8), allocatable :: y(:)
-      real(r8), allocatable :: hx(:,:)
-      real(r8), allocatable :: r(:)
+      ! Model equivalents at observation locations; unmapped values are spval.
+      real(r8), allocatable :: hx_obs(:,:)                    ! [nobs, ens]
 
    CONTAINS
 
-      procedure :: init    => SYNOP_type_init
-      procedure :: calcg   => SYNOP_type_calc_on_grid
-      procedure :: save    => SYNOP_type_save
-      procedure :: clear   => SYNOP_type_clear
-      procedure :: concat  => SYNOP_type_concat
-      procedure :: prepare => SYNOP_type_prepare_on_pset
+      procedure, PUBLIC :: init       => SYNOP_init           ! Initialize the observation reader and patch mapping
+      procedure, PUBLIC :: calc_model => SYNOP_calc_model     ! Compute model-space H(x) on local patches
+      procedure, PUBLIC :: calc_obs   => SYNOP_calc_obs       ! Read y, compute H(x), and map to observation space
+      procedure, PUBLIC :: clear      => SYNOP_clear          ! Clear time-step data while retaining the mapping
+
+   END type SYNOP_type
+
+!-----------------------------------------------------------------------------
+! SYNOP observation stream configuration
+!-----------------------------------------------------------------------------
+   type :: SYNOP_config_type
+
+      character(len=16) :: source_name                        ! Observation source class
+      character(len=32) :: sensor_name                        ! Sensor or station network name
+      character(len=16) :: var_name                           ! Observation variable and file prefix
+
+   END type SYNOP_config_type
+
+!-----------------------------------------------------------------------------
+! Collection of SYNOP observation streams and their combined data
+!-----------------------------------------------------------------------------
+   type :: SYNOP_set_type
+
+      integer :: nsensor = 0                                  ! Number of configured observation streams
+      type(SYNOP_type), allocatable :: sensors(:)             ! Stream objects [nsensor]
+      type(SYNOP_config_type), allocatable :: cfgs(:)         ! Stream configurations [nsensor]
+
+      ! Current time-step data concatenated in stream order for assimilation.
+      integer :: nobs = 0                                     ! Total number of observations
+      real(r8), allocatable :: lat(:)                         ! Observation latitude [nobs], degrees
+      real(r8), allocatable :: lon(:)                         ! Observation longitude [nobs], degrees
+      real(r8), allocatable :: y(:)                           ! Observation values [nobs]
+      real(r8), allocatable :: r(:)                           ! Observation error standard deviations [nobs]
+      real(r8), allocatable :: hx_obs(:,:)                    ! Model equivalents at y locations [nobs, ens]
+
+   CONTAINS
+
+      procedure, PUBLIC :: init       => SYNOP_set_init       ! Initialize all streams from their configurations
+      procedure, PUBLIC :: calc_model => SYNOP_set_calc_model ! Recompute model-space H(x) for all streams
+      procedure, PUBLIC :: calc_obs   => SYNOP_set_calc_obs   ! Prepare observation-space y and H(x), then combine streams
+      procedure, PUBLIC :: concat     => SYNOP_set_concat     ! Combine stream data into the set-level arrays
+      procedure, PUBLIC :: clear      => SYNOP_set_clear      ! Clear time-step data while retaining configurations
 
    END type SYNOP_set_type
-
 
 !-----------------------------------------------------------------------------
 
@@ -137,50 +109,182 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE SYNOP_calc_rh ()
+   SUBROUTINE SYNOP_init (this, pixelset, source_name, sensor_name, var_name)
 
-!-----------------------------------------------------------------------------
-! Derive 2 m relative humidity from the model specific humidity and
-! temperature, using the legacy SYNOP formula.
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
 
+!------------------------ Dummy Arguments ------------------------------------
+      class(SYNOP_type), intent(inout) :: this
+      type(pixelset_type), intent(in) :: pixelset
+      character(len=*), intent(in) :: source_name
+      character(len=*), intent(in) :: sensor_name
+      character(len=*), intent(in) :: var_name
+
+!-----------------------------------------------------------------------------
+      CALL this%y%init(pixelset, source_name, sensor_name, var_name)
+
+   END SUBROUTINE SYNOP_init
+
+!-----------------------------------------------------------------------------
+
+   SUBROUTINE SYNOP_calc_model (this)
+
+!-----------------------------------------------------------------------------
+      IMPLICIT NONE
+
+!------------------------ Dummy Arguments ------------------------------------
+      class(SYNOP_type), intent(inout) :: this
+
 !------------------------ Local Variables ------------------------------------
-      integer :: iens, np
-      real(r8) :: tc, es, e
+      integer :: np                                           ! Local patch index
+      integer :: iens                                         ! Ensemble member index
+      real(r8) :: tc                                          ! 2 m air temperature [degrees Celsius]
+      real(r8) :: es                                          ! Saturation vapor pressure [hPa]
+      real(r8) :: e                                           ! Water vapor pressure [hPa]
 
 !-----------------------------------------------------------------------------
       IF (.not. p_is_worker) RETURN
-      IF (numpatch <= 0) RETURN
-      IF (.not. allocated(tref_ens))  RETURN
-      IF (.not. allocated(qref_ens))  RETURN
-      IF (.not. allocated(rhref_ens)) RETURN
-      IF (.not. allocated(forc_psrf)) RETURN
+      IF (allocated(this%hx_model)) deallocate(this%hx_model)
+      allocate(this%hx_model(0:DEF_DA_ENS_NUM, numpatch))
+      this%hx_model = spval
+      IF (numpatch == 0) RETURN
 
-      DO np = 1, numpatch
-         DO iens = 0, DEF_DA_ENS_NUM
-            rhref_ens(iens,np) = spval
+      SELECT CASE (trim(this%y%var_name))
+!-----------------------------------------------------------------------------
+! 2 m air temperature observations [K].
+! H(x) is the model 2 m air temperature.
+!-----------------------------------------------------------------------------
+      CASE ('2MT')
+         this%hx_model = tref_ens
 
-            IF (tref_ens(iens,np) == spval .or. &
-                qref_ens(iens,np) == spval .or. &
-                forc_psrf(np)    == spval .or. &
-                forc_psrf(np)    <= 0.0_r8) CYCLE
+!-----------------------------------------------------------------------------
+! 2 m relative humidity observations [0-1].
+! H(x) is derived from specific humidity, temperature, and surface pressure.
+!-----------------------------------------------------------------------------
+      CASE ('2MRH')
+         IF (.not. allocated(tref_ens)) RETURN
+         IF (.not. allocated(qref_ens)) RETURN
+         IF (.not. allocated(rhref_ens)) RETURN
+         IF (.not. allocated(forc_psrf)) RETURN
 
-            tc = tref_ens(iens,np) - 273.15_r8
-            es = 6.112_r8 * exp((17.67_r8*tc)/(tc + 243.5_r8))
-            e  = (qref_ens(iens,np)*forc_psrf(np)/100.0_r8) / &
-                 (0.378_r8*qref_ens(iens,np) + 0.622_r8)
-            IF (es > 0.0_r8) THEN
-               rhref_ens(iens,np) = max(min(1.0_r8, e/es), 0.0_r8)
-            ENDIF
+         ! Convert specific humidity to relative humidity [0-1].
+         DO np = 1, numpatch
+            DO iens = 0, DEF_DA_ENS_NUM
+               rhref_ens(iens,np) = spval
+
+               IF (tref_ens(iens,np) == spval .or. &
+                   qref_ens(iens,np) == spval .or. &
+                   forc_psrf(np)    == spval .or. &
+                   forc_psrf(np)    <= 0.0_r8) CYCLE
+
+               tc = tref_ens(iens,np) - 273.15_r8
+               es = 6.112_r8 * exp((17.67_r8*tc)/(tc + 243.5_r8))
+               e  = (qref_ens(iens,np)*forc_psrf(np)/100.0_r8) / &
+                    (0.378_r8*qref_ens(iens,np) + 0.622_r8)
+               IF (es > 0.0_r8) THEN
+                  rhref_ens(iens,np) = max(min(1.0_r8, e/es), 0.0_r8)
+               ENDIF
+            ENDDO
          ENDDO
-      ENDDO
+         this%hx_model = rhref_ens
 
-   END SUBROUTINE SYNOP_calc_rh
+!-----------------------------------------------------------------------------
+! snow depth.
+!-----------------------------------------------------------------------------
+      CASE ('SD')
+         RETURN
+      END SELECT
+
+   END SUBROUTINE SYNOP_calc_model
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE SYNOP_type_init (this, pixelset, configs)
+   SUBROUTINE SYNOP_calc_obs (this, idate, deltim)
+
+!-----------------------------------------------------------------------------
+      IMPLICIT NONE
+
+!------------------------ Dummy Arguments ------------------------------------
+      class(SYNOP_type), intent(inout) :: this
+      integer, intent(in) :: idate(3)
+      real(r8), intent(in) :: deltim
+
+!------------------------ Local Variables ------------------------------------
+      integer :: iobs                                         ! Observation index
+      integer :: isite                                        ! Site-table index
+      integer :: np                                           ! Local patch index
+      integer, allocatable :: owner(:)                        ! Number of workers contributing to each observation
+
+!-----------------------------------------------------------------------------
+      CALL this%clear()
+
+      ! Read current observations.
+      CALL this%y%read(idate, deltim)
+
+      ! Compute model-space H(x).
+      CALL this%calc_model()
+      allocate (this%hx_obs(this%y%nobs, 1:DEF_DA_ENS_NUM))
+      this%hx_obs(:,:) = spval
+      IF (this%y%nobs == 0) RETURN
+
+      ! Extract H(x) at the mapped station patches.
+      allocate (owner(this%y%nobs))
+      owner(:) = 0
+      this%hx_obs(:,:) = 0.0_r8
+
+      IF (p_is_worker .and. numpatch > 0 .and. allocated(this%hx_model)) THEN
+         IF (size(this%hx_model, 2) >= numpatch) THEN
+            DO iobs = 1, this%y%nobs
+               isite = this%y%isite(iobs)
+               IF (this%y%site_iworker(isite) == p_iam_glb) THEN
+                  np = this%y%site_iworker_ipatch(isite)
+                  IF (np >= 1 .and. np <= numpatch) THEN
+                     this%hx_obs(iobs, 1:DEF_DA_ENS_NUM) = this%hx_model(1:DEF_DA_ENS_NUM, np)
+                     owner(iobs) = 1
+                  ENDIF
+               ENDIF
+            ENDDO
+         ENDIF
+      ENDIF
+
+      ! Share observation-space H(x) across all ranks.
+#ifdef USEMPI
+      CALL mpi_allreduce (MPI_IN_PLACE, this%hx_obs, this%y%nobs*DEF_DA_ENS_NUM, MPI_REAL8, &
+         MPI_SUM, p_comm_glb, p_err)
+      CALL mpi_allreduce (MPI_IN_PLACE, owner, this%y%nobs, MPI_INTEGER, &
+         MPI_SUM, p_comm_glb, p_err)
+#endif
+
+      ! Mark observations without exactly one contributing worker as missing.
+      DO iobs = 1, this%y%nobs
+         IF (owner(iobs) /= 1) this%hx_obs(iobs, 1:DEF_DA_ENS_NUM) = spval
+      ENDDO
+
+      deallocate (owner)
+
+   END SUBROUTINE SYNOP_calc_obs
+
+!-----------------------------------------------------------------------------
+
+   SUBROUTINE SYNOP_clear (this)
+
+!-----------------------------------------------------------------------------
+      IMPLICIT NONE
+
+!------------------------ Dummy Arguments ------------------------------------
+      class(SYNOP_type), intent(inout) :: this
+
+!-----------------------------------------------------------------------------
+      CALL this%y%clear()
+      IF (allocated(this%hx_model)) deallocate(this%hx_model)
+      IF (allocated(this%hx_obs)) deallocate(this%hx_obs)
+
+   END SUBROUTINE SYNOP_clear
+
+!-----------------------------------------------------------------------------
+
+   SUBROUTINE SYNOP_set_init (this, pixelset, configs)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -194,47 +298,29 @@ CONTAINS
       integer :: i
 
 !-----------------------------------------------------------------------------
-      IF (allocated(this%cfgs))    deallocate(this%cfgs)
+      CALL this%clear()
+      IF (allocated(this%cfgs)) deallocate(this%cfgs)
       IF (allocated(this%sensors)) deallocate(this%sensors)
-      this%nobs = 0
+      this%nsensor = 0
 
       IF (size(configs) == 0) RETURN
 
       allocate(this%cfgs(size(configs)))
       this%cfgs = configs
 
-      this%use_t  = any(configs%use_t)
-      this%use_rh = any(configs%use_rh)
-
-      this%dres = DEF_DA_ASSIM_2MTQ_DRES
-      this%locr = DEF_DA_ASSIM_2MTQ_LOCR
-      this%infl = DEF_DA_ASSIM_2MTQ_INFL
-
-      ! One sensor owns the temperature and relative humidity pair. Each
-      ! variable is stored in its own hourly file, named after the file
-      ! variable, following the same convention as the gridded observation
-      ! type. Only the variables enabled by the stream are initialized.
-      ! The namelist VAR ('2MT' / '2MQ') is also the hourly file variable.
-      allocate(this%sensors(size(configs)))
-      DO i = 1, size(configs)
-         this%sensors(i)%sensor_name = configs(i)%sensor_name
-         this%sensors(i)%var_name    = configs(i)%var_name
-
-         IF (configs(i)%use_t) THEN
-            CALL this%sensors(i)%t%init(pixelset, configs(i)%source_name, &
-               configs(i)%sensor_name, configs(i)%var_name)
-         ENDIF
-         IF (configs(i)%use_rh) THEN
-            CALL this%sensors(i)%rh%init(pixelset, configs(i)%source_name, &
-               configs(i)%sensor_name, configs(i)%var_name)
-         ENDIF
+      ! Initialize one observation reader and operator per stream.
+      this%nsensor = size(configs)
+      allocate(this%sensors(this%nsensor))
+      DO i = 1, this%nsensor
+         CALL this%sensors(i)%init(pixelset, configs(i)%source_name, &
+            configs(i)%sensor_name, configs(i)%var_name)
       ENDDO
 
-   END SUBROUTINE SYNOP_type_init
+   END SUBROUTINE SYNOP_set_init
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE SYNOP_type_clear (this)
+   SUBROUTINE SYNOP_set_clear (this)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -250,342 +336,116 @@ CONTAINS
       IF (allocated(this%lat)) deallocate(this%lat)
       IF (allocated(this%lon)) deallocate(this%lon)
       IF (allocated(this%y))   deallocate(this%y)
-      IF (allocated(this%hx))  deallocate(this%hx)
+      IF (allocated(this%hx_obs))  deallocate(this%hx_obs)
       IF (allocated(this%r))   deallocate(this%r)
 
       IF (allocated(this%sensors)) THEN
          DO i = 1, size(this%sensors)
-            CALL this%sensors(i)%t%clear()
-            CALL this%sensors(i)%rh%clear()
-            IF (allocated(this%sensors(i)%hx_t))  deallocate(this%sensors(i)%hx_t)
-            IF (allocated(this%sensors(i)%hx_rh)) deallocate(this%sensors(i)%hx_rh)
+            CALL this%sensors(i)%clear()
          ENDDO
       ENDIF
 
-   END SUBROUTINE SYNOP_type_clear
+   END SUBROUTINE SYNOP_set_clear
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE SYNOP_gather_hx (site, hx_pset, hx)
-
-!-----------------------------------------------------------------------------
-! Map a patch-space field to the observation locations.
-!
-! This is a collective operation: every MPI rank must call it. It returns the
-! same global (nobs,0:ens) array on all ranks. Observations whose site is not
-! owned by any worker, or whose patch falls outside the local patch range,
-! are set to spval.
-!-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
-!------------------------ Dummy Arguments ------------------------------------
-      type(site_obs_type),   intent(in)    :: site         ! Site observations and patch mapping
-      real(r8), allocatable, intent(in)    :: hx_pset(:,:) ! H(x) on patches [0:ens, patch]
-      real(r8), allocatable, intent(out)   :: hx(:,:)      ! H(x) at obs [nobs, 0:ens]
-
-!------------------------ Local Variables ------------------------------------
-      integer :: iobs                                      ! Observation index
-      integer :: isite                                     ! Site-table index
-      integer :: np                                        ! Local patch index
-      integer :: nens                                      ! Number of ensemble members excluding the open loop
-      integer, allocatable :: owner(:)                     ! number of ranks that filled each obs
-
-!-----------------------------------------------------------------------------
-
-      nens = DEF_DA_ENS_NUM
-      allocate (hx(site%nobs, 0:nens))
-      hx(:,:) = spval
-      IF (site%nobs == 0) RETURN
-
-      allocate (owner(site%nobs))
-      owner(:) = 0
-      hx(:,:) = 0.0_r8
-
-      IF (p_is_worker .and. numpatch > 0 .and. allocated(hx_pset)) THEN
-         IF (size(hx_pset, 2) >= numpatch) THEN
-            DO iobs = 1, site%nobs
-               isite = site%isite(iobs)
-               IF (site%site_iworker(isite) == p_iam_glb) THEN
-                  np = site%site_iworker_ipatch(isite)
-                  IF (np >= 1 .and. np <= numpatch) THEN
-                     hx(iobs, 0:nens) = hx_pset(0:nens, np)
-                     owner(iobs) = 1
-                  ENDIF
-               ENDIF
-            ENDDO
-         ENDIF
-      ENDIF
-
-#ifdef USEMPI
-      CALL mpi_allreduce (MPI_IN_PLACE, hx, site%nobs*(nens+1), MPI_REAL8, &
-         MPI_SUM, p_comm_glb, p_err)
-      CALL mpi_allreduce (MPI_IN_PLACE, owner, site%nobs, MPI_INTEGER, &
-         MPI_SUM, p_comm_glb, p_err)
-#endif
-
-      DO iobs = 1, site%nobs
-         IF (owner(iobs) /= 1) hx(iobs, 0:nens) = spval
-      ENDDO
-
-      deallocate (owner)
-
-
-   END SUBROUTINE SYNOP_gather_hx
-
-!-----------------------------------------------------------------------------
-
-   SUBROUTINE SYNOP_type_calc_on_grid (this, idate, deltim)
+   SUBROUTINE SYNOP_set_calc_model (this)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
 
 !------------------------ Dummy Arguments ------------------------------------
       class(SYNOP_set_type), intent(inout) :: this
-      integer,               intent(in)    :: idate(3)
-      real(r8),              intent(in)    :: deltim
 
 !------------------------ Local Variables ------------------------------------
-      integer :: i
+      integer :: is
+
+!-----------------------------------------------------------------------------
+      IF (.not. allocated(this%sensors)) RETURN
+      DO is = 1, this%nsensor
+         CALL this%sensors(is)%calc_model()
+      ENDDO
+
+   END SUBROUTINE SYNOP_set_calc_model
+
+!-----------------------------------------------------------------------------
+
+   SUBROUTINE SYNOP_set_calc_obs (this, idate, deltim)
+
+!-----------------------------------------------------------------------------
+      IMPLICIT NONE
+
+!------------------------ Dummy Arguments ------------------------------------
+      class(SYNOP_set_type), intent(inout) :: this
+      integer, intent(in) :: idate(3)
+      real(r8), intent(in) :: deltim
+
+!------------------------ Local Variables ------------------------------------
+      integer :: is
 
 !-----------------------------------------------------------------------------
       CALL this%clear()
-
       IF (.not. allocated(this%sensors)) RETURN
-
-      ! H(x) for humidity is relative humidity, derived from qref_ens;
-      ! only needed when a relative humidity stream is enabled
-      IF (this%use_rh) CALL SYNOP_calc_rh()
-
-      DO i = 1, size(this%sensors)
-         IF (this%cfgs(i)%use_t) THEN
-            CALL this%sensors(i)%t%read(idate, deltim)
-            CALL SYNOP_gather_hx(this%sensors(i)%t, tref_ens, this%sensors(i)%hx_t)
-         ENDIF
-         IF (this%cfgs(i)%use_rh) THEN
-            CALL this%sensors(i)%rh%read(idate, deltim)
-            CALL SYNOP_gather_hx(this%sensors(i)%rh, rhref_ens, this%sensors(i)%hx_rh)
-         ENDIF
+      DO is = 1, this%nsensor
+         CALL this%sensors(is)%calc_obs(idate, deltim)
       ENDDO
-
       CALL this%concat()
 
-   END SUBROUTINE SYNOP_type_calc_on_grid
+   END SUBROUTINE SYNOP_set_calc_obs
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE SYNOP_type_concat (this)
+   SUBROUTINE SYNOP_set_concat (this)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
 
-!------------------------ Dummy Arguments ------------------------------------
       class(SYNOP_set_type), intent(inout) :: this
-
-!------------------------ Local Variables ------------------------------------
-      integer :: i, n, nt, nrh
-      integer :: offset
+      integer :: is, n, offset
 
 !-----------------------------------------------------------------------------
       this%nobs = 0
       IF (allocated(this%lat)) deallocate(this%lat)
       IF (allocated(this%lon)) deallocate(this%lon)
-      IF (allocated(this%y))   deallocate(this%y)
-      IF (allocated(this%hx))  deallocate(this%hx)
-      IF (allocated(this%r))   deallocate(this%r)
-
+      IF (allocated(this%y)) deallocate(this%y)
+      IF (allocated(this%r)) deallocate(this%r)
+      IF (allocated(this%hx_obs)) deallocate(this%hx_obs)
       IF (.not. allocated(this%sensors)) RETURN
 
-      DO i = 1, size(this%sensors)
-         IF (this%cfgs(i)%use_t)  this%nobs = this%nobs + this%sensors(i)%t%nobs
-         IF (this%cfgs(i)%use_rh) this%nobs = this%nobs + this%sensors(i)%rh%nobs
+      ! Count observations with model equivalents and allocate combined arrays.
+      DO is = 1, this%nsensor
+         IF (this%sensors(is)%y%nobs == 0) CYCLE
+         IF (.not. allocated(this%sensors(is)%hx_obs)) CYCLE
+         this%nobs = this%nobs + this%sensors(is)%y%nobs
       ENDDO
-      IF (this%nobs == 0) RETURN
+      IF (this%nobs == 0) return
 
       allocate(this%lat(this%nobs))
       allocate(this%lon(this%nobs))
       allocate(this%y(this%nobs))
-      allocate(this%hx(this%nobs, DEF_DA_ENS_NUM))
       allocate(this%r(this%nobs))
+      allocate(this%hx_obs(this%nobs, DEF_DA_ENS_NUM))
 
+      ! Combine observations and H(x) in stream order.
       offset = 0
+      DO is = 1, this%nsensor
+         IF (.not. allocated(this%sensors(is)%hx_obs)) CYCLE
 
-      DO i = 1, size(this%sensors)
-         ! 2 m temperature observations
-         IF (this%cfgs(i)%use_t) THEN
-            nt = this%sensors(i)%t%nobs
-            IF (nt > 0) THEN
-               n = offset + 1
-               this%lat(n:offset+nt) = this%sensors(i)%t%lat
-               this%lon(n:offset+nt) = this%sensors(i)%t%lon
-               this%y  (n:offset+nt) = this%sensors(i)%t%y
-               this%hx (n:offset+nt,:) = this%sensors(i)%hx_t(:,1:DEF_DA_ENS_NUM)
-               this%r  (n:offset+nt) = this%sensors(i)%t%r
-               offset = offset + nt
-            ENDIF
-         ENDIF
+         n = this%sensors(is)%y%nobs
+         IF (n == 0) CYCLE
 
-         ! 2 m relative humidity observations
-         IF (this%cfgs(i)%use_rh) THEN
-            nrh = this%sensors(i)%rh%nobs
-            IF (nrh > 0) THEN
-               n = offset + 1
-               this%lat(n:offset+nrh) = this%sensors(i)%rh%lat
-               this%lon(n:offset+nrh) = this%sensors(i)%rh%lon
-               this%y  (n:offset+nrh) = this%sensors(i)%rh%y
-               this%hx (n:offset+nrh,:) = this%sensors(i)%hx_rh(:,1:DEF_DA_ENS_NUM)
-               this%r  (n:offset+nrh) = this%sensors(i)%rh%r
-               offset = offset + nrh
-            ENDIF
-         ENDIF
+         this%lat(offset+1:offset+n) = this%sensors(is)%y%lat
+         this%lon(offset+1:offset+n) = this%sensors(is)%y%lon
+         this%y(offset+1:offset+n) = this%sensors(is)%y%y
+         this%r(offset+1:offset+n) = this%sensors(is)%y%r
+         this%hx_obs(offset+1:offset+n,:) = this%sensors(is)%hx_obs
+
+         offset = offset + n
       ENDDO
 
-   END SUBROUTINE SYNOP_type_concat
+   END SUBROUTINE SYNOP_set_concat
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE SYNOP_type_save (this, is_analysis)
-
-!-----------------------------------------------------------------------------
-! Save patch-space H(x) diagnostics. The shared hx_* arrays have one slot per
-! observation stream; a '2MT' stream stores 2 m temperature in its slot and a
-! '2MQ' stream stores 2 m relative humidity. Since tref_ens and rhref_ens are
-! derived from the analysis variables, the analysis H(x) is available directly
-! after the update.
-!-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
-!------------------------ Dummy Arguments ------------------------------------
-      class(SYNOP_set_type), intent(in) :: this
-      logical,               intent(in) :: is_analysis
-
-!------------------------ Local Variables ------------------------------------
-      integer :: i
-      integer :: is
-      integer :: np
-      logical :: valid_hx
-
-!-----------------------------------------------------------------------------
-      IF (nsource <= 0) RETURN
-      IF (numpatch <= 0) RETURN
-      IF (.not. allocated(hx_f_ens)) RETURN
-      IF (this%use_t  .and. .not. allocated(tref_ens))  RETURN
-      IF (this%use_rh .and. .not. allocated(rhref_ens)) RETURN
-
-      DO i = 1, size(this%cfgs)
-         is = this%cfgs(i)%istream
-         IF (is_analysis) THEN
-            hx_a_ens(is,:,:) = spval
-            hx_a    (is,:)   = spval
-         ELSE
-            hx_ol   (is,:)   = spval
-            hx_f_ens(is,:,:) = spval
-            hx_f    (is,:)   = spval
-         ENDIF
-      ENDDO
-
-      DO i = 1, size(this%cfgs)
-         is = this%cfgs(i)%istream
-         DO np = 1, numpatch
-            IF (this%cfgs(i)%use_t) THEN
-               valid_hx = all(tref_ens(1:DEF_DA_ENS_NUM,np) /= spval)
-
-               IF (is_analysis) THEN
-                  hx_a_ens(is,1:DEF_DA_ENS_NUM,np) = tref_ens(1:DEF_DA_ENS_NUM,np)
-                  IF (valid_hx) hx_a(is,np) = &
-                     sum(tref_ens(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
-               ELSE
-                  hx_ol(is,np) = tref_ens(0,np)
-                  hx_f_ens(is,1:DEF_DA_ENS_NUM,np) = tref_ens(1:DEF_DA_ENS_NUM,np)
-                  IF (valid_hx) hx_f(is,np) = &
-                     sum(tref_ens(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
-               ENDIF
-            ELSE IF (this%cfgs(i)%use_rh) THEN
-               valid_hx = all(rhref_ens(1:DEF_DA_ENS_NUM,np) /= spval)
-
-               IF (is_analysis) THEN
-                  hx_a_ens(is,1:DEF_DA_ENS_NUM,np) = rhref_ens(1:DEF_DA_ENS_NUM,np)
-                  IF (valid_hx) hx_a(is,np) = &
-                     sum(rhref_ens(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
-               ELSE
-                  hx_ol(is,np) = rhref_ens(0,np)
-                  hx_f_ens(is,1:DEF_DA_ENS_NUM,np) = rhref_ens(1:DEF_DA_ENS_NUM,np)
-                  IF (valid_hx) hx_f(is,np) = &
-                     sum(rhref_ens(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
-               ENDIF
-            ENDIF
-         ENDDO
-      ENDDO
-
-   END SUBROUTINE SYNOP_type_save
-
-!-----------------------------------------------------------------------------
-
-   SUBROUTINE SYNOP_type_prepare_on_pset (this, np, nobs_p, y_p, hx_p, r_p)
-
-!-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
-!------------------------ Dummy Arguments ------------------------------------
-      class(SYNOP_set_type),  intent(in)  :: this
-      integer,                intent(in)  :: np
-      integer,                intent(out) :: nobs_p
-      real(r8), allocatable,  intent(out) :: y_p(:)
-      real(r8), allocatable,  intent(out) :: hx_p(:,:)
-      real(r8), allocatable,  intent(out) :: r_p(:)
-
-!------------------------ Local Variables ------------------------------------
-      integer :: iens, iobs, n
-      real(r8) :: lat_p, lon_p, dlat, dlon
-      logical,  allocatable :: valid(:)
-      real(r8), allocatable :: lat(:)
-      real(r8), allocatable :: lon(:)
-      real(r8), allocatable :: dist(:)
-
-!-----------------------------------------------------------------------------
-      nobs_p = 0
-
-      ! find the observations around the target patch
-      allocate(valid(this%nobs))
-      valid = .false.
-      IF (this%nobs > 0) THEN
-         lat_p = patchlatr(np)*180/pi
-         lon_p = patchlonr(np)*180/pi
-         DO iobs = 1, this%nobs
-            dlat = abs(this%lat(iobs) - lat_p)
-            dlon = abs(this%lon(iobs) - lon_p)
-            IF (dlon > 180) dlon = 360 - dlon
-
-            valid(iobs) = dlat < this%dres .and. dlon < this%dres .and. &
-                          this%y(iobs) /= spval .and. all(this%hx(iobs,:) /= spval)
-         ENDDO
-      ENDIF
-      n = count(valid)
-      IF (n == 0) RETURN
-      nobs_p = n
-
-      ! pack the valid y and H(x)
-      allocate(y_p(n))
-      allocate(hx_p(n, DEF_DA_ENS_NUM))
-      y_p = pack(this%y, valid)
-      DO iens = 1, DEF_DA_ENS_NUM
-         hx_p(:,iens) = pack(this%hx(:,iens), valid)
-      ENDDO
-
-      ! Convert the error standard deviation to variance and localize R.
-      allocate(r_p(n))
-      allocate(lat(n))
-      allocate(lon(n))
-      allocate(dist(n))
-      lat = pack(this%lat, valid)
-      lon = pack(this%lon, valid)
-      dist = 2.0*6378.1*asin(sqrt( &
-         sin((lat*pi/180.0 - patchlatr(np))/2.0)**2 + &
-         cos(lat*pi/180.0)*cos(patchlatr(np))* &
-         sin((lon*pi/180.0 - patchlonr(np))/2.0)**2))
-      r_p = pack(this%r, valid)**2 / max(exp(-(dist**2)/(2.0*this%locr**2)), 1.0e-6)
-
-   END SUBROUTINE SYNOP_type_prepare_on_pset
-
-!-----------------------------------------------------------------------------
 END MODULE MOD_DA_Obs_SYNOP
 #endif

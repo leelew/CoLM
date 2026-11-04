@@ -1,6 +1,6 @@
 #include <define.h>
 
-#ifdef DataAssimilation
+#ifdef DataAssimilation & GridRiverLakeFlow
 MODULE MOD_DA_Assim_DISC
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
@@ -11,25 +11,20 @@ MODULE MOD_DA_Assim_DISC
 !    The current scheme propagates land-analysis information through runoff;
 !    it does not directly assimilate discharge observations.
 !-----------------------------------------------------------------------------
-   USE MOD_Precision, ONLY: r8
-#ifdef GridRiverLakeFlow
-   USE MOD_SPMD_Task, ONLY: p_is_worker
-   USE MOD_Namelist, ONLY: DEF_DA_ENS_NUM, DEF_Reservoir_Method
-   USE MOD_LandPatch, ONLY: numpatch
-   USE MOD_Vars_Global, ONLY: spval
-   USE MOD_Vars_1DFluxes, ONLY: rnof
-   USE MOD_Grid_RiverLakeNetwork, ONLY: numucat
-   USE MOD_Grid_RiverLakeFlow, ONLY: grid_riverlake_flow
-   USE MOD_Grid_RiverLakeTimeVars, ONLY: wdsrf_ucat, veloc_riv, volresv
-   USE MOD_Grid_RiverLakeHistState, ONLY: a_discharge, acctime_ucat
-   USE MOD_DA_Vars_TimeVars, ONLY: rnof_ens, wdsrf_ucat_a, veloc_riv_a, volresv_a, &
-      wdsrf_ucat_ol, veloc_riv_ol, volresv_ol
-   USE MOD_DA_Vars_AccVars, ONLY: &
-      a_discharge_ol, acctime_ucat_ol, a_discharge_a, acctime_ucat_a
-#endif
+   USE MOD_Precision
+   USE MOD_SPMD_Task
+   USE MOD_Namelist
+   USE MOD_LandPatch
+   USE MOD_Vars_Global
+   USE MOD_Vars_1DFluxes
+   USE MOD_Grid_RiverLakeNetwork
+   USE MOD_Grid_RiverLakeFlow
+   USE MOD_Grid_RiverLakeTimeVars
+   USE MOD_Grid_RiverLakeHistState
+   USE MOD_DA_Vars_TimeVars
+   USE MOD_DA_Vars_AccVars
    IMPLICIT NONE
    PRIVATE
-   PUBLIC :: run_DA_DISC
 
 !-----------------------------------------------------------------------------
 

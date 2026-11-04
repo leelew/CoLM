@@ -31,29 +31,6 @@ MODULE MOD_DA_Vars_Hist
    SAVE
 
 !-----------------------------------------------------------------------------
-! NOTE (duplicated history pipeline):
-!   write_DA_hist_2d/3d below duplicate the normalization (nac or acc_num),
-!   patch-to-grid mapping, and area averaging implemented by
-!   MOD_Hist.F90:write_history_variable_3d/4d and
-!   MOD_HistGridded.F90:flux_map_and_write_3d/4d. The DA names omit the grid
-!   dimensions, so the 2d writer here corresponds to the 3d routines there,
-!   and the 3d writer to the 4d ones. The copy exists because those files
-!   are maintained outside the DA module: DA-only features (such as the
-!   per-source filter_3d mask and its per-source sumarea) are not wanted in
-!   the shared core, and threading them through it would couple the history
-!   core to DA.
-!
-!   If the shared routines are ever refactored or split so that the common
-!   steps can be called without this coupling, reduce write_DA_hist_2d/3d to
-!   thin wrappers around them. Until then, mirror any logic change in
-!   MOD_Hist.F90 / MOD_HistGridded.F90 here.
-!-----------------------------------------------------------------------------
-   INTERFACE write_DA_hist
-      MODULE PROCEDURE write_DA_hist_2d
-      MODULE PROCEDURE write_DA_hist_3d
-   END INTERFACE write_DA_hist
-
-!-----------------------------------------------------------------------------
 
 CONTAINS
 
@@ -196,6 +173,25 @@ CONTAINS
 
    END SUBROUTINE save_DA_hist
 
+
+
+
+
+
+
+
+
+
+
+
+!-----------------------------------------------------------------------------
+! WARNING (duplicated codes):
+!   Keep DA history definitions, accumulation, and output within DA modules
+!   without modifying the core model. Necessary utilities are included here
+!   to avoid circular module dependencies.
+!
+!   Remove these copies once the core utilities are moved to an independent
+!   module that DA can use directly.
 !-----------------------------------------------------------------------------
 
    SUBROUTINE write_DA_hist_2d (HistForm, is_hist, &
@@ -203,13 +199,9 @@ CONTAINS
          sumarea, filter, longname, units, filter_3d)
 
 !-----------------------------------------------------------------------------
-! DESCRIPTION:
-!    Normalize diagnostic sums, map patches to the history grid, and write
-!    the resulting field. Array rank excludes the history-grid dimensions.
-!-----------------------------------------------------------------------------
+
       IMPLICIT NONE
 
-!------------------------ Dummy Arguments ------------------------------------
       character(len=*), intent(in)           :: HistForm
       logical, intent(in)                    :: is_hist
       real(r8), intent(inout)                :: acc_vec(:,:)
@@ -225,7 +217,6 @@ CONTAINS
       character(len=*), intent(in)           :: units
       logical, intent(in), optional          :: filter_3d(:,:)
 
-!------------------------ Local Variables ------------------------------------
       type(block_data_real8_3d)              :: flux_xy_3d
       type(block_data_real8_3d)              :: sumarea_3d
       type(block_data_real8_2d)              :: sumarea_one_source
@@ -238,7 +229,6 @@ CONTAINS
       integer                                :: compress
       real(r8)                               :: area_den
 
-!-----------------------------------------------------------------------------
       IF (.not. is_hist) RETURN
       IF (HistForm /= 'Gridded') RETURN
 
@@ -319,13 +309,8 @@ CONTAINS
          sumarea, filter, longname, units, acc_num)
 
 !-----------------------------------------------------------------------------
-! DESCRIPTION:
-!    Normalize diagnostic sums, map patches to the history grid, and write
-!    the resulting field. Array rank excludes the history-grid dimensions.
-!-----------------------------------------------------------------------------
       IMPLICIT NONE
 
-!------------------------ Dummy Arguments ------------------------------------
       character(len=*), intent(in)           :: HistForm
       logical, intent(in)                    :: is_hist
       real(r8), intent(inout)                :: acc_vec(:,:,:)
@@ -344,7 +329,6 @@ CONTAINS
       character(len=*), intent(in)           :: units
       real(r8), intent(in), optional         :: acc_num(:)
 
-!------------------------ Local Variables ------------------------------------
       type(block_data_real8_4d)              :: flux_xy_4d
       integer                                :: iblkme
       integer                                :: xblk
@@ -355,7 +339,6 @@ CONTAINS
       integer                                :: i2
       integer                                :: compress
 
-!-----------------------------------------------------------------------------
       IF (.not. is_hist) RETURN
       IF (HistForm /= 'Gridded') RETURN
 

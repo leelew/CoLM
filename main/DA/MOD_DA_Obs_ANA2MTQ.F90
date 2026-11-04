@@ -14,7 +14,7 @@ MODULE MOD_DA_Obs_ANA2MTQ
    USE MOD_Precision
    USE MOD_Namelist
    USE MOD_DA_Obs_PseudoType
-   USE MOD_DA_Vars_TimeVars
+   USE MOD_DA_Assim_2MTQ
    IMPLICIT NONE
 
 !-----------------------------------------------------------------------------

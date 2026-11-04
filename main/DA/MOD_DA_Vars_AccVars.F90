@@ -31,12 +31,6 @@ MODULE MOD_DA_Vars_AccVars
    PUBLIC :: deallocate_DA_AccVars
    PUBLIC :: flush_DA_AccVars
    PUBLIC :: accumulate_DA_AccVars
-   PUBLIC :: acc_DA_hist
-
-   INTERFACE acc_DA_hist
-      MODULE PROCEDURE acc_DA_hist_2d
-      MODULE PROCEDURE acc_DA_hist_3d
-   END INTERFACE acc_DA_hist
 
 !=============================================================================
 ! diagnostic sample sums for history output
@@ -195,6 +189,26 @@ CONTAINS
 
    END SUBROUTINE accumulate_DA_AccVars
 
+
+
+
+
+
+
+
+
+
+
+
+
+!-----------------------------------------------------------------------------
+! WARNING (duplicated codes):
+!   Keep DA history definitions, accumulation, and output within DA modules
+!   without modifying the core model. Necessary utilities are included here
+!   to avoid circular module dependencies.
+!
+!   Remove these copies once the core utilities are moved to an independent
+!   module that DA can use directly.
 !-----------------------------------------------------------------------------
 
    SUBROUTINE acc_DA_hist_2d (var, s)
@@ -249,6 +263,5 @@ CONTAINS
    END SUBROUTINE acc_DA_hist_3d
 
 !-----------------------------------------------------------------------------
-
 END MODULE MOD_DA_Vars_AccVars
 #endif

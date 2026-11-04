@@ -203,7 +203,7 @@ CONTAINS
             this%lat(offset+1:offset+n) = this%pm%lat
             this%lon(offset+1:offset+n) = this%pm%lon
             this%y(offset+1:offset+n) = this%pm%y
-            this%hx(offset+1:offset+n,:) = this%pm%hx
+            this%hx(offset+1:offset+n,:) = this%pm%hx_obs
             this%r(offset+1:offset+n) = this%pm%r
             offset = offset + n
          ENDIF
@@ -290,22 +290,22 @@ CONTAINS
 
             IF (is_analysis) THEN
                DO np = 1, numpatch
-                  valid_hx = all(this%pm%sensors(ipm)%hx_pset(1:DEF_DA_ENS_NUM,np) /= spval)
+                  valid_hx = all(this%pm%sensors(ipm)%hx_model(1:DEF_DA_ENS_NUM,np) /= spval)
                   DO iens = 1, DEF_DA_ENS_NUM
-                     hx_a_ens(is,iens,np) = this%pm%sensors(ipm)%hx_pset(iens,np)
+                     hx_a_ens(is,iens,np) = this%pm%sensors(ipm)%hx_model(iens,np)
                   ENDDO
                   IF (valid_hx) hx_a(is,np) = &
-                     sum(this%pm%sensors(ipm)%hx_pset(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
+                     sum(this%pm%sensors(ipm)%hx_model(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
                ENDDO
             ELSE
                DO np = 1, numpatch
-                  hx_ol(is,np) = this%pm%sensors(ipm)%hx_pset(0,np)
-                  valid_hx = all(this%pm%sensors(ipm)%hx_pset(1:DEF_DA_ENS_NUM,np) /= spval)
+                  hx_ol(is,np) = this%pm%sensors(ipm)%hx_model(0,np)
+                  valid_hx = all(this%pm%sensors(ipm)%hx_model(1:DEF_DA_ENS_NUM,np) /= spval)
                   DO iens = 1, DEF_DA_ENS_NUM
-                     hx_f_ens(is,iens,np) = this%pm%sensors(ipm)%hx_pset(iens,np)
+                     hx_f_ens(is,iens,np) = this%pm%sensors(ipm)%hx_model(iens,np)
                   ENDDO
                   IF (valid_hx) hx_f(is,np) = &
-                     sum(this%pm%sensors(ipm)%hx_pset(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
+                     sum(this%pm%sensors(ipm)%hx_model(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
                ENDDO
             ENDIF
          ENDIF

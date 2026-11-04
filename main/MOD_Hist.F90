@@ -30,7 +30,7 @@ MODULE MOD_Hist
    USE MOD_Catch_Hist
 #endif
 #ifdef DataAssimilation
-   USE MOD_DA_Vars_Hist, only: save_DA_hist
+   USE MOD_DA_Vars_Hist
 #endif
 #ifdef GridRiverLakeFlow
    USE MOD_Grid_RiverLakeHist

@@ -27,7 +27,7 @@ MODULE MOD_DA_Assim_2MTQ
 !    Lu Li, 05/2026: Initial implementation
 !-----------------------------------------------------------------------------
    USE MOD_Precision
-   USE MOD_DA_Obs_SYNOP
+   USE MOD_DA_Obs_2MTQ
    USE MOD_DA_EnKF
    USE MOD_DA_Vars_TimeVars
    USE MOD_LandPatch
@@ -38,11 +38,25 @@ MODULE MOD_DA_Assim_2MTQ
    USE MOD_Qsadv, ONLY: qsadv
    IMPLICIT NONE
 
-   type(SYNOP_set_type) :: synop_t   ! '2MT' streams: 2 m temperature
-   type(SYNOP_set_type) :: synop_q   ! '2MQ' streams: 2 m relative humidity
+   type(TQ_type) :: tq_t                      ! '2MT' streams: 2 m temperature
+   type(TQ_type) :: tq_q                      ! '2MQ' target: specific humidity analyzed using 2MRH
 
-   logical :: use_2mt = .false.      ! any '2MT' stream configured
-   logical :: use_2mq = .false.      ! any '2MQ' stream configured
+   logical :: use_2mt = .false.               ! any '2MT' stream configured
+   logical :: use_2mq = .false.               ! any '2MQ' stream configured
+
+   ! Products of the current SYNOP assimilation cycle for ANA2MTQ.
+   ! Ensemble arrays use [0:DEF_DA_ENS_NUM, numpatch].
+   ! Analysis arrays are allocated only after both analysis steps finish.
+   real(r8), allocatable :: tref_ens_f  (:,:) ! Forecast 2 m temperature ensemble [K]
+   real(r8), allocatable :: tref_ens_a  (:,:) ! Analysis 2 m temperature ensemble [K]
+   real(r8), allocatable :: tref_f      (:)   ! Forecast ensemble-mean 2 m temperature [K]
+   real(r8), allocatable :: tref_a      (:)   ! Analysis ensemble-mean 2 m temperature [K]
+   real(r8), allocatable :: qref_ens_f  (:,:) ! Forecast 2 m specific humidity ensemble [kg/kg]
+   real(r8), allocatable :: qref_ens_a  (:,:) ! Analysis 2 m specific humidity ensemble [kg/kg]
+   real(r8), allocatable :: qref_f      (:)   ! Forecast ensemble-mean 2 m specific humidity [kg/kg]
+   real(r8), allocatable :: qref_a      (:)   ! Analysis ensemble-mean 2 m specific humidity [kg/kg]
+   real(r8), allocatable :: rhref_ens_f (:,:) ! Forecast 2 m relative humidity ensemble [0-1]
+   real(r8), allocatable :: rhref_ens_a (:,:) ! Analysis 2 m relative humidity ensemble [0-1]
 
    PUBLIC :: init_DA_2MTQ
    PUBLIC :: run_DA_2MTQ
@@ -60,7 +74,7 @@ CONTAINS
       IMPLICIT NONE
 
       integer :: is, i, nsensor_t, nsensor_q
-      type(SYNOP_config_type), allocatable :: configs(:)
+      type(TQ_config_type), allocatable :: configs(:)
 
 !-----------------------------------------------------------------------------
       nsensor_t = 0
@@ -73,7 +87,7 @@ CONTAINS
       use_2mq = nsensor_q > 0
       IF (.not. use_2mt .and. .not. use_2mq) RETURN
 
-      ! Each SYNOP stream is packed with the variable enabled by its target.
+      ! Group SYNOP streams by analysis target; VAR selects the observation operator.
       ! istream is the namelist index of the stream, consistent with the
       ! other assimilation drivers and the shared hx_* diagnostics, so the
       ! DEF_DA_OBS_TARGET entries must be filled contiguously from 1.
@@ -87,10 +101,9 @@ CONTAINS
                configs(is)%sensor_name = DEF_DA_OBS_SENSOR(i)
                configs(is)%var_name    = DEF_DA_OBS_VAR(i)
                configs(is)%istream     = i
-               configs(is)%use_t       = .true.
             ENDIF
          ENDDO
-         CALL synop_t%init(landpatch, configs)
+         CALL tq_t%init(landpatch, configs)
          deallocate(configs)
       ENDIF
 
@@ -104,10 +117,9 @@ CONTAINS
                configs(is)%sensor_name = DEF_DA_OBS_SENSOR(i)
                configs(is)%var_name    = DEF_DA_OBS_VAR(i)
                configs(is)%istream     = i
-               configs(is)%use_rh      = .true.
             ENDIF
          ENDDO
-         CALL synop_q%init(landpatch, configs)
+         CALL tq_q%init(landpatch, configs)
          deallocate(configs)
       ENDIF
 
@@ -129,6 +141,9 @@ CONTAINS
       integer :: iens
       integer :: nobs_p
       real(r8) :: es, esdT, qs, qsdT
+      real(r8) :: tc_rh                       ! 2 m air temperature [degrees Celsius]
+      real(r8) :: es_rh                       ! Saturation vapor pressure [hPa]
+      real(r8) :: e_rh                        ! Water vapor pressure [hPa]
       real(r8), allocatable :: y_p(:)
       real(r8), allocatable :: hx_p(:,:)
       real(r8), allocatable :: r_p(:)
@@ -139,22 +154,57 @@ CONTAINS
       real(r8), allocatable :: qref_work_a(:,:)
 
 !-----------------------------------------------------------------------------
+      ! Discard products from the previous assimilation cycle.
+      IF (allocated(tref_ens_f )) deallocate (tref_ens_f )
+      IF (allocated(tref_ens_a )) deallocate (tref_ens_a )
+      IF (allocated(tref_f     )) deallocate (tref_f     )
+      IF (allocated(tref_a     )) deallocate (tref_a     )
+      IF (allocated(qref_ens_f )) deallocate (qref_ens_f )
+      IF (allocated(qref_ens_a )) deallocate (qref_ens_a )
+      IF (allocated(qref_f     )) deallocate (qref_f     )
+      IF (allocated(qref_a     )) deallocate (qref_a     )
+      IF (allocated(rhref_ens_f)) deallocate (rhref_ens_f)
+      IF (allocated(rhref_ens_a)) deallocate (rhref_ens_a)
+      IF (.not. use_2mt .and. .not. use_2mq) RETURN
+      IF (DEF_DA_ENS_NUM <= 1) RETURN
+
       ! read the SYNOP observations and calculate the prior H(x) at station
       ! sites for each enabled target
       IF (use_2mt) THEN
-         CALL synop_t%calcg(idate, deltim)
-         CALL synop_t%save(.false.)
+         CALL tq_t%calc_obs(idate, deltim)
+         CALL tq_t%save(.false.)
       ENDIF
 
-      CALL SYNOP_calc_rh()
       IF (p_is_worker .and. numpatch > 0) THEN
-         ! Preserve the complete prior ensemble before either screen-level analysis.
+         ! Compute relative humidity before saving the prior ensembles.
+         DO np = 1, numpatch
+            DO iens = 0, DEF_DA_ENS_NUM
+               rhref_ens(iens,np) = spval
+
+               IF (tref_ens(iens,np) == spval .or. &
+                   qref_ens(iens,np) == spval .or. &
+                   forc_psrf(np)    == spval .or. &
+                   forc_psrf(np)    <= 0.0_r8) CYCLE
+
+               tc_rh = tref_ens(iens,np) - 273.15_r8
+               es_rh = 6.112_r8 * exp((17.67_r8*tc_rh)/(tc_rh + 243.5_r8))
+               e_rh  = (qref_ens(iens,np)*forc_psrf(np)/100.0_r8) / &
+                    (0.378_r8*qref_ens(iens,np) + 0.622_r8)
+               IF (es_rh > 0.0_r8) THEN
+                  rhref_ens(iens,np) = max(min(1.0_r8, e_rh/es_rh), 0.0_r8)
+               ENDIF
+            ENDDO
+         ENDDO
+
+         ! Preserve forecasts before either screen-level analysis.
+         allocate (tref_ens_f (0:DEF_DA_ENS_NUM, numpatch))
+         allocate (tref_f     (numpatch))
+         allocate (qref_ens_f (0:DEF_DA_ENS_NUM, numpatch))
+         allocate (qref_f     (numpatch))
+         allocate (rhref_ens_f(0:DEF_DA_ENS_NUM, numpatch))
          tref_ens_f(:,:) = tref_ens
          qref_ens_f(:,:) = qref_ens
-         tref_ens_a(:,:) = tref_ens_f
-         qref_ens_a(:,:) = qref_ens_f
          rhref_ens_f(:,:) = rhref_ens
-         rhref_ens_a(:,:) = rhref_ens_f
          tref_f(:) = sum(tref_ens(1:DEF_DA_ENS_NUM,:), dim=1) / DEF_DA_ENS_NUM
          qref_f(:) = sum(qref_ens(1:DEF_DA_ENS_NUM,:), dim=1) / DEF_DA_ENS_NUM
       ENDIF
@@ -166,12 +216,12 @@ CONTAINS
             IF (patchtype(np) >= 3) CYCLE
 
             ! prepare localized y, R, and H(x) for the target patch
-            CALL synop_t%prepare(np, nobs_p, y_p, hx_p, r_p)
+            CALL tq_t%prepare(np, nobs_p, y_p, hx_p, r_p)
             IF (nobs_p == 0) CYCLE
 
             ! perform data assimilation
             allocate(trans(DEF_DA_ENS_NUM, DEF_DA_ENS_NUM))
-            CALL letkf(DEF_DA_ENS_NUM, nobs_p, hx_p, y_p, r_p, synop_t%infl, trans)
+            CALL letkf(DEF_DA_ENS_NUM, nobs_p, hx_p, y_p, r_p, tq_t%infl, trans)
 
             ! apply the LETKF transform to the 2 m temperature ensemble
             allocate(tref_work_f(1, DEF_DA_ENS_NUM))
@@ -200,10 +250,10 @@ CONTAINS
 
       ! 2 m humidity analysis: H(x) is relative humidity derived from
       ! qref_ens, so it is calculated after the temperature analysis;
-      ! SYNOP_calc_rh inside calcg therefore sees the analyzed tref_ens
+      ! The humidity operator in calc_obs therefore uses the analyzed tref_ens
       IF (use_2mq) THEN
-         CALL synop_q%calcg(idate, deltim)
-         CALL synop_q%save(.false.)
+         CALL tq_q%calc_obs(idate, deltim)
+         CALL tq_q%save(.false.)
       ENDIF
 
       IF (use_2mq .and. p_is_worker .and. DEF_DA_ENS_NUM > 1) THEN
@@ -211,12 +261,12 @@ CONTAINS
             IF (patchtype(np) >= 3) CYCLE
 
             ! prepare localized y, R, and H(x) for the target patch
-            CALL synop_q%prepare(np, nobs_p, y_p, hx_p, r_p)
+            CALL tq_q%prepare(np, nobs_p, y_p, hx_p, r_p)
             IF (nobs_p == 0) CYCLE
 
             ! perform data assimilation
             allocate(trans(DEF_DA_ENS_NUM, DEF_DA_ENS_NUM))
-            CALL letkf(DEF_DA_ENS_NUM, nobs_p, hx_p, y_p, r_p, synop_q%infl, trans)
+            CALL letkf(DEF_DA_ENS_NUM, nobs_p, hx_p, y_p, r_p, tq_q%infl, trans)
 
             ! apply the LETKF transform to the 2 m specific humidity ensemble
             allocate(qref_work_f(1, DEF_DA_ENS_NUM))
@@ -248,15 +298,38 @@ CONTAINS
          ENDDO
       ENDIF
 
-      ! update H(x) for the analyzed ensembles and save the analysis
-      ! diagnostics. The means of a disabled target stay at the prior means,
-      ! so the ANA2MTQ products are always defined.
+      ! Publish the completed analyses and save model-space H(x) diagnostics.
+      ! Disabled targets retain their forecast values.
       IF (DEF_DA_ENS_NUM > 1) THEN
-         CALL SYNOP_calc_rh()
          IF (p_is_worker .and. numpatch > 0) THEN
-            ! Store the final ensembles after temperature and saturation constraints.
-            tref_ens_a(:,:) = tref_ens
-            qref_ens_a(:,:) = qref_ens
+            ! Compute relative humidity from the final analyzed ensembles.
+            DO np = 1, numpatch
+               DO iens = 0, DEF_DA_ENS_NUM
+                  rhref_ens(iens,np) = spval
+
+                  IF (tref_ens(iens,np) == spval .or. &
+                      qref_ens(iens,np) == spval .or. &
+                      forc_psrf(np)    == spval .or. &
+                      forc_psrf(np)    <= 0.0_r8) CYCLE
+
+                  tc_rh = tref_ens(iens,np) - 273.15_r8
+                  es_rh = 6.112_r8 * exp((17.67_r8*tc_rh)/(tc_rh + 243.5_r8))
+                  e_rh  = (qref_ens(iens,np)*forc_psrf(np)/100.0_r8) / &
+                       (0.378_r8*qref_ens(iens,np) + 0.622_r8)
+                  IF (es_rh > 0.0_r8) THEN
+                     rhref_ens(iens,np) = max(min(1.0_r8, e_rh/es_rh), 0.0_r8)
+                  ENDIF
+               ENDDO
+            ENDDO
+
+            ! Store final ensembles after temperature and saturation constraints.
+            allocate (tref_ens_a (0:DEF_DA_ENS_NUM, numpatch))
+            allocate (tref_a     (numpatch))
+            allocate (qref_ens_a (0:DEF_DA_ENS_NUM, numpatch))
+            allocate (qref_a     (numpatch))
+            allocate (rhref_ens_a(0:DEF_DA_ENS_NUM, numpatch))
+            tref_ens_a (:,:) = tref_ens
+            qref_ens_a (:,:) = qref_ens
             rhref_ens_a(:,:) = rhref_ens
             IF (use_2mt) THEN
                tref_a(:) = sum(tref_ens(1:DEF_DA_ENS_NUM,:), dim=1) / DEF_DA_ENS_NUM
@@ -269,11 +342,17 @@ CONTAINS
                qref_a(:) = qref_f(:)
             ENDIF
          ENDIF
-         IF (use_2mt) CALL synop_t%save(.true.)
-         IF (use_2mq) CALL synop_q%save(.true.)
+         IF (use_2mt) THEN
+            CALL tq_t%calc_model()
+            CALL tq_t%save(.true.)
+         ENDIF
+         IF (use_2mq) THEN
+            CALL tq_q%calc_model()
+            CALL tq_q%save(.true.)
+         ENDIF
       ENDIF
-      IF (use_2mt) CALL synop_t%clear()
-      IF (use_2mq) CALL synop_q%clear()
+      IF (use_2mt) CALL tq_t%clear()
+      IF (use_2mq) CALL tq_q%clear()
 
    END SUBROUTINE run_DA_2MTQ
 
@@ -286,15 +365,28 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
       IF (use_2mt) THEN
-         CALL synop_t%clear()
-         IF (allocated(synop_t%cfgs))    deallocate(synop_t%cfgs)
-         IF (allocated(synop_t%sensors)) deallocate(synop_t%sensors)
+         CALL tq_t%clear()
+         IF (allocated(tq_t%cfgs))    deallocate(tq_t%cfgs)
+         IF (allocated(tq_t%synop%cfgs)) deallocate(tq_t%synop%cfgs)
+         IF (allocated(tq_t%synop%sensors)) deallocate(tq_t%synop%sensors)
       ENDIF
       IF (use_2mq) THEN
-         CALL synop_q%clear()
-         IF (allocated(synop_q%cfgs))    deallocate(synop_q%cfgs)
-         IF (allocated(synop_q%sensors)) deallocate(synop_q%sensors)
+         CALL tq_q%clear()
+         IF (allocated(tq_q%cfgs))    deallocate(tq_q%cfgs)
+         IF (allocated(tq_q%synop%cfgs)) deallocate(tq_q%synop%cfgs)
+         IF (allocated(tq_q%synop%sensors)) deallocate(tq_q%synop%sensors)
       ENDIF
+
+      IF (allocated(tref_ens_f )) deallocate (tref_ens_f )
+      IF (allocated(tref_ens_a )) deallocate (tref_ens_a )
+      IF (allocated(tref_f     )) deallocate (tref_f     )
+      IF (allocated(tref_a     )) deallocate (tref_a     )
+      IF (allocated(qref_ens_f )) deallocate (qref_ens_f )
+      IF (allocated(qref_ens_a )) deallocate (qref_ens_a )
+      IF (allocated(qref_f     )) deallocate (qref_f     )
+      IF (allocated(qref_a     )) deallocate (qref_a     )
+      IF (allocated(rhref_ens_f)) deallocate (rhref_ens_f)
+      IF (allocated(rhref_ens_a)) deallocate (rhref_ens_a)
 
       use_2mt = .false.
       use_2mq = .false.
