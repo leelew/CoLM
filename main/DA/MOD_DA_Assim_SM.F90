@@ -4,26 +4,36 @@
 MODULE MOD_DA_Assim_SM
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
-!    Main soil-moisture assimilation driver for multiple passive-microwave
-!    observation streams.
+!    Soil-moisture assimilation driver using observations prepared by Obs_SM,
+!    including passive-microwave data and ANATQ pseudo-observations.
+!
+! WORKFLOW:
+!    1. Initialize observation streams from the namelist.
+!    2. Prepare observations and forecast H(x); save forecast diagnostics.
+!    3. Apply a localized LETKF update and soil-water constraints per patch.
+!    4. Save analysis diagnostics, recompute H(x), and clear time-step data.
+!
+! NOTES:
+!    The LETKF update is applied to the top two soil layers. Water-content
+!    bounds are enforced and the aquifer compensates liquid-water changes.
+!    Model feedback is handled by the DA ensemble postprocessing step.
+!
+! HISTORY:
+!    Lu Li, Zhilong Fan, 11/2026: DA v1.0
 !-----------------------------------------------------------------------------
    USE MOD_Precision
-   USE MOD_DA_Obs_SM
-   USE MOD_DA_EnKF
-   USE MOD_DA_Vars_TimeVars
    USE MOD_Vars_TimeInvariants
-   USE MOD_Vars_Global, ONLY: pi, nl_soil, dz_soi
+   USE MOD_Vars_Global
    USE MOD_LandPatch
    USE MOD_Namelist
    USE MOD_SPMD_Task
-   USE MOD_Const_Physical, ONLY: denice, denh2o, tfrz
+   USE MOD_Const_Physical
+   USE MOD_DA_Obs_SM
+   USE MOD_DA_EnKF
+   USE MOD_DA_Vars_TimeVars
    IMPLICIT NONE
 
    type(SM_type) :: sm
-
-   PUBLIC :: init_DA_SM
-   PUBLIC :: run_DA_SM
-   PUBLIC :: end_DA_SM
 
 !-----------------------------------------------------------------------------
 
@@ -82,17 +92,16 @@ CONTAINS
       integer :: np
       integer :: iens
       integer :: il
-      integer :: nobs_p
-      real(r8) :: eff_porsl
-      real(r8), allocatable :: y_p(:)
-      real(r8), allocatable :: hx_p(:,:)
-      real(r8), allocatable :: r_p(:)
-      real(r8), allocatable :: trans(:,:)
-      real(r8), allocatable :: wliq_ens_f(:,:)
-      real(r8), allocatable :: wliq_ens_a(:,:)
+      integer :: nobs_p                      ! Number of valid observations selected for the target patch
+      real(r8), allocatable :: y_p(:)        ! Selected observation values [nobs_p]
+      real(r8), allocatable :: hx_p(:,:)     ! Forecast observation equivalents [nobs_p, ens]
+      real(r8), allocatable :: r_p(:)        ! Localized observation error variances [nobs_p]
+      real(r8), allocatable :: trans(:,:)    ! LETKF ensemble transform [ens, ens]
+      real(r8), allocatable :: state_f(:,:)  ! Forecast soil liquid water [soil, ens], kg/m2
+      real(r8), allocatable :: state_a(:,:)  ! Transformed soil liquid water [soil, ens], kg/m2
 
 !-----------------------------------------------------------------------------
-      ! calculate y and H(x) at y locations from different sources
+      ! Prepare observations and forecast H(x).
       CALL sm%calc_obs(idate, deltim)
       CALL sm%save(.false.)
 
@@ -101,30 +110,30 @@ CONTAINS
          wliq_soisno_f (:,:) = sum(wliq_soisno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2) / DEF_DA_ENS_NUM
       ENDIF
 
-      ! loop over patches and perform assimilation for each patch
+      ! Apply the localized LETKF update to each eligible patch.
       IF (p_is_worker .and. DEF_DA_ENS_NUM > 1) THEN
          DO np = 1, numpatch
             IF (patchtype(np) >= 3) CYCLE
 
-            ! prepare localized y, R, and H(x) for the target patch
+            ! Select observations and localize their error variances.
             CALL sm%prepare(np, nobs_p, y_p, hx_p, r_p)
             IF (nobs_p == 0) CYCLE
 
-            ! perform data assimilation
+            ! Compute the ensemble transform.
             allocate(trans(DEF_DA_ENS_NUM, DEF_DA_ENS_NUM))
             CALL letkf(DEF_DA_ENS_NUM, nobs_p, hx_p, y_p, r_p, sm%infl, trans)
 
-            allocate(wliq_ens_f(nl_soil, DEF_DA_ENS_NUM))
-            allocate(wliq_ens_a(nl_soil, DEF_DA_ENS_NUM))
+            allocate(state_f(nl_soil, DEF_DA_ENS_NUM))
+            allocate(state_a(nl_soil, DEF_DA_ENS_NUM))
             DO iens = 1, DEF_DA_ENS_NUM
-               wliq_ens_f(:,iens) = wliq_soisno_ens(1:,iens,np)
+               state_f(:,iens) = wliq_soisno_ens(1:,iens,np)
             ENDDO
             CALL dgemm('N', 'N', nl_soil, DEF_DA_ENS_NUM, DEF_DA_ENS_NUM, &
-                        1.0_r8, wliq_ens_f, nl_soil, trans, DEF_DA_ENS_NUM, &
-                        0.0_r8, wliq_ens_a, nl_soil)
-            wliq_ens_a = max(0.0_r8, wliq_ens_a)
+                        1.0_r8, state_f, nl_soil, trans, DEF_DA_ENS_NUM, &
+                        0.0_r8, state_a, nl_soil)
+            state_a = max(0.0_r8, state_a)
             DO iens = 1, DEF_DA_ENS_NUM
-               wliq_soisno_ens(1:2,iens,np) = wliq_ens_a(1:2,iens)
+               wliq_soisno_ens(1:2,iens,np) = state_a(1:2,iens)
             ENDDO
 
             ! postprocess soil moisture to ensure physical consistency
@@ -143,20 +152,21 @@ CONTAINS
                   ENDIF
 
                   wliq_soisno_ens(il,iens,np) = min(porsl(il,np)*(dz_soi(il)*denh2o), wliq_soisno_ens(il,iens,np))
-                  eff_porsl = max(0.0_r8, porsl(il,np) - wliq_soisno_ens(il,iens,np)/(dz_soi(il)*denh2o))
-                  wice_soisno_ens(il,iens,np) = min(eff_porsl*(dz_soi(il)*denice), wice_soisno_ens(il,iens,np))
+                  wice_soisno_ens(il,iens,np) = min( &
+                     max(0.0_r8, porsl(il,np) - wliq_soisno_ens(il,iens,np)/(dz_soi(il)*denh2o)) &
+                     * (dz_soi(il)*denice), wice_soisno_ens(il,iens,np))
                ENDDO
             ENDDO
 
             wa_ens(1:DEF_DA_ENS_NUM,np) = wa_ens(1:DEF_DA_ENS_NUM,np) - &
-               sum(wliq_soisno_ens(1:,1:DEF_DA_ENS_NUM,np) - wliq_ens_f, dim=1)
+               sum(wliq_soisno_ens(1:,1:DEF_DA_ENS_NUM,np) - state_f, dim=1)
 
             deallocate(y_p, r_p, hx_p, trans)
-            deallocate(wliq_ens_f, wliq_ens_a)
+            deallocate(state_f, state_a)
          ENDDO
       ENDIF
 
-      ! Recalculate H(x) after LETKF so history can compare prior and analysis
+      ! Save analysis diagnostics and recompute model-space H(x).
       IF (DEF_DA_ENS_NUM > 1) THEN
          IF (p_is_worker .and. numpatch > 0) THEN
             wliq_soisno_a(:,:) = sum(wliq_soisno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2) / DEF_DA_ENS_NUM
@@ -182,8 +192,7 @@ CONTAINS
 
       sm%pm%nsensor = 0
       sm%use_pm = .false.
-      sm%use_gnos = .false.
-      sm%use_ana2mtq = .false.
+      sm%use_anatq = .false.
 
    END SUBROUTINE end_DA_SM
 

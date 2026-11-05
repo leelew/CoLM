@@ -34,7 +34,7 @@ MODULE MOD_DA_Obs_PM
 !
 ! HISTORY:
 !    Lu Li, 05/2026: First implementation
-!    Lu Li, Zhilong Fan, 10/2026: First operational version
+!    Lu Li, Zhilong Fan, 11/2026: DA v1.0
 !-----------------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_Const_Physical

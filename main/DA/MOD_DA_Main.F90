@@ -32,9 +32,9 @@ MODULE MOD_DA_Main
    USE MOD_Grid_RiverLakeTimeVars
    USE MOD_DA_Vars_AccVars
    USE MOD_Grid_RiverLakeHist
-#endif
-   USE MOD_DA_Assim_2MTQ
    USE MOD_DA_Assim_DISC
+#endif
+   USE MOD_DA_Assim_TQ
    USE MOD_DA_Assim_SM
    USE MOD_DA_Assim_ST
    USE MOD_DA_Ens
@@ -68,7 +68,7 @@ CONTAINS
       use_assim_sm   = any(DEF_DA_OBS_TARGET == 'SM' )
       use_assim_st   = any(DEF_DA_OBS_TARGET == 'ST' )
 
-      IF (use_assim_2mt .or. use_assim_2mq) CALL init_DA_2MTQ ()
+      IF (use_assim_2mt .or. use_assim_2mq) CALL init_DA_TQ ()
       IF (use_assim_sm) CALL init_DA_SM ()
       IF (use_assim_st) CALL init_DA_ST ()
 
@@ -108,10 +108,12 @@ CONTAINS
       ! Run data assimilation
       IF (.not. is_spinup .and. DEF_DA_ENS_NUM > 1) THEN
          CALL mpi_barrier (p_comm_glb, p_err)
-         IF (use_assim_2mt .or. use_assim_2mq) CALL run_DA_2MTQ (idate, deltim)
+         IF (use_assim_2mt .or. use_assim_2mq) CALL run_DA_TQ (idate, deltim)
          IF (use_assim_sm) CALL run_DA_SM (idate, deltim)
          IF (use_assim_st) CALL run_DA_ST (idate, deltim)
+#ifdef GridRiverLakeFlow
          IF (use_assim_disc) CALL run_DA_DISC (idate, deltim)
+#endif
       ENDIF
 
       ! Restore open-loop (if offline) or analysis (if online) to model states
@@ -128,7 +130,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-      IF (use_assim_2mt .or. use_assim_2mq) CALL end_DA_2MTQ ()
+      IF (use_assim_2mt .or. use_assim_2mq) CALL end_DA_TQ ()
       use_assim_2mt  = .false.
       use_assim_2mq  = .false.
       use_assim_disc = .false.

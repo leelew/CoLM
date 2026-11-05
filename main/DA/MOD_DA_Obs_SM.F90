@@ -8,7 +8,7 @@ MODULE MOD_DA_Obs_SM
 !
 !    This module provides SM_type, a soil-moisture-specific observation
 !    container used by MOD_DA_Assim_SM. It sits above source-specific
-!    observation modules such as PM, GNSS, ANA2MTQ.
+!    observation modules such as PM, GNSS, ANATQ.
 !
 !    SM_type owns the soil-moisture observation workflow:
 !      1. receive a unified list of observation configs from the assimilation
@@ -20,7 +20,7 @@ MODULE MOD_DA_Obs_SM
 !      4. concatenate all enabled source/sensor observations into one vector;
 !      5. prepare localized patch-level y, R, and H(x) arrays for LETKF.
 !
-!    ANA2MTQ selects changed T and q records independently, gathers them on
+!    ANATQ selects changed T and q records independently, gathers them on
 !    master, and broadcasts to all workers. Its combined vectors follow the
 !    same concatenation and localization path as the other sources.
 !
@@ -35,7 +35,7 @@ MODULE MOD_DA_Obs_SM
 !-----------------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_DA_Obs_PM
-   USE MOD_DA_Obs_ANA2MTQ
+   USE MOD_DA_Obs_ANATQ
    USE MOD_DA_Vars_TimeVars
    USE MOD_Namelist
    USE MOD_Pixelset
@@ -48,11 +48,11 @@ MODULE MOD_DA_Obs_SM
 !-----------------------------------------------------------------------------
    type :: SM_config_type
 
-      character(len=16) :: source_name  ! Observation source, e.g., 'PM' or 'ANA2MTQ'
-      character(len=32) :: sensor_name  ! Sensor or dataset identifier used by the source module
-      character(len=16) :: var_name     ! Observation variable, e.g., 'TB_H', 'TB_V' or 'SM' for PM
-      real(r8) :: fghz                  ! Microwave frequency [GHz], used by the PM brightness temperature operator
-      integer  :: istream               ! Stream index in the shared hx_ol, hx_f* and hx_a* diagnostic arrays
+      character(len=16) :: source_name                        ! Observation source, e.g., 'PM' or 'ANATQ'
+      character(len=32) :: sensor_name                        ! Sensor or dataset identifier used by the source module
+      character(len=16) :: var_name                           ! Observation variable, e.g., 'TB_H', 'TB_V' or 'SM' for PM
+      real(r8) :: fghz                                        ! Microwave frequency [GHz], used by the PM brightness temperature operator
+      integer  :: istream                                     ! Stream index in the shared hx_ol, hx_f* and hx_a* diagnostic arrays
 
    END type SM_config_type
 
@@ -63,38 +63,37 @@ MODULE MOD_DA_Obs_SM
 !-----------------------------------------------------------------------------
    type :: SM_type
 
-      type(SM_config_type), allocatable :: cfgs(:)        ! Configuration for each observation stream
+      type(SM_config_type), allocatable :: cfgs(:)            ! Configuration for each observation stream
 
-      logical :: use_pm = .false.                         ! Include passive microwave observations
-      logical :: use_gnos = .false.                       ! Include GNOS observations
-      logical :: use_ana2mtq = .false.                    ! Include 2 m temperature and RH analysis pseudo-observations
+      logical :: use_pm = .false.                             ! Include passive microwave observations
+      logical :: use_anatq = .false.                          ! Include 2 m temperature and RH analysis pseudo-observations
 
       ! Observation selection and LETKF parameters.
-      real(r8) :: dres                                    ! Maximum latitude and longitude separation from the target patch [degrees]
-      real(r8) :: locr                                    ! Gaussian localization length scale for distance-based R inflation [km]
-      real(r8) :: infl                                    ! Ensemble background covariance inflation factor
+      real(r8) :: dres                                        ! Maximum latitude and longitude separation from the target patch [degrees]
+      real(r8) :: locr                                        ! Gaussian localization length scale for distance-based R inflation [km]
+      real(r8) :: infl                                        ! Ensemble background covariance inflation factor
 
       ! Source-specific observation containers.
-      type(PM_set_type) :: pm                             ! Passive microwave observations and ensemble H(x)
-      type(ANA2MTQ_type) :: ana2mtq                       ! 2 m temperature and RH pseudo-observations and ensemble H(x)
+      type(PM_set_type) :: pm                                 ! Passive microwave observations and ensemble H(x)
+      type(ANATQ_set_type) :: anatq                           ! 2 m temperature and RH pseudo-observations and ensemble H(x)
 
-      ! Combined records on all ranks; units of y, hx and r depend on the variable.
-      integer :: nobs = 0                                 ! Total number of records from all enabled sources
-      real(r8), allocatable :: lat(:)                     ! Observation latitudes [nobs], degrees north
-      real(r8), allocatable :: lon(:)                     ! Observation longitudes [nobs], degrees east
-      real(r8), allocatable :: y(:)                       ! Observed values or analysis ensemble means [nobs]
-      real(r8), allocatable :: hx(:,:)                    ! Forecast observation equivalents [nobs, DEF_DA_ENS_NUM]
-      real(r8), allocatable :: r(:)                       ! Observation error variances before localization [nobs]
+      ! Combined records on all ranks; units of y, hx_obs and r depend on the variable.
+      integer :: nobs = 0                                     ! Total number of records from all enabled sources
+      real(r8), allocatable :: lat(:)                         ! Observation latitudes [nobs], degrees north
+      real(r8), allocatable :: lon(:)                         ! Observation longitudes [nobs], degrees east
+      real(r8), allocatable :: y(:)                           ! Observed values or analysis ensemble means [nobs]
+      real(r8), allocatable :: hx_obs(:,:)                    ! Forecast observation equivalents [nobs, DEF_DA_ENS_NUM]
+      real(r8), allocatable :: r(:)                           ! Observation error standard deviations [nobs]
 
    CONTAINS
 
-      procedure :: init       => SM_type_init             ! Configure enabled sources and assimilation parameters
-      procedure :: calc_obs   => SM_type_calc_obs         ! Prepare observation-space y and H(x) from enabled sources
-      procedure :: calc_model => SM_type_calc_model       ! Recompute PM model-space H(x) after state updates
-      procedure :: save       => SM_type_save             ! Copy PM patch H(x) into forecast or analysis diagnostics
-      procedure :: clear      => SM_type_clear            ! Deallocate combined records and clear source observations
-      procedure :: concat     => SM_type_concat           ! Combine enabled sources in matching y, hx and r order
-      procedure :: prepare    => SM_type_prepare          ! Select nearby valid records and localize their error variances
+      procedure :: init       => SM_type_init                 ! Configure enabled sources and assimilation parameters
+      procedure :: calc_obs   => SM_type_calc_obs             ! Prepare observation-space y and H(x) from enabled sources
+      procedure :: calc_model => SM_type_calc_model           ! Recompute PM model-space H(x) after state updates
+      procedure :: save       => SM_type_save                 ! Copy PM patch H(x) into forecast or analysis diagnostics
+      procedure :: clear      => SM_type_clear                ! Deallocate combined records and clear source observations
+      procedure :: concat     => SM_type_concat               ! Combine enabled sources in matching y, hx_obs and r order
+      procedure :: prepare    => SM_type_prepare              ! Select nearby valid records and localize their error variances
 
    END type SM_type
 
@@ -122,7 +121,7 @@ CONTAINS
 !-----------------------------------------------------------------------------
       CALL this%clear()
       this%use_pm = .false.
-      this%use_ana2mtq = .false.
+      this%use_anatq = .false.
 
       IF (allocated(this%cfgs)) deallocate(this%cfgs)
 
@@ -159,12 +158,12 @@ CONTAINS
          deallocate(pm_configs)
       ENDIF
 
-      this%use_ana2mtq = any(configs%source_name == 'ANA2MTQ')
-      IF (this%use_ana2mtq) THEN
-         IF (.not. (any(DEF_DA_OBS_SOURCE == 'situ' .and. DEF_DA_OBS_TARGET == '2MT') .and. &
-                    any(DEF_DA_OBS_SOURCE == 'situ' .and. DEF_DA_OBS_TARGET == '2MQ'))) &
-            ERROR STOP 'ANA2MTQ requires SYNOP 2MT and 2MQ screen level analyses'
-         CALL this%ana2mtq%init()
+      this%use_anatq = any(configs%source_name == 'ANATQ')
+      IF (this%use_anatq) THEN
+         IF (.not. (any(DEF_DA_OBS_SOURCE == 'SYNOP' .and. DEF_DA_OBS_TARGET == '2MT') .and. &
+                    any(DEF_DA_OBS_SOURCE == 'SYNOP' .and. DEF_DA_OBS_TARGET == '2MQ'))) &
+            ERROR STOP 'ANATQ requires SYNOP 2MT and 2MQ screen level analyses'
+         CALL this%anatq%init()
       ENDIF
 
    END SUBROUTINE SM_type_init
@@ -184,11 +183,11 @@ CONTAINS
       IF (allocated(this%lat))       deallocate(this%lat)
       IF (allocated(this%lon))       deallocate(this%lon)
       IF (allocated(this%y  ))       deallocate(this%y  )
-      IF (allocated(this%hx ))       deallocate(this%hx )
+      IF (allocated(this%hx_obs ))   deallocate(this%hx_obs )
       IF (allocated(this%r  ))       deallocate(this%r  )
 
       CALL this%pm%clear()
-      CALL this%ana2mtq%clear()
+      CALL this%anatq%clear()
 
    END SUBROUTINE SM_type_clear
 
@@ -211,17 +210,17 @@ CONTAINS
       IF (allocated(this%lat)) deallocate(this%lat)
       IF (allocated(this%lon)) deallocate(this%lon)
       IF (allocated(this%y))   deallocate(this%y)
-      IF (allocated(this%hx))  deallocate(this%hx)
+      IF (allocated(this%hx_obs))  deallocate(this%hx_obs)
       IF (allocated(this%r))   deallocate(this%r)
 
       IF (this%use_pm) this%nobs = this%nobs + this%pm%nobs
-      IF (this%use_ana2mtq) this%nobs = this%nobs + this%ana2mtq%nobs
+      IF (this%use_anatq) this%nobs = this%nobs + this%anatq%nobs
       IF (this%nobs == 0) RETURN
 
       allocate(this%lat(this%nobs))
       allocate(this%lon(this%nobs))
       allocate(this%y(this%nobs))
-      allocate(this%hx(this%nobs, DEF_DA_ENS_NUM))
+      allocate(this%hx_obs(this%nobs, DEF_DA_ENS_NUM))
       allocate(this%r(this%nobs))
 
       offset = 0
@@ -232,20 +231,20 @@ CONTAINS
             this%lat(offset+1:offset+n) = this%pm%lat
             this%lon(offset+1:offset+n) = this%pm%lon
             this%y(offset+1:offset+n) = this%pm%y
-            this%hx(offset+1:offset+n,:) = this%pm%hx_obs
+            this%hx_obs(offset+1:offset+n,:) = this%pm%hx_obs
             this%r(offset+1:offset+n) = this%pm%r
             offset = offset + n
          ENDIF
       ENDIF
 
-      IF (this%use_ana2mtq) THEN
-         n = this%ana2mtq%nobs
+      IF (this%use_anatq) THEN
+         n = this%anatq%nobs
          IF (n > 0) THEN
-            this%lat(offset+1:offset+n) = this%ana2mtq%lat
-            this%lon(offset+1:offset+n) = this%ana2mtq%lon
-            this%y(offset+1:offset+n) = this%ana2mtq%y
-            this%hx(offset+1:offset+n,:) = this%ana2mtq%hx
-            this%r(offset+1:offset+n) = this%ana2mtq%r
+            this%lat(offset+1:offset+n) = this%anatq%lat
+            this%lon(offset+1:offset+n) = this%anatq%lon
+            this%y(offset+1:offset+n) = this%anatq%y
+            this%hx_obs(offset+1:offset+n,:) = this%anatq%hx_obs
+            this%r(offset+1:offset+n) = this%anatq%r
             offset = offset + n
          ENDIF
       ENDIF
@@ -267,7 +266,7 @@ CONTAINS
       CALL this%clear()
 
       IF (this%use_pm) CALL this%pm%calc_obs(idate, deltim)
-      IF (this%use_ana2mtq) CALL this%ana2mtq%calc_obs()
+      IF (this%use_anatq) CALL this%anatq%calc_obs()
 
       CALL this%concat()
 
@@ -312,8 +311,7 @@ CONTAINS
       IF (numpatch <= 0) RETURN
       IF (.not. allocated(hx_f_ens)) RETURN
 
-      ! ANA2MTQ is an SM observation; its analysis increment is not a
-      ! meaningful H(x) diagnostic, so its slot intentionally stays spval.
+      ! ANATQ is not a meaningful H(x) diagnostic
       DO istream = 1, size(this%cfgs)
          is = this%cfgs(istream)%istream
          IF (is_analysis) THEN
@@ -392,7 +390,7 @@ CONTAINS
          dlon = modulo(abs(this%lon(iobs) - lon_p), 360.0_r8)
          IF (dlon > 180.0_r8) dlon = 360.0_r8 - dlon
          valid(iobs) = dlat < this%dres .and. dlon < this%dres .and. &
-                       this%y(iobs) /= spval .and. all(this%hx(iobs,:) /= spval)
+                       this%y(iobs) /= spval .and. all(this%hx_obs(iobs,:) /= spval)
       ENDDO
       nobs_p = count(valid)
       IF (nobs_p == 0) RETURN
@@ -401,7 +399,7 @@ CONTAINS
       allocate(lat(nobs_p), lon(nobs_p), dist(nobs_p), hav(nobs_p))
       y_p = pack(this%y, valid)
       DO iens = 1, DEF_DA_ENS_NUM
-         hx_p(:,iens) = pack(this%hx(:,iens), valid)
+         hx_p(:,iens) = pack(this%hx_obs(:,iens), valid)
       ENDDO
       r_p = pack(this%r, valid)
       lat = pack(this%lat, valid)

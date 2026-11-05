@@ -108,7 +108,7 @@ CONTAINS
          DO i = 1, size(DEF_DA_OBS_TARGET)
             IF (len_trim(DEF_DA_OBS_TARGET(i)) == 0) CYCLE
             s = s + 1
-            IF (trim(DEF_DA_OBS_SOURCE(i)) == 'ANA2MTQ') CYCLE
+            IF (trim(DEF_DA_OBS_SOURCE(i)) == 'ANATQ') CYCLE
 
             stream_suffix = '_'//trim(DEF_DA_OBS_SENSOR(i))//'_'// &
                trim(DEF_DA_OBS_VAR(i))//'_'//trim(DEF_DA_OBS_TARGET(i))

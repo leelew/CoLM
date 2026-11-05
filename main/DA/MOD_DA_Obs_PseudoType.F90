@@ -16,11 +16,10 @@ MODULE MOD_DA_Obs_PseudoType
 !    pseudo-observations for subsequent land-surface data assimilation.
 !
 ! HISTORY:
-!    Lu Li, 10/2026: First operational version
+!    Lu Li, 11/2026: DA v1.0
 !-----------------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_LandPatch
-   USE MOD_Namelist
    USE MOD_SPMD_Task
    USE MOD_Vars_Global
    USE MOD_Vars_TimeInvariants
@@ -28,25 +27,19 @@ MODULE MOD_DA_Obs_PseudoType
 
 !-----------------------------------------------------------------------------
 ! Pseudo-observation derived type
-!
-! Both y and hx are derived from model ensembles and processed together:
-! y contains analysis ensemble means, while hx contains forecast member values.
-! Unlike GridType, which reads external observations and leaves hx calculation
-! to the source-specific module, this type constructs and stores both y and hx.
 !-----------------------------------------------------------------------------
    type :: pseudo_obs_type
 
-      integer :: nobs = 0                            ! Number of changed patches across all workers
+      integer :: nobs = 0                            ! Number of selected patches across all workers
       real(r8), allocatable :: lat(:)                ! Patch latitude [nobs], degrees
       real(r8), allocatable :: lon(:)                ! Patch longitude [nobs], degrees
       real(r8), allocatable :: y(:)                  ! Analysis ensemble means [nobs]
       real(r8), allocatable :: r(:)                  ! Observation error standard deviations [nobs]
-      real(r8), allocatable :: hx(:,:)               ! Forecast ensemble values [nobs, ens]
 
    CONTAINS
 
       procedure, PUBLIC :: init  => pseudo_obs_init  ! Initialize an empty pseudo-observation collection
-      procedure, PUBLIC :: read  => pseudo_obs_read  ! Select changed patches, construct y and hx, gather and broadcast
+      procedure, PUBLIC :: read  => pseudo_obs_read  ! Gather and broadcast selected patch observations
       procedure, PUBLIC :: clear => pseudo_obs_clear ! Deallocate observation arrays and reset nobs
 
    END type pseudo_obs_type
@@ -71,72 +64,48 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE pseudo_obs_read (this, hx_ens_f, hx_ens_a, r)
+   SUBROUTINE pseudo_obs_read (this, mask, y, r)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
 
 !------------------------ Dummy Arguments ------------------------------------
-      class(pseudo_obs_type), intent(inout) :: this      ! Pseudo-observations constructed by this call
-      real(r8), allocatable, intent(in) :: hx_ens_f(:,:) ! Forecast values [0:DEF_DA_ENS_NUM, numpatch]
-      real(r8), allocatable, intent(in) :: hx_ens_a(:,:) ! Analysis values [0:DEF_DA_ENS_NUM, numpatch]
-      real(r8), intent(in) :: r                          ! Error variance assigned to each pseudo-observation
+      class(pseudo_obs_type), intent(inout) :: this  ! Pseudo-observations constructed by this call
+      logical, intent(in) :: mask(:)                 ! Selected local patches [numpatch]
+      real(r8), intent(in) :: y(:)                   ! Analysis means at patch observation locations [numpatch]
+      real(r8), intent(in) :: r                      ! Observation error standard deviation
 
 !------------------------ Local Variables ------------------------------------
-      integer :: np                                      ! Local patch index
-      integer :: nlocal                                  ! Number of selected patches on this rank
-      integer :: iobs                                    ! Selected-patch index in send buffers
-      logical, allocatable :: valid(:)                   ! Selection mask for local patches [numpatch]
-      real(r8), allocatable :: y_f(:)                    ! Forecast ensemble means [numpatch]
-      real(r8), allocatable :: y_a(:)                    ! Analysis ensemble means [numpatch]
-      real(r8), allocatable :: obs(:,:)                  ! Send buffer: lat, lon, y, r [4, nlocal]
-      real(r8), allocatable :: obs_global(:,:)           ! Gathered lat, lon, y, r on master [4, nobs]
-      real(r8), allocatable :: hx(:,:)                   ! Forecast send buffer [DEF_DA_ENS_NUM, nlocal]
-      real(r8), allocatable :: hx_global(:,:)            ! Gathered forecasts on master [DEF_DA_ENS_NUM, nobs]
-      integer :: iproc                                   ! Rank index in p_comm_glb
-      integer, allocatable :: counts(:)                  ! Selected-patch count per rank [0:p_np_glb-1]
-      integer, allocatable :: displs(:)                  ! Receive offset per rank, in patch units [0:p_np_glb-1]
+      integer :: np                                  ! Local patch index
+      integer :: nlocal                              ! Number of selected patches on this rank
+      integer :: iobs                                ! Selected-patch index in send buffers
+      real(r8), allocatable :: obs(:,:)              ! Send buffer: lat, lon, y, r [4, nlocal]
+      real(r8), allocatable :: obs_global(:,:)       ! Gathered lat, lon, y, r on master [4, nobs]
+      integer :: iproc                               ! Rank index in p_comm_glb
+      integer, allocatable :: counts(:)              ! Selected-patch count per rank [0:p_np_glb-1]
+      integer, allocatable :: displs(:)              ! Receive offset per rank, in patch units [0:p_np_glb-1]
 
 !-----------------------------------------------------------------------------
       CALL this%clear()
 
-      ! Select local patches with nonzero increments in the ensemble mean.
       nlocal = 0
-      IF (p_is_worker) THEN
-         allocate(valid(numpatch), y_f(numpatch), y_a(numpatch))
-         valid = .false.
+      IF (p_is_worker) nlocal = count(mask)
 
-         IF (allocated(hx_ens_f) .and. allocated(hx_ens_a)) THEN
-            DO np = 1, numpatch
-               IF (patchtype(np) >= 3) CYCLE
-               IF (any(hx_ens_f == spval) .or. any(hx_ens_a == spval)) CYCLE
-               y_f(np) = sum(hx_ens_f(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
-               y_a(np) = sum(hx_ens_a(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
-               valid(np) = y_a(np) /= y_f(np)
-            ENDDO
-         ENDIF
-
-         nlocal = count(valid)
-      ENDIF
-
-      ! Pack obs (lat, lon, y, r) and H(x) in the same selected-patch order.
-      ! NOTES: Zero-length send buffers are valid when this rank has no selected patches.
-      allocate(obs(4,nlocal), hx(DEF_DA_ENS_NUM,nlocal))
+      ! Pack selected patches in local patch order.
+      allocate(obs(4,nlocal))
       IF (nlocal > 0) THEN
          iobs = 0
          DO np = 1, numpatch
-            IF (.not. valid(np)) CYCLE
+            IF (.not. mask(np)) CYCLE
             iobs = iobs + 1
             obs(1,iobs) = patchlatr(np)*180.0_r8/pi
             obs(2,iobs) = (modulo(patchlonr(np)+pi,2.0_r8*pi)-pi)*180.0_r8/pi
-            obs(3,iobs) = y_a(np)
+            obs(3,iobs) = y(np)
             obs(4,iobs) = r
-            hx(:,iobs)  = hx_ens_f(1:DEF_DA_ENS_NUM,np)
          ENDDO
       ENDIF
 
 #ifdef USEMPI
-      ! All ranks participate; non-worker ranks contribute zero records.
       ! Gather selected-patch counts on master, then broadcast the total count.
       allocate(counts(0:p_np_glb-1), displs(0:p_np_glb-1))
       counts = 0
@@ -155,31 +124,26 @@ CONTAINS
          DO iproc = 1, p_np_glb-1
             displs(iproc) = displs(iproc-1) + counts(iproc-1)
          ENDDO
-         allocate(obs_global(4,this%nobs), hx_global(DEF_DA_ENS_NUM,this%nobs))
+         allocate(obs_global(4,this%nobs))
       ELSE
-         allocate(obs_global(4,1), hx_global(DEF_DA_ENS_NUM,1))
+         allocate(obs_global(4,1))
       ENDIF
       CALL mpi_gatherv(obs, 4*nlocal, MPI_REAL8, obs_global, 4*counts, 4*displs, &
-         MPI_REAL8, p_address_master, p_comm_glb, p_err)
-      CALL mpi_gatherv(hx, DEF_DA_ENS_NUM*nlocal, MPI_REAL8, hx_global, &
-         DEF_DA_ENS_NUM*counts, DEF_DA_ENS_NUM*displs, &
          MPI_REAL8, p_address_master, p_comm_glb, p_err)
 
       ! Store the gathered data in object members on master and broadcast to workers
       allocate(this%lat(this%nobs), this%lon(this%nobs))
-      allocate(this%y(this%nobs), this%r(this%nobs), this%hx(this%nobs,DEF_DA_ENS_NUM))
+      allocate(this%y(this%nobs), this%r(this%nobs))
       IF (p_is_master) THEN
          this%lat = obs_global(1,:)
          this%lon = obs_global(2,:)
          this%y   = obs_global(3,:)
          this%r   = obs_global(4,:)
-         this%hx  = transpose(hx_global)
       ENDIF
       CALL mpi_bcast(this%lat, this%nobs, MPI_REAL8, p_address_master, p_comm_glb, p_err)
       CALL mpi_bcast(this%lon, this%nobs, MPI_REAL8, p_address_master, p_comm_glb, p_err)
       CALL mpi_bcast(this%y,   this%nobs, MPI_REAL8, p_address_master, p_comm_glb, p_err)
       CALL mpi_bcast(this%r,   this%nobs, MPI_REAL8, p_address_master, p_comm_glb, p_err)
-      CALL mpi_bcast(this%hx,  this%nobs*DEF_DA_ENS_NUM, MPI_REAL8, p_address_master, p_comm_glb, p_err)
 #endif
 
    END SUBROUTINE pseudo_obs_read
@@ -199,7 +163,6 @@ CONTAINS
       IF (allocated(this%lon)) deallocate(this%lon)
       IF (allocated(this%y  )) deallocate(this%y  )
       IF (allocated(this%r  )) deallocate(this%r  )
-      IF (allocated(this%hx )) deallocate(this%hx )
 
    END SUBROUTINE pseudo_obs_clear
 

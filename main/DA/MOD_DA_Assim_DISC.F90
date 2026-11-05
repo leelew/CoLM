@@ -1,15 +1,26 @@
 #include <define.h>
 
-#ifdef DataAssimilation & GridRiverLakeFlow
+#if defined(DataAssimilation) && defined(GridRiverLakeFlow)
 MODULE MOD_DA_Assim_DISC
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
-!    Route ensemble-mean land runoff and accumulate DA discharge diagnostics.
-!    Retain the DA river state between calls and restore the ordinary river
-!    state after the additional routing calculation.
+!    Discharge diagnostic driver using ensemble-mean forecast runoff.
 !
-!    The current scheme propagates land-analysis information through runoff;
-!    it does not directly assimilate discharge observations.
+! WORKFLOW:
+!    1. Back up the ordinary river state and discharge accumulators.
+!    2. Load the retained DA river state and ensemble-mean forecast runoff.
+!    3. Advance river routing and accumulate discharge diagnostics.
+!    4. Retain the updated DA river state and restore the ordinary river state.
+!
+! NOTES:
+!    No discharge observations are assimilated. The additional routing uses
+!    forecast runoff; land-state analysis does not recompute runoff here.
+!    The suffix _a denotes the separate DA routing trajectory, rather than
+!    a direct discharge-observation analysis. Vars modules manage its storage.
+!
+! HISTORY:
+!    Lu Li, 05/2026: Initial implementation
+!    Lu Li, Zhilong Fan, 11/2026: DA v1.0
 !-----------------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_SPMD_Task
@@ -24,8 +35,6 @@ MODULE MOD_DA_Assim_DISC
    USE MOD_DA_Vars_TimeVars
    USE MOD_DA_Vars_AccVars
    IMPLICIT NONE
-   PRIVATE
-   PUBLIC :: run_DA_DISC
 
 !-----------------------------------------------------------------------------
 
@@ -38,12 +47,10 @@ CONTAINS
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
 
-!------------------------ Dummy Arguments ------------------------------------
-      integer, intent(in) :: idate(3)  ! Model time: year, Julian day, seconds of day
-      real(r8), intent(in) :: deltim   ! Land-model time step [s]
+      integer, intent(in) :: idate(3)
+      real(r8), intent(in) :: deltim
 
 !-----------------------------------------------------------------------------
-#ifdef GridRiverLakeFlow
       IF (p_is_worker) THEN
          ! Back up the ordinary river state and history accumulators.
          IF (allocated(wdsrf_ucat_ol)) THEN
@@ -107,7 +114,6 @@ CONTAINS
             acctime_ucat = acctime_ucat_ol
          ENDIF
       ENDIF
-#endif
 
    END SUBROUTINE run_DA_DISC
 
