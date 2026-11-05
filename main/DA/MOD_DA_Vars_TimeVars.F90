@@ -211,6 +211,7 @@ CONTAINS
             allocate (trad_ens         (                   0:DEF_DA_ENS_NUM,numpatch)); trad_ens         (    :,:) = spval
             allocate (tref_ens         (                   0:DEF_DA_ENS_NUM,numpatch)); tref_ens         (    :,:) = spval
             allocate (qref_ens         (                   0:DEF_DA_ENS_NUM,numpatch)); qref_ens         (    :,:) = spval
+            allocate (rhref_ens        (                   0:DEF_DA_ENS_NUM,numpatch)); rhref_ens        (    :,:) = spval
             allocate (rst_ens          (                   0:DEF_DA_ENS_NUM,numpatch)); rst_ens          (    :,:) = spval
             allocate (emis_ens         (                   0:DEF_DA_ENS_NUM,numpatch)); emis_ens         (    :,:) = spval
             allocate (z0m_ens          (                   0:DEF_DA_ENS_NUM,numpatch)); z0m_ens          (    :,:) = spval
@@ -222,9 +223,6 @@ CONTAINS
             allocate (fm_ens           (                   0:DEF_DA_ENS_NUM,numpatch)); fm_ens           (    :,:) = spval
             allocate (fh_ens           (                   0:DEF_DA_ENS_NUM,numpatch)); fh_ens           (    :,:) = spval
             allocate (fq_ens           (                   0:DEF_DA_ENS_NUM,numpatch)); fq_ens           (    :,:) = spval
-
-            ! Screen-level analysis
-            allocate (rhref_ens        (                   0:DEF_DA_ENS_NUM,numpatch)); rhref_ens        (    :,:) = spval
 
             ! Forcings
             allocate (forc_t_ens       (                   0:DEF_DA_ENS_NUM,numpatch)); forc_t_ens       (    :,:) = spval
@@ -323,6 +321,7 @@ CONTAINS
             deallocate (trad_ens                         )
             deallocate (tref_ens                         )
             deallocate (qref_ens                         )
+            deallocate (rhref_ens                        )
             deallocate (rst_ens                          )
             deallocate (emis_ens                         )
             deallocate (z0m_ens                          )
@@ -334,8 +333,6 @@ CONTAINS
             deallocate (fm_ens                           )
             deallocate (fh_ens                           )
             deallocate (fq_ens                           )
-
-            deallocate (rhref_ens                        )
 
             deallocate (forc_t_ens                       )
             deallocate (forc_frl_ens                     )

@@ -14,6 +14,17 @@ MODULE MOD_DA_Obs_GridType
 !    Source-specific modules, such as PM, AM, GNSS, and MR, build on this
 !    type instead of duplicating storage and search logic. 
 !
+! FILE CONVENTIONS:
+!      Files are located under <DEF_DA_OBS_DIR>/<sensor>/.
+!      grid.nc                       grid centers: 'latitude', 'longitude'
+!      <var_name>_YYYY_MM_DD_HH.nc    per-timestep observations with
+!                                      'latitude', 'longitude', 'time',
+!                                      <var_name>, 'r', 'theta', 'ii', 'jj'
+!
+!    ii and jj are the 1-based latitude and longitude indices in grid.nc.
+!    time is UTC seconds since the beginning of the observation day.
+!    r is the observation error standard deviation; theta is in radians.
+!
 ! SUPPORTED:
 ! +--------+----------+----------------------+-------------------------------+
 ! | Source | Variable | Assimilated state    | Example datasets              |
@@ -52,7 +63,7 @@ MODULE MOD_DA_Obs_GridType
 !
 ! HISTORY:
 !    Lu Li, 05/2026: Initial version
-!    Lu Li, Zhilong Fan, 10/2026: First operational version
+!    Lu Li, Zhilong Fan, 11/2026: DA v1.0
 !-----------------------------------------------------------------------------
     USE MOD_Precision
     USE MOD_SPMD_Task
@@ -181,7 +192,6 @@ CONTAINS
         integer,  allocatable :: ii(:)         ! raw obs ii index read from file
         integer,  allocatable :: jj(:)         ! raw obs jj index read from file
         logical,  allocatable :: valid(:)      ! full-length mask for obs inside time window and domain
-        character(len=512) :: logmsg           ! log message buffer
 
 !-----------------------------------------------------------------------------
         CALL this%clear()

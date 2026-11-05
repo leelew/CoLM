@@ -14,10 +14,7 @@ MODULE MOD_DA_Obs_SiteType
 !      3. the per-timestep observation vectors read from
 !         <DEF_DA_OBS_DIR>/<sensor>/<var_name>_YYYY_MM_DD_HH.nc.
 !
-!    Source-specific modules compute H(x), extract values at the mapped
-!    patches, and share the results across MPI ranks.
-!
-!    File conventions:
+! FILE CONVENTIONS:
 !      sites.nc                        station table with 'latitude' and
 !                                       'longitude'
 !      <var_name>_YYYY_MM_DD_HH.nc     per-timestep observations with
@@ -43,6 +40,7 @@ MODULE MOD_DA_Obs_SiteType
 !
 ! HISTORY:
 !    Lu Li, 05/2026: Initial version
+!    Lu Li, Zhilong Fan, 11/2026: DA v1.0
 !-----------------------------------------------------------------------------
     USE MOD_Precision
     USE MOD_SPMD_Task
