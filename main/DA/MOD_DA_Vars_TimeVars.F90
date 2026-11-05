@@ -26,9 +26,7 @@ MODULE MOD_DA_Vars_TimeVars
    USE MOD_SPMD_Task
    USE MOD_LandPatch
    USE MOD_NetCDFVector
-   USE MOD_DA_Vars_Fluxes
 #ifdef GridRiverLakeFlow
-   USE MOD_DataType
    USE MOD_NetCDFSerial
    USE MOD_Vector_ReadWrite
    USE MOD_Grid_RiverLakeNetwork

@@ -141,7 +141,6 @@ CONTAINS
       IF (allocated(rhref_ens_f)) deallocate (rhref_ens_f)
       IF (allocated(rhref_ens_a)) deallocate (rhref_ens_a)
       IF (.not. allocated(tq_tref%cfgs) .and. .not. allocated(tq_qref%cfgs)) RETURN
-      IF (DEF_DA_ENS_NUM <= 1) RETURN
 
       ! Prepare both observation operators before updating either state.
       IF (allocated(tq_tref%cfgs)) THEN
@@ -151,6 +150,12 @@ CONTAINS
       IF (allocated(tq_qref%cfgs)) THEN
          CALL tq_qref%calc_obs(idate, deltim)
          CALL tq_qref%save(.false.)
+      ENDIF
+
+      IF (DEF_DA_ENS_NUM <= 1) THEN
+         IF (allocated(tq_tref%cfgs)) CALL tq_tref%clear()
+         IF (allocated(tq_qref%cfgs)) CALL tq_qref%clear()
+         RETURN
       ENDIF
 
       IF (p_is_worker .and. numpatch > 0) THEN

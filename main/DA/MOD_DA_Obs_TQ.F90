@@ -212,9 +212,11 @@ CONTAINS
                   sum(this%synop%sensors(isynop)%hx_model(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
             ELSE
                hx_ol(is,np) = this%synop%sensors(isynop)%hx_model(0,np)
-               hx_f_ens(is,1:DEF_DA_ENS_NUM,np) = this%synop%sensors(isynop)%hx_model(1:DEF_DA_ENS_NUM,np)
-               IF (valid_hx) hx_f(is,np) = &
-                  sum(this%synop%sensors(isynop)%hx_model(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
+               IF (DEF_DA_ENS_NUM > 1) THEN
+                  hx_f_ens(is,1:DEF_DA_ENS_NUM,np) = this%synop%sensors(isynop)%hx_model(1:DEF_DA_ENS_NUM,np)
+                  IF (valid_hx) hx_f(is,np) = &
+                     sum(this%synop%sensors(isynop)%hx_model(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
+               ENDIF
             ENDIF
          ENDDO
       ENDDO

@@ -32,6 +32,7 @@ MODULE MOD_DA_Assim_DISC
    USE MOD_Grid_RiverLakeFlow
    USE MOD_Grid_RiverLakeTimeVars
    USE MOD_Grid_RiverLakeHistState
+   USE MOD_DA_Vars_Fluxes
    USE MOD_DA_Vars_TimeVars
    USE MOD_DA_Vars_AccVars
    IMPLICIT NONE
@@ -51,6 +52,8 @@ CONTAINS
       real(r8), intent(in) :: deltim
 
 !-----------------------------------------------------------------------------
+      IF (DEF_DA_ENS_NUM <= 1) RETURN
+
       IF (p_is_worker) THEN
          ! Back up the ordinary river state and history accumulators.
          IF (allocated(wdsrf_ucat_ol)) THEN

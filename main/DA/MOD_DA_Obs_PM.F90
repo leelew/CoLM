@@ -223,6 +223,7 @@ CONTAINS
                   IF (theta_part(np)%val(ipart) == spval) CYCLE
 
                   DO iens = 0, DEF_DA_ENS_NUM
+                     IF (DEF_DA_ENS_NUM == 1 .and. iens == 1) CYCLE
                      CALL PM_RTM( &
                         patchtype(np), patchclass(np), dz_sno_ens(:,iens,np), &
                         forc_topo(np), htop(np), &

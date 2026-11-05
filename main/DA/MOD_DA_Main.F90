@@ -106,7 +106,7 @@ CONTAINS
       ENDIF
 
       ! Run data assimilation
-      IF (.not. is_spinup .and. DEF_DA_ENS_NUM > 1) THEN
+      IF (.not. is_spinup) THEN
          CALL mpi_barrier (p_comm_glb, p_err)
          IF (use_assim_2mt .or. use_assim_2mq) CALL run_DA_TQ (idate, deltim)
          IF (use_assim_sm) CALL run_DA_SM (idate, deltim)
