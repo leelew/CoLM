@@ -8,7 +8,7 @@ MODULE MOD_DA_Obs_SM
 !
 !    This module provides SM_type, a soil-moisture-specific observation
 !    container used by MOD_DA_Assim_SM. It sits above source-specific
-!    observation modules such as PM, GNSS, ANA2MTQ.
+!    observation modules such as PM, GNSS, ANATQ.
 !
 !    SM_type owns the soil-moisture observation workflow:
 !      1. receive a unified list of observation configs from the assimilation
@@ -20,7 +20,7 @@ MODULE MOD_DA_Obs_SM
 !      4. concatenate all enabled source/sensor observations into one vector;
 !      5. prepare localized patch-level y, R, and H(x) arrays for LETKF.
 !
-!    ANA2MTQ selects changed T and q records independently, gathers them on
+!    ANATQ selects changed T and q records independently, gathers them on
 !    master, and broadcasts to all workers. Its combined vectors follow the
 !    same concatenation and localization path as the other sources.
 !
@@ -35,7 +35,7 @@ MODULE MOD_DA_Obs_SM
 !-----------------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_DA_Obs_PM
-   USE MOD_DA_Obs_ANA2MTQ
+   USE MOD_DA_Obs_ANATQ
    USE MOD_DA_Vars_TimeVars
    USE MOD_Namelist
    USE MOD_Pixelset
@@ -48,7 +48,7 @@ MODULE MOD_DA_Obs_SM
 !-----------------------------------------------------------------------------
    type :: SM_config_type
 
-      character(len=16) :: source_name                        ! Observation source, e.g., 'PM' or 'ANA2MTQ'
+      character(len=16) :: source_name                        ! Observation source, e.g., 'PM' or 'ANATQ'
       character(len=32) :: sensor_name                        ! Sensor or dataset identifier used by the source module
       character(len=16) :: var_name                           ! Observation variable, e.g., 'TB_H', 'TB_V' or 'SM' for PM
       real(r8) :: fghz                                        ! Microwave frequency [GHz], used by the PM brightness temperature operator
@@ -66,7 +66,7 @@ MODULE MOD_DA_Obs_SM
       type(SM_config_type), allocatable :: cfgs(:)            ! Configuration for each observation stream
 
       logical :: use_pm = .false.                             ! Include passive microwave observations
-      logical :: use_ana2mtq = .false.                        ! Include 2 m temperature and RH analysis pseudo-observations
+      logical :: use_anatq = .false.                          ! Include 2 m temperature and RH analysis pseudo-observations
 
       ! Observation selection and LETKF parameters.
       real(r8) :: dres                                        ! Maximum latitude and longitude separation from the target patch [degrees]
@@ -75,7 +75,7 @@ MODULE MOD_DA_Obs_SM
 
       ! Source-specific observation containers.
       type(PM_set_type) :: pm                                 ! Passive microwave observations and ensemble H(x)
-      type(ANA2MTQ_set_type) :: ana2mtq                       ! 2 m temperature and RH pseudo-observations and ensemble H(x)
+      type(ANATQ_set_type) :: anatq                           ! 2 m temperature and RH pseudo-observations and ensemble H(x)
 
       ! Combined records on all ranks; units of y, hx_obs and r depend on the variable.
       integer :: nobs = 0                                     ! Total number of records from all enabled sources
@@ -121,7 +121,7 @@ CONTAINS
 !-----------------------------------------------------------------------------
       CALL this%clear()
       this%use_pm = .false.
-      this%use_ana2mtq = .false.
+      this%use_anatq = .false.
 
       IF (allocated(this%cfgs)) deallocate(this%cfgs)
 
@@ -158,12 +158,12 @@ CONTAINS
          deallocate(pm_configs)
       ENDIF
 
-      this%use_ana2mtq = any(configs%source_name == 'ANA2MTQ')
-      IF (this%use_ana2mtq) THEN
+      this%use_anatq = any(configs%source_name == 'ANATQ')
+      IF (this%use_anatq) THEN
          IF (.not. (any(DEF_DA_OBS_SOURCE == 'SYNOP' .and. DEF_DA_OBS_TARGET == '2MT') .and. &
                     any(DEF_DA_OBS_SOURCE == 'SYNOP' .and. DEF_DA_OBS_TARGET == '2MQ'))) &
-            ERROR STOP 'ANA2MTQ requires SYNOP 2MT and 2MQ screen level analyses'
-         CALL this%ana2mtq%init()
+            ERROR STOP 'ANATQ requires SYNOP 2MT and 2MQ screen level analyses'
+         CALL this%anatq%init()
       ENDIF
 
    END SUBROUTINE SM_type_init
@@ -187,7 +187,7 @@ CONTAINS
       IF (allocated(this%r  ))       deallocate(this%r  )
 
       CALL this%pm%clear()
-      CALL this%ana2mtq%clear()
+      CALL this%anatq%clear()
 
    END SUBROUTINE SM_type_clear
 
@@ -214,7 +214,7 @@ CONTAINS
       IF (allocated(this%r))   deallocate(this%r)
 
       IF (this%use_pm) this%nobs = this%nobs + this%pm%nobs
-      IF (this%use_ana2mtq) this%nobs = this%nobs + this%ana2mtq%nobs
+      IF (this%use_anatq) this%nobs = this%nobs + this%anatq%nobs
       IF (this%nobs == 0) RETURN
 
       allocate(this%lat(this%nobs))
@@ -237,14 +237,14 @@ CONTAINS
          ENDIF
       ENDIF
 
-      IF (this%use_ana2mtq) THEN
-         n = this%ana2mtq%nobs
+      IF (this%use_anatq) THEN
+         n = this%anatq%nobs
          IF (n > 0) THEN
-            this%lat(offset+1:offset+n) = this%ana2mtq%lat
-            this%lon(offset+1:offset+n) = this%ana2mtq%lon
-            this%y(offset+1:offset+n) = this%ana2mtq%y
-            this%hx_obs(offset+1:offset+n,:) = this%ana2mtq%hx_obs
-            this%r(offset+1:offset+n) = this%ana2mtq%r
+            this%lat(offset+1:offset+n) = this%anatq%lat
+            this%lon(offset+1:offset+n) = this%anatq%lon
+            this%y(offset+1:offset+n) = this%anatq%y
+            this%hx_obs(offset+1:offset+n,:) = this%anatq%hx_obs
+            this%r(offset+1:offset+n) = this%anatq%r
             offset = offset + n
          ENDIF
       ENDIF
@@ -266,7 +266,7 @@ CONTAINS
       CALL this%clear()
 
       IF (this%use_pm) CALL this%pm%calc_obs(idate, deltim)
-      IF (this%use_ana2mtq) CALL this%ana2mtq%calc_obs()
+      IF (this%use_anatq) CALL this%anatq%calc_obs()
 
       CALL this%concat()
 
@@ -311,7 +311,7 @@ CONTAINS
       IF (numpatch <= 0) RETURN
       IF (.not. allocated(hx_f_ens)) RETURN
 
-      ! ANA2MTQ is not a meaningful H(x) diagnostic
+      ! ANATQ is not a meaningful H(x) diagnostic
       DO istream = 1, size(this%cfgs)
          is = this%cfgs(istream)%istream
          IF (is_analysis) THEN

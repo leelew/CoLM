@@ -5,7 +5,7 @@ MODULE MOD_DA_Assim_SM
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
 !    Soil-moisture assimilation driver using observations prepared by Obs_SM,
-!    including passive-microwave data and ANA2MTQ pseudo-observations.
+!    including passive-microwave data and ANATQ pseudo-observations.
 !
 ! WORKFLOW:
 !    1. Initialize observation streams from the namelist.
@@ -192,7 +192,7 @@ CONTAINS
 
       sm%pm%nsensor = 0
       sm%use_pm = .false.
-      sm%use_ana2mtq = .false.
+      sm%use_anatq = .false.
 
    END SUBROUTINE end_DA_SM
 
