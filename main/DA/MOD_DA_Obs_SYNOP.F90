@@ -163,7 +163,7 @@ CONTAINS
 ! 2 m relative humidity observations [0-1].
 ! H(x) is derived from specific humidity, temperature, and surface pressure.
 !-----------------------------------------------------------------------------
-      CASE ('2MRH')
+      CASE ('2MQ')
          ! Convert specific humidity to relative humidity [0-1].
          DO np = 1, numpatch
             DO iens = 0, DEF_DA_ENS_NUM

@@ -160,8 +160,8 @@ CONTAINS
 
       this%use_anatq = any(configs%source_name == 'ANATQ')
       IF (this%use_anatq) THEN
-         IF (.not. (any(DEF_DA_OBS_SOURCE == 'SYNOP' .and. DEF_DA_OBS_TARGET == '2MT') .and. &
-                    any(DEF_DA_OBS_SOURCE == 'SYNOP' .and. DEF_DA_OBS_TARGET == '2MQ'))) &
+         IF (.not. (any(DEF_DA_OBS_SOURCE == 'site' .and. DEF_DA_OBS_TARGET == '2MT') .and. &
+                    any(DEF_DA_OBS_SOURCE == 'site' .and. DEF_DA_OBS_TARGET == '2MQ'))) &
             ERROR STOP 'ANATQ requires SYNOP 2MT and 2MQ screen level analyses'
          CALL this%anatq%init()
       ENDIF
