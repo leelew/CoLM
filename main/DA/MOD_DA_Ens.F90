@@ -313,16 +313,6 @@ CONTAINS
          lake_icefrac_ens(  :,iens,:) = lake_icefrac
          savedtke1_ens   (    iens,:) = savedtke1
 
-         ! Forcings
-         forc_t_ens      (    iens,:) = forc_t
-         forc_frl_ens    (    iens,:) = forc_frl
-         forc_prc_ens    (    iens,:) = forc_prc
-         forc_prl_ens    (    iens,:) = forc_prl
-         forc_sols_ens   (    iens,:) = forc_sols
-         forc_soll_ens   (    iens,:) = forc_soll
-         forc_solsd_ens  (    iens,:) = forc_solsd
-         forc_solld_ens  (    iens,:) = forc_solld
-
          ! Land-atmosphere coupling states
          trad_ens        (    iens,:) = trad
          tref_ens        (    iens,:) = tref
@@ -338,6 +328,16 @@ CONTAINS
          fm_ens          (    iens,:) = fm
          fh_ens          (    iens,:) = fh
          fq_ens          (    iens,:) = fq
+
+         ! Forcings
+         forc_t_ens      (    iens,:) = forc_t
+         forc_frl_ens    (    iens,:) = forc_frl
+         forc_prc_ens    (    iens,:) = forc_prc
+         forc_prl_ens    (    iens,:) = forc_prl
+         forc_sols_ens   (    iens,:) = forc_sols
+         forc_soll_ens   (    iens,:) = forc_soll
+         forc_solsd_ens  (    iens,:) = forc_solsd
+         forc_solld_ens  (    iens,:) = forc_solld
 
          ! Surface fluxes
          taux_ens        (    iens,:) = taux
@@ -447,16 +447,6 @@ CONTAINS
          lake_icefrac = lake_icefrac_ens(  :,iens,:)
          savedtke1    = savedtke1_ens   (    iens,:)
 
-         ! Forcings
-         forc_t       = forc_t_ens      (    iens,:)
-         forc_frl     = forc_frl_ens    (    iens,:)
-         forc_prc     = forc_prc_ens    (    iens,:)
-         forc_prl     = forc_prl_ens    (    iens,:)
-         forc_sols    = forc_sols_ens   (    iens,:)
-         forc_soll    = forc_soll_ens   (    iens,:)
-         forc_solsd   = forc_solsd_ens  (    iens,:)
-         forc_solld   = forc_solld_ens  (    iens,:)
-
          ! Land-atmosphere coupling states
          trad         = trad_ens        (    iens,:)
          tref         = tref_ens        (    iens,:)
@@ -472,6 +462,16 @@ CONTAINS
          fm           = fm_ens          (    iens,:)
          fh           = fh_ens          (    iens,:)
          fq           = fq_ens          (    iens,:)
+
+         ! Forcings
+         forc_t       = forc_t_ens      (    iens,:)
+         forc_frl     = forc_frl_ens    (    iens,:)
+         forc_prc     = forc_prc_ens    (    iens,:)
+         forc_prl     = forc_prl_ens    (    iens,:)
+         forc_sols    = forc_sols_ens   (    iens,:)
+         forc_soll    = forc_soll_ens   (    iens,:)
+         forc_solsd   = forc_solsd_ens  (    iens,:)
+         forc_solld   = forc_solld_ens  (    iens,:)
 
          ! Surface fluxes
          taux         = taux_ens        (    iens,:)

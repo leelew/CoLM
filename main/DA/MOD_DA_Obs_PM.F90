@@ -243,10 +243,9 @@ CONTAINS
                   ENDDO
                ENDDO
 
-               DO iens = 0, DEF_DA_ENS_NUM
-                  IF (sumarea(iens) > 0.0_r8) &
-                     this%hx_model(iens,np) = this%hx_model(iens,np) / sumarea(iens)
-               ENDDO
+               WHERE (sumarea > 0.0)
+                  this%hx_model(:,np) = this%hx_model(:,np) / sumarea
+               ENDWHERE
 
 !-----------------------------------------------------------------------------
 ! Retrieved soil moisture products from passive microwave observations.

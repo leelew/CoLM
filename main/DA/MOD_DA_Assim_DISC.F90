@@ -47,8 +47,8 @@ CONTAINS
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
 
-      integer, intent(in) :: idate(3)  
-      real(r8), intent(in) :: deltim  
+      integer, intent(in) :: idate(3)
+      real(r8), intent(in) :: deltim
 
 !-----------------------------------------------------------------------------
       IF (p_is_worker) THEN

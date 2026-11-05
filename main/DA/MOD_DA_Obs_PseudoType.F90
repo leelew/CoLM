@@ -22,6 +22,7 @@ MODULE MOD_DA_Obs_PseudoType
    USE MOD_LandPatch
    USE MOD_SPMD_Task
    USE MOD_Vars_Global
+   USE MOD_Vars_TimeInvariants
    IMPLICIT NONE
 
 !-----------------------------------------------------------------------------
@@ -112,6 +113,10 @@ CONTAINS
       CALL mpi_gather(nlocal, 1, MPI_INTEGER, counts, 1, MPI_INTEGER, p_address_master, p_comm_glb, p_err)
       IF (p_is_master) this%nobs = sum(counts)
       CALL mpi_bcast(this%nobs, 1, MPI_INTEGER, p_address_master, p_comm_glb, p_err)
+      IF (p_is_master) THEN
+         WRITE (*,'(A,I0,A)') '[DA] Selected ', this%nobs, &
+            ' pseudo observations from analysis increments'
+      ENDIF
       IF (this%nobs == 0) RETURN
 
       ! Compute receive offsets in patch units and allocate receive buffers.
