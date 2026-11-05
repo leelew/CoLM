@@ -107,7 +107,9 @@ CONTAINS
 
       IF (p_is_worker .and. numpatch > 0) THEN
          wliq_soisno_ol(:,:) = wliq_soisno_ens(:,0,:)
-         wliq_soisno_f (:,:) = sum(wliq_soisno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2) / DEF_DA_ENS_NUM
+         IF (DEF_DA_ENS_NUM > 1) THEN
+            wliq_soisno_f(:,:) = sum(wliq_soisno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2) / DEF_DA_ENS_NUM
+         ENDIF
       ENDIF
 
       ! Apply the localized LETKF update to each eligible patch.

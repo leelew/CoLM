@@ -342,12 +342,14 @@ CONTAINS
             ELSE
                DO np = 1, numpatch
                   hx_ol(is,np) = this%pm%sensors(ipm)%hx_model(0,np)
-                  valid_hx = all(this%pm%sensors(ipm)%hx_model(1:DEF_DA_ENS_NUM,np) /= spval)
-                  DO iens = 1, DEF_DA_ENS_NUM
-                     hx_f_ens(is,iens,np) = this%pm%sensors(ipm)%hx_model(iens,np)
-                  ENDDO
-                  IF (valid_hx) hx_f(is,np) = &
-                     sum(this%pm%sensors(ipm)%hx_model(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
+                  IF (DEF_DA_ENS_NUM > 1) THEN
+                     valid_hx = all(this%pm%sensors(ipm)%hx_model(1:DEF_DA_ENS_NUM,np) /= spval)
+                     DO iens = 1, DEF_DA_ENS_NUM
+                        hx_f_ens(is,iens,np) = this%pm%sensors(ipm)%hx_model(iens,np)
+                     ENDDO
+                     IF (valid_hx) hx_f(is,np) = &
+                        sum(this%pm%sensors(ipm)%hx_model(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
+                  ENDIF
                ENDDO
             ENDIF
 
