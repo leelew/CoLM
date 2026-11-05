@@ -32,9 +32,9 @@ MODULE MOD_DA_Main
    USE MOD_Grid_RiverLakeTimeVars
    USE MOD_DA_Vars_AccVars
    USE MOD_Grid_RiverLakeHist
+   USE MOD_DA_Assim_DISC
 #endif
    USE MOD_DA_Assim_2MTQ
-   USE MOD_DA_Assim_DISC
    USE MOD_DA_Assim_SM
    USE MOD_DA_Assim_ST
    USE MOD_DA_Ens
@@ -111,7 +111,9 @@ CONTAINS
          IF (use_assim_2mt .or. use_assim_2mq) CALL run_DA_2MTQ (idate, deltim)
          IF (use_assim_sm) CALL run_DA_SM (idate, deltim)
          IF (use_assim_st) CALL run_DA_ST (idate, deltim)
+#ifdef GridRiverLakeFlow
          IF (use_assim_disc) CALL run_DA_DISC (idate, deltim)
+#endif
       ENDIF
 
       ! Restore open-loop (if offline) or analysis (if online) to model states
