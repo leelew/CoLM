@@ -7,9 +7,8 @@ MODULE MOD_DA_Obs_ST
 !    Observation aggregation module for soil-temperature data assimilation.
 !
 !    This module provides ST_type, a soil-temperature-specific observation
-!    container used by MOD_DA_Assim_ST. It mirrors MOD_DA_Obs_SM and sits
-!    above source-specific observation modules such as PM, MR, and in-situ
-!    observations.
+!    container used by MOD_DA_Assim_ST. It sits above source-specific
+!    observation modules, currently PM.
 !
 !    ST_type owns the soil-temperature observation workflow:
 !      1. receive a unified list of observation configs from the assimilation
@@ -21,8 +20,14 @@ MODULE MOD_DA_Obs_ST
 !      4. concatenate all enabled source/sensor observations into one vector;
 !      5. prepare localized patch-level y, R, and H(x) arrays for LETKF.
 !
+!    Source-level parameters, such as PM sensor, variable, and frequency,
+!    are passed to the corresponding source module config type.
+!    Soil-temperature assimilation parameters, such as observation search
+!    radius and localization radius, are kept in ST_type.
+!
 ! HISTORY:
 !    Lu Li, 05/2026: First implementation
+!    Lu Li, Zhilong Fan, 11/2026: DA v1.0
 !-----------------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_DA_Obs_PM
@@ -33,51 +38,58 @@ MODULE MOD_DA_Obs_ST
    USE MOD_Vars_TimeInvariants
    IMPLICIT NONE
 
+!-----------------------------------------------------------------------------
+! Configuration for one observation stream used in soil temperature assimilation.
+!-----------------------------------------------------------------------------
    type :: ST_config_type
 
-      character(len=16) :: source_name  ! 'PM', 'MR', 'situ'
-      character(len=32) :: sensor_name  ! 'SMAP', 'MODIS', 'FY3D', 'ISMN', etc.
-      character(len=16) :: var_name     ! 'TB_H', 'TB_V', 'LST'
-      real(r8) :: fghz                  ! frequency in GHz
-      integer  :: istream               ! index of this stream in the shared hx_* diagnostics
+      character(len=16) :: source_name                  ! Observation source, currently 'PM'
+      character(len=32) :: sensor_name                  ! Sensor or dataset identifier used by the source module
+      character(len=16) :: var_name                     ! Observation variable passed to the source operator
+      real(r8) :: fghz                                  ! Microwave frequency for the PM brightness temperature operator [GHz]
+      integer  :: istream                               ! Stream index in the shared hx_ol, hx_f* and hx_a* diagnostic arrays
 
    END type ST_config_type
 
-
+!-----------------------------------------------------------------------------
+! Observation collection for soil temperature assimilation.
+! Source modules prepare observations and ensemble H(x); this type combines
+! their records and selects nearby observations for each target patch.
+!-----------------------------------------------------------------------------
    type :: ST_type
 
-      type(ST_config_type), allocatable :: cfgs(:)
+      type(ST_config_type), allocatable :: cfgs(:)      ! Configuration for each observation stream
 
-      logical :: use_pm = .false.
+      logical :: use_pm = .false.                       ! Include passive microwave observations
 
-      ! assimilation parameters
-      real(r8) :: dres                               ! search radius for observations around a target patch [deg]
-      real(r8) :: locr                               ! localization radius [km]
-      real(r8) :: infl                               ! inflation factor for error covariance
+      ! Observation selection and LETKF parameters.
+      real(r8) :: dres                                  ! Observation search half-width in latitude and longitude [degrees]
+      real(r8) :: locr                                  ! Gaussian localization length scale for distance-based R inflation [km]
+      real(r8) :: infl                                  ! Ensemble background covariance inflation factor
 
-      ! module-level data
-      type(PM_set_type) :: pm
+      ! Source-specific observation containers.
+      type(PM_set_type) :: pm                           ! Passive microwave observations and ensemble H(x)
 
-      ! outputs used for assimilation
-      integer :: nobs = 0
-      real(r8), allocatable :: lat(:)
-      real(r8), allocatable :: lon(:)
-      real(r8), allocatable :: y(:)
-      real(r8), allocatable :: hx(:,:)
-      real(r8), allocatable :: r(:)
+      ! Combined records on all ranks; units of y, hx_obs and r depend on the variable.
+      integer :: nobs = 0                               ! Total number of records from all enabled sources
+      real(r8), allocatable :: lat(:)                   ! Observation latitudes [nobs], degrees north
+      real(r8), allocatable :: lon(:)                   ! Observation longitudes [nobs], degrees east
+      real(r8), allocatable :: y(:)                     ! Observed values [nobs]
+      real(r8), allocatable :: hx_obs(:,:)              ! Forecast observation equivalents [nobs, DEF_DA_ENS_NUM]
+      real(r8), allocatable :: r(:)                     ! Observation error standard deviations [nobs]
 
    CONTAINS
 
-      procedure :: init       => ST_type_init
-      procedure :: calc_obs   => ST_type_calc_obs    ! Prepare observation-space y and H(x) from enabled sources
-      procedure :: calc_model => ST_type_calc_model  ! Recompute PM model-space H(x) after state updates
-      procedure :: save       => ST_type_save
-      procedure :: clear      => ST_type_clear
-      procedure :: concat     => ST_type_concat
-      procedure :: prepare    => ST_type_prepare_on_pset
+      procedure :: init       => ST_type_init           ! Configure enabled sources and assimilation parameters
+      procedure :: calc_obs   => ST_type_calc_obs       ! Prepare observation-space y and H(x) from enabled sources
+      procedure :: calc_model => ST_type_calc_model     ! Recompute PM model-space H(x) after state updates
+      procedure :: save       => ST_type_save           ! Copy PM patch H(x) into forecast or analysis diagnostics
+      procedure :: clear      => ST_type_clear          ! Deallocate combined records and clear source observations
+      procedure :: concat     => ST_type_concat         ! Combine enabled sources in matching y, hx_obs and r order
+      procedure :: prepare    => ST_type_prepare        ! Select nearby valid records and localize their error variances
+
 
    END type ST_type
-
 
 !-----------------------------------------------------------------------------
 
@@ -100,6 +112,7 @@ CONTAINS
       type(PM_config_type), allocatable  :: pm_configs(:)
 
 !-----------------------------------------------------------------------------
+      CALL this%clear()
       this%use_pm = .false.
 
       IF (allocated(this%cfgs)) deallocate(this%cfgs)
@@ -138,8 +151,6 @@ CONTAINS
          deallocate(pm_configs)
       ENDIF
 
-      !//TODO: initialize other source types (MR, situ)
-
    END SUBROUTINE ST_type_init
 
 !-----------------------------------------------------------------------------
@@ -154,11 +165,11 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
       this%nobs = 0
-      IF (allocated(this%lat))       deallocate(this%lat)
-      IF (allocated(this%lon))       deallocate(this%lon)
-      IF (allocated(this%y))         deallocate(this%y)
-      IF (allocated(this%hx))        deallocate(this%hx)
-      IF (allocated(this%r))         deallocate(this%r)
+      IF (allocated(this%lat   )) deallocate(this%lat   )
+      IF (allocated(this%lon   )) deallocate(this%lon   )
+      IF (allocated(this%y     )) deallocate(this%y     )
+      IF (allocated(this%hx_obs)) deallocate(this%hx_obs)
+      IF (allocated(this%r     )) deallocate(this%r     )
 
       CALL this%pm%clear()
 
@@ -180,11 +191,11 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
       this%nobs = 0
-      IF (allocated(this%lat)) deallocate(this%lat)
-      IF (allocated(this%lon)) deallocate(this%lon)
-      IF (allocated(this%y))   deallocate(this%y)
-      IF (allocated(this%hx))  deallocate(this%hx)
-      IF (allocated(this%r))   deallocate(this%r)
+      IF (allocated(this%lat   )) deallocate(this%lat   )
+      IF (allocated(this%lon   )) deallocate(this%lon   )
+      IF (allocated(this%y     )) deallocate(this%y     )
+      IF (allocated(this%hx_obs)) deallocate(this%hx_obs)
+      IF (allocated(this%r     )) deallocate(this%r     )
 
       IF (this%use_pm) this%nobs = this%nobs + this%pm%nobs
       IF (this%nobs == 0) RETURN
@@ -192,7 +203,7 @@ CONTAINS
       allocate(this%lat(this%nobs))
       allocate(this%lon(this%nobs))
       allocate(this%y(this%nobs))
-      allocate(this%hx(this%nobs, DEF_DA_ENS_NUM))
+      allocate(this%hx_obs(this%nobs, DEF_DA_ENS_NUM))
       allocate(this%r(this%nobs))
 
       offset = 0
@@ -203,7 +214,7 @@ CONTAINS
             this%lat(offset+1:offset+n) = this%pm%lat
             this%lon(offset+1:offset+n) = this%pm%lon
             this%y(offset+1:offset+n) = this%pm%y
-            this%hx(offset+1:offset+n,:) = this%pm%hx_obs
+            this%hx_obs(offset+1:offset+n,:) = this%pm%hx_obs
             this%r(offset+1:offset+n) = this%pm%r
             offset = offset + n
          ENDIF
@@ -218,6 +229,7 @@ CONTAINS
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
 
+!------------------------ Dummy Arguments ------------------------------------
       class(ST_type), intent(inout) :: this
       integer,        intent(in)    :: idate(3)
       real(r8),       intent(in)    :: deltim
@@ -315,7 +327,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE ST_type_prepare_on_pset(this, np, nobs_p, y_p, hx_p, r_p)
+   SUBROUTINE ST_type_prepare (this, np, nobs_p, y_p, hx_p, r_p)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -329,57 +341,47 @@ CONTAINS
       real(r8), allocatable,  intent(out) :: r_p(:)
 
 !------------------------ Local Variables ------------------------------------
-      integer :: iens, iobs, n
+      integer :: iens, iobs
       real(r8) :: lat_p, lon_p, dlat, dlon
       logical,  allocatable :: valid(:)
-      real(r8), allocatable :: lat(:)
-      real(r8), allocatable :: lon(:)
-      real(r8), allocatable :: dist(:)
+      real(r8), allocatable :: lat(:), lon(:), dist(:), hav(:)
 
 !-----------------------------------------------------------------------------
       nobs_p = 0
+      lat_p = patchlatr(np)*180.0_r8/pi
+      lon_p = patchlonr(np)*180.0_r8/pi
 
-      ! find the nearest y values around target patch
+      ! All source records are globally available before this local search.
       allocate(valid(this%nobs))
       valid = .false.
-      IF (this%nobs > 0) THEN
-         lat_p = patchlatr(np)*180/pi
-         lon_p = patchlonr(np)*180/pi
-         DO iobs = 1, this%nobs
-            dlat = abs(this%lat(iobs) - lat_p)
-            dlon = abs(this%lon(iobs) - lon_p)
-            IF (dlon > 180) dlon = 360 - dlon
+      DO iobs = 1, this%nobs
+         dlat = abs(this%lat(iobs) - lat_p)
+         dlon = modulo(abs(this%lon(iobs) - lon_p), 360.0_r8)
+         IF (dlon > 180.0_r8) dlon = 360.0_r8 - dlon
+         valid(iobs) = dlat < this%dres .and. dlon < this%dres .and. &
+                       this%y(iobs) /= spval .and. all(this%hx_obs(iobs,:) /= spval)
+      ENDDO
+      nobs_p = count(valid)
+      IF (nobs_p == 0) RETURN
 
-            valid(iobs) = dlat < this%dres .and. dlon < this%dres .and. &
-                          this%y(iobs) /= spval .and. all(this%hx(iobs,:) /= spval)
-         ENDDO
-      ENDIF
-      n = count(valid)
-      IF (n == 0) RETURN
-      nobs_p = n
-
-      ! pack the valid y and H(x)
-      allocate(y_p(n))
-      allocate(hx_p(n, DEF_DA_ENS_NUM))
+      allocate(y_p(nobs_p), hx_p(nobs_p,DEF_DA_ENS_NUM), r_p(nobs_p))
+      allocate(lat(nobs_p), lon(nobs_p), dist(nobs_p), hav(nobs_p))
       y_p = pack(this%y, valid)
       DO iens = 1, DEF_DA_ENS_NUM
-         hx_p(:,iens) = pack(this%hx(:,iens), valid)
+         hx_p(:,iens) = pack(this%hx_obs(:,iens), valid)
       ENDDO
-
-      ! Convert the error standard deviation to variance and localize R.
-      allocate(r_p(n))
-      allocate(lat(n))
-      allocate(lon(n))
-      allocate(dist(n))
+      r_p = pack(this%r, valid)
       lat = pack(this%lat, valid)
       lon = pack(this%lon, valid)
-      dist = 2.0*6378.1*asin(sqrt( &
-         sin((lat*pi/180.0 - patchlatr(np))/2.0)**2 + &
-         cos(lat*pi/180.0)*cos(patchlatr(np))* &
-         sin((lon*pi/180.0 - patchlonr(np))/2.0)**2))
-      r_p = pack(this%r, valid)**2 / max(exp(-(dist**2)/(2.0*this%locr**2)), 1.0e-6)
 
-   END SUBROUTINE ST_type_prepare_on_pset
+      ! Convert the error standard deviation to variance, then inflate R.
+      hav = sin((lat*pi/180.0_r8 - patchlatr(np))/2.0_r8)**2 + &
+            cos(lat*pi/180.0_r8)*cos(patchlatr(np))* &
+            sin((lon*pi/180.0_r8 - patchlonr(np))/2.0_r8)**2
+      dist = 2.0_r8*6378.1_r8*asin(sqrt(max(0.0_r8,min(1.0_r8,hav))))
+      r_p = r_p**2 / max(exp(-(dist**2)/(2.0_r8*this%locr**2)), 1.0e-6_r8)
+
+   END SUBROUTINE ST_type_prepare
 
 !-----------------------------------------------------------------------------
 END MODULE MOD_DA_Obs_ST
