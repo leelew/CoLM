@@ -30,6 +30,7 @@ MODULE MOD_DA_Obs_SYNOP
 !
 ! HISTORY:
 !    Lu Li, 05/2026: Initial implementation
+!    Lu Li, Zhilong Fan, 11/2026: DA v1.0
 !-----------------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_LandPatch
@@ -51,7 +52,7 @@ MODULE MOD_DA_Obs_SYNOP
       real(r8), allocatable :: hx_model(:,:)                  ! [0:ens, patch]
 
       ! Observations and metadata at the locations read for this time step.
-      type(site_obs_type) :: y
+      type(site_obs_type)   :: y
 
       ! Model equivalents at observation locations; unmapped values are spval.
       real(r8), allocatable :: hx_obs(:,:)                    ! [nobs, ens]
@@ -163,11 +164,6 @@ CONTAINS
 ! H(x) is derived from specific humidity, temperature, and surface pressure.
 !-----------------------------------------------------------------------------
       CASE ('2MRH')
-         IF (.not. allocated(tref_ens)) RETURN
-         IF (.not. allocated(qref_ens)) RETURN
-         IF (.not. allocated(rhref_ens)) RETURN
-         IF (.not. allocated(forc_psrf)) RETURN
-
          ! Convert specific humidity to relative humidity [0-1].
          DO np = 1, numpatch
             DO iens = 0, DEF_DA_ENS_NUM
@@ -446,6 +442,5 @@ CONTAINS
    END SUBROUTINE SYNOP_set_concat
 
 !-----------------------------------------------------------------------------
-
 END MODULE MOD_DA_Obs_SYNOP
 #endif
