@@ -591,8 +591,8 @@ MODULE MOD_Namelist
 !
 ! DEF_DA_OBS_SOURCE(:)
 !    Observation source type for each configured observation stream.
-!    Supported examples: 'PM', 'GNOS', 'AM', 'situ', 'GRACE', 'SR'
-!    'ANA2MTQ' with VAR='2MTQ', TARGET='SM' uses patch SYNOP analyses;
+!    Supported examples: 'PM', 'GNOS', 'AM', 'site', 'GRACE', 'SR'
+!    'ANATQ' with VAR='2MTQ', TARGET='SM' uses patch SYNOP analyses;
 !    requires 'SYNOP' streams with TARGET='2MT' and TARGET='2MQ'.
 !
 ! DEF_DA_OBS_SENSOR(:)
@@ -667,15 +667,15 @@ MODULE MOD_Namelist
 !    Inflation factor used to inflate the analysis ensemble spread after soil
 !    temperature assimilation.
 !
-! DEF_DA_ASSIM_2MTQ_DRES
+! DEF_DA_ASSIM_TQ_DRES
 !    Search radius used to select SYNOP stations around each target patch for
 !    2 m temperature and humidity assimilation.
 !
-! DEF_DA_ASSIM_2MTQ_LOCR
+! DEF_DA_ASSIM_TQ_LOCR
 !    Localization radius used to inflate observation error with
 !    patch-observation distance in 2 m temperature/humidity assimilation.
 !
-! DEF_DA_ASSIM_2MTQ_INFL
+! DEF_DA_ASSIM_TQ_INFL
 !    Inflation factor used to inflate the analysis ensemble spread after 2 m
 !    temperature/humidity assimilation. The analysis variables are the model
 !    2 m air temperature (tref_ens) and specific humidity (qref_ens).
@@ -704,9 +704,9 @@ MODULE MOD_Namelist
    real(r8)           :: DEF_DA_ASSIM_ST_LOCR      = 40.0
    real(r8)           :: DEF_DA_ASSIM_ST_INFL      = 1.0
 
-   real(r8)           :: DEF_DA_ASSIM_2MTQ_DRES    = 0.4
-   real(r8)           :: DEF_DA_ASSIM_2MTQ_LOCR    = 40.0
-   real(r8)           :: DEF_DA_ASSIM_2MTQ_INFL    = 1.0
+   real(r8)           :: DEF_DA_ASSIM_TQ_DRES      = 0.4
+   real(r8)           :: DEF_DA_ASSIM_TQ_LOCR      = 40.0
+   real(r8)           :: DEF_DA_ASSIM_TQ_INFL      = 1.0
 
 ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ! ----- Part 14: parameter optimization -----
@@ -1574,9 +1574,9 @@ CONTAINS
       DEF_DA_ASSIM_ST_DRES,                   &
       DEF_DA_ASSIM_ST_LOCR,                   &
       DEF_DA_ASSIM_ST_INFL,                   &
-      DEF_DA_ASSIM_2MTQ_DRES,                 &
-      DEF_DA_ASSIM_2MTQ_LOCR,                 &
-      DEF_DA_ASSIM_2MTQ_INFL,                 &
+      DEF_DA_ASSIM_TQ_DRES,                   &
+      DEF_DA_ASSIM_TQ_LOCR,                   &
+      DEF_DA_ASSIM_TQ_INFL,                   &
 
       DEF_Optimize_Baseflow,                  &
 
@@ -2362,9 +2362,9 @@ ENDIF
       CALL mpi_bcast (DEF_DA_ASSIM_ST_DRES                   ,1   ,mpi_real8     ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_ASSIM_ST_LOCR                   ,1   ,mpi_real8     ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_ASSIM_ST_INFL                   ,1   ,mpi_real8     ,p_address_master ,p_comm_glb ,p_err)
-      CALL mpi_bcast (DEF_DA_ASSIM_2MTQ_DRES                 ,1   ,mpi_real8     ,p_address_master ,p_comm_glb ,p_err)
-      CALL mpi_bcast (DEF_DA_ASSIM_2MTQ_LOCR                 ,1   ,mpi_real8     ,p_address_master ,p_comm_glb ,p_err)
-      CALL mpi_bcast (DEF_DA_ASSIM_2MTQ_INFL                 ,1   ,mpi_real8     ,p_address_master ,p_comm_glb ,p_err)
+      CALL mpi_bcast (DEF_DA_ASSIM_TQ_DRES                   ,1   ,mpi_real8     ,p_address_master ,p_comm_glb ,p_err)
+      CALL mpi_bcast (DEF_DA_ASSIM_TQ_LOCR                   ,1   ,mpi_real8     ,p_address_master ,p_comm_glb ,p_err)
+      CALL mpi_bcast (DEF_DA_ASSIM_TQ_INFL                   ,1   ,mpi_real8     ,p_address_master ,p_comm_glb ,p_err)
 
       CALL mpi_bcast (DEF_Optimize_Baseflow                  ,1   ,mpi_logical   ,p_address_master ,p_comm_glb ,p_err)
 
