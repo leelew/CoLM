@@ -358,6 +358,7 @@ OBJS_MAIN = \
 				MOD_HistGridded.o                         \
 				MOD_HistVector.o                          \
 				MOD_HistSingle.o                          \
+				MOD_HistInterface.o                       \
 				MOD_Grid_RiverLakeHist.o                  \
 				MOD_DA_Vars_Hist.o                        \
 				MOD_Hist.o                                \

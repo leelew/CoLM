@@ -94,7 +94,7 @@ MODULE MOD_DA_Obs_SM
       procedure :: save       => SM_type_save             ! Copy PM patch H(x) into forecast or analysis diagnostics
       procedure :: clear      => SM_type_clear            ! Deallocate combined records and clear source observations
       procedure :: concat     => SM_type_concat           ! Combine enabled sources in matching y, hx and r order
-      procedure :: prepare    => SM_type_prepare_on_pset  ! Select nearby valid records and localize their error variances
+      procedure :: prepare    => SM_type_prepare          ! Select nearby valid records and localize their error variances
 
    END type SM_type
 
@@ -161,8 +161,8 @@ CONTAINS
 
       this%use_ana2mtq = any(configs%source_name == 'ANA2MTQ')
       IF (this%use_ana2mtq) THEN
-         IF (.not. (any(DEF_DA_OBS_SOURCE == 'SYNOP' .and. DEF_DA_OBS_TARGET == '2MT') .and. &
-                    any(DEF_DA_OBS_SOURCE == 'SYNOP' .and. DEF_DA_OBS_TARGET == '2MQ'))) &
+         IF (.not. (any(DEF_DA_OBS_SOURCE == 'situ' .and. DEF_DA_OBS_TARGET == '2MT') .and. &
+                    any(DEF_DA_OBS_SOURCE == 'situ' .and. DEF_DA_OBS_TARGET == '2MQ'))) &
             ERROR STOP 'ANA2MTQ requires SYNOP 2MT and 2MQ screen level analyses'
          CALL this%ana2mtq%init()
       ENDIF

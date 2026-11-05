@@ -17,9 +17,9 @@ MODULE MOD_Hist
 
    USE MOD_Vars_1DAccFluxes
    USE MOD_Vars_Global, only: spval
-   USE MOD_NetCDFSerial
 
-   USE MOD_HistGridded
+   USE MOD_HistInterface
+
 #if (defined UNSTRUCTURED || defined CATCHMENT)
    USE MOD_HistVector
 #endif
@@ -42,8 +42,6 @@ MODULE MOD_Hist
    PUBLIC :: hist_init
    PUBLIC :: hist_out
    PUBLIC :: hist_final
-
-   character(len=10) :: HistForm ! 'Gridded', 'Vector', 'Single'
 
    character(len=256) :: file_last = 'null'
 
@@ -267,7 +265,7 @@ CONTAINS
 
          file_hist = trim(dir_hist) // '/' // trim(casename) //'_hist_'//trim(cdate)//'.nc'
 
-         CALL hist_write_time (file_hist, file_last, 'time', idate, itime_in_file)
+         CALL write_history_time (file_hist, file_last, 'time', idate, itime_in_file)
 
          IF (p_is_worker) THEN
             IF (numpatch > 0) THEN
@@ -5066,12 +5064,12 @@ ENDIF
          CALL write_history_variable_2d ( DEF_hist_vars%discharge, a_discharge_pch,     &
             file_hist, 'f_discharge', itime_in_file, sumarea_one, filter_ucat,          &
             'regridded discharge in river and flood plain', 'm^3/s',                    &
-            nac_one, input_mode = 'total')
+            nac_one, average_mode = 'total')
 
          CALL write_history_variable_2d ( DEF_hist_vars%discharge, a_dis_rmth_pch,      &
             file_hist, 'f_discharge_rivermouth_regrid', itime_in_file, sumarea_one,     &
             filter_ucat, 'regridded river mouth discharge into ocean', 'm^3/s',         &
-            nac_one, input_mode = 'total')
+            nac_one, average_mode = 'total')
 
          CALL write_history_variable_2d ( DEF_hist_vars%floodfrc, a_floodfrc_pch,       &
             file_hist, 'f_floodfrc', itime_in_file, sumarea_inpm, filter_inpm,          &
@@ -5111,284 +5109,5 @@ ENDIF
       ENDIF
 
    END SUBROUTINE hist_out
-
-
-   SUBROUTINE write_history_variable_2d ( is_hist, &
-         acc_vec, file_hist, varname, itime_in_file, sumarea, filter, &
-         longname, units, acc_num, input_mode)
-
-   USE MOD_Vars_1DAccFluxes, only: nac
-
-   IMPLICIT NONE
-
-   logical, intent(in) :: is_hist
-
-   real(r8),         intent(inout) :: acc_vec(:)
-   character(len=*), intent(in)    :: file_hist
-   character(len=*), intent(in)    :: varname
-   integer,          intent(in)    :: itime_in_file
-   character(len=*), intent(in)    :: longname
-   character(len=*), intent(in)    :: units
-
-   type(block_data_real8_2d), intent(in) :: sumarea
-   logical, intent(in) :: filter(:)
-   real(r8), intent(in), optional  :: acc_num(:)
-
-   character(len=*), intent(in), optional :: input_mode
-
-      IF (.not. is_hist) RETURN
-
-#ifndef SinglePoint
-      IF ( .not. present(acc_num) ) THEN
-         IF (p_is_worker) &
-            WHERE (acc_vec /= spval) acc_vec = acc_vec / nac
-      ELSE
-         IF (p_is_worker)  &
-            WHERE (acc_vec/=spval .and. acc_num>0) acc_vec = acc_vec / acc_num
-      ENDIF
-#else
-      IF ( .not. present(acc_num) ) THEN
-         WHERE (acc_vec /= spval)  acc_vec = acc_vec / nac
-      ELSE
-         WHERE (acc_vec/=spval .and. acc_num>0) acc_vec = acc_vec / acc_num
-      ENDIF
-#endif
-
-      select CASE (HistForm)
-      CASE ('Gridded')
-         IF (present(input_mode)) THEN
-            CALL flux_map_and_write_2d ( &
-               acc_vec, file_hist, varname, itime_in_file, sumarea, filter, longname, units, input_mode)
-         ELSE
-            CALL flux_map_and_write_2d ( &
-               acc_vec, file_hist, varname, itime_in_file, sumarea, filter, longname, units)
-         ENDIF
-#if (defined UNSTRUCTURED || defined CATCHMENT)
-      CASE ('Vector')
-         IF (present(input_mode)) THEN
-            CALL aggregate_to_vector_and_write_2d ( &
-               acc_vec, file_hist, varname, itime_in_file, filter, longname, units, input_mode)
-         ELSE
-            CALL aggregate_to_vector_and_write_2d ( &
-               acc_vec, file_hist, varname, itime_in_file, filter, longname, units)
-         ENDIF
-#endif
-#ifdef SinglePoint
-      CASE ('Single')
-         CALL single_write_2d ( &
-            acc_vec, file_hist, varname, itime_in_file, longname, units)
-#endif
-      END select
-
-   END SUBROUTINE write_history_variable_2d
-
-
-#ifdef URBAN_MODEL
-   SUBROUTINE write_history_variable_urb_2d ( is_hist, &
-         acc_vec, file_hist, varname, itime_in_file, sumarea, filter, &
-         longname, units, acc_num)
-
-   USE MOD_Vars_1DAccFluxes, only: nac
-
-   IMPLICIT NONE
-
-   logical, intent(in) :: is_hist
-
-   real(r8), intent(inout) :: acc_vec(:)
-   character(len=*), intent(in) :: file_hist
-   character(len=*), intent(in) :: varname
-   integer,          intent(in) :: itime_in_file
-   character(len=*), intent(in) :: longname
-   character(len=*), intent(in) :: units
-
-   type(block_data_real8_2d), intent(in) :: sumarea
-   logical, intent(in) :: filter(:)
-   real(r8), intent(in), optional  :: acc_num(:)
-
-      IF (.not. is_hist) RETURN
-
-#ifndef SinglePoint
-      IF ( .not. present(acc_num) ) THEN
-         IF (p_is_worker) &
-            WHERE (acc_vec /= spval) acc_vec = acc_vec / nac
-      ELSE
-         IF (p_is_worker)  &
-            WHERE (acc_vec/=spval .and. acc_num>0) acc_vec = acc_vec / acc_num
-      ENDIF
-#else
-      IF ( .not. present(acc_num) ) THEN
-         WHERE (acc_vec /= spval)  acc_vec = acc_vec / nac
-      ELSE
-         WHERE (acc_vec/=spval .and. acc_num>0) acc_vec = acc_vec / acc_num
-      ENDIF
-#endif
-
-      select CASE (HistForm)
-      CASE ('Gridded')
-         CALL flux_map_and_write_urb_2d ( &
-            acc_vec, file_hist, varname, itime_in_file, sumarea, filter, longname, units)
-#if (defined UNSTRUCTURED || defined CATCHMENT)
-      CASE ('Vector')
-         !TODO: currently, it is not applicable to urban variables
-         CALL aggregate_to_vector_and_write_urb_2d ( &
-            acc_vec, file_hist, varname, itime_in_file, filter, longname, units)
-#endif
-#ifdef SinglePoint
-      CASE ('Single')
-         CALL single_write_2d ( &
-            acc_vec, file_hist, varname, itime_in_file, longname, units)
-#endif
-      END select
-
-   END SUBROUTINE write_history_variable_urb_2d
-#endif
-
-
-   SUBROUTINE write_history_variable_3d ( is_hist, &
-         acc_vec, file_hist, varname, itime_in_file, dim1name, lb1, ndim1, &
-         sumarea, filter, longname, units)
-
-   IMPLICIT NONE
-
-   logical, intent(in) :: is_hist
-
-   real(r8), intent(inout) :: acc_vec(:,:)
-   character(len=*), intent(in) :: file_hist
-   character(len=*), intent(in) :: varname
-   integer, intent(in) :: itime_in_file
-   character(len=*), intent(in) :: dim1name
-   integer, intent(in) :: lb1, ndim1
-
-   type(block_data_real8_2d), intent(in) :: sumarea
-   logical, intent(in) :: filter(:)
-   character (len=*), intent(in) :: longname
-   character (len=*), intent(in) :: units
-
-   ! Local variables
-   integer :: iblkme, xblk, yblk, xloc, yloc, i1
-   integer :: compress
-
-      IF (.not. is_hist) RETURN
-
-      select CASE (HistForm)
-      CASE ('Gridded')
-         CALL flux_map_and_write_3d ( &
-            acc_vec, file_hist, varname, itime_in_file, dim1name, lb1, ndim1, &
-            sumarea, filter, longname, units)
-#if (defined UNSTRUCTURED || defined CATCHMENT)
-      CASE ('Vector')
-         CALL aggregate_to_vector_and_write_3d ( &
-            acc_vec, file_hist, varname, itime_in_file, dim1name, lb1, ndim1, &
-            filter, longname, units)
-#endif
-#ifdef SinglePoint
-      CASE ('Single')
-         CALL single_write_3d (acc_vec, file_hist, varname, itime_in_file, &
-            dim1name, ndim1, longname, units)
-#endif
-      END select
-
-   END SUBROUTINE write_history_variable_3d
-
-
-   SUBROUTINE write_history_variable_4d ( is_hist,   &
-         acc_vec, file_hist, varname, itime_in_file, &
-         dim1name, lb1, ndim1, dim2name, lb2, ndim2, &
-         sumarea, filter, longname, units, acc_num)
-
-   IMPLICIT NONE
-
-   logical, intent(in) :: is_hist
-
-   real(r8), intent(inout) :: acc_vec(:,:,:)
-   character(len=*), intent(in) :: file_hist
-   character(len=*), intent(in) :: varname
-   integer, intent(in) :: itime_in_file
-   character(len=*), intent(in) :: dim1name, dim2name
-   integer, intent(in) :: lb1, ndim1, lb2, ndim2
-
-   type(block_data_real8_2d), intent(in) :: sumarea
-   logical, intent(in) :: filter(:)
-   character (len=*), intent(in) :: longname
-   character (len=*), intent(in) :: units
-   real(r8), intent(in), optional:: acc_num(:)
-
-   ! Local variables
-   integer :: i1, i2
-
-      IF (.not. is_hist) RETURN
-
-#ifndef SinglePoint
-      IF ( .not. present(acc_num) ) THEN
-         IF (p_is_worker) &
-            WHERE (acc_vec /= spval) acc_vec = acc_vec / nac
-      ELSE
-         IF (p_is_worker) THEN
-            DO i1 = lbound(acc_vec,1), ubound(acc_vec,1)
-               DO i2 = lbound(acc_vec,2), ubound(acc_vec,2)
-                  WHERE (acc_vec(i1,i2,:)/=spval .and. acc_num>0) &
-                        acc_vec(i1,i2,:) = acc_vec(i1,i2,:) / acc_num
-               ENDDO
-            ENDDO
-         ENDIF
-      ENDIF
-#else
-      IF ( .not. present(acc_num) ) THEN
-         WHERE (acc_vec /= spval)  acc_vec = acc_vec / nac
-      ELSE
-         DO i1 = lbound(acc_vec,1), ubound(acc_vec,1)
-            DO i2 = lbound(acc_vec,2), ubound(acc_vec,2)
-               WHERE (acc_vec(i1,i2,:)/=spval .and. acc_num>0) &
-                     acc_vec(i1,i2,:) = acc_vec(i1,i2,:) / acc_num
-            ENDDO
-         ENDDO
-      ENDIF
-#endif
-
-      select CASE (HistForm)
-      CASE ('Gridded')
-         CALL flux_map_and_write_4d ( &
-            acc_vec, file_hist, varname, itime_in_file, dim1name, lb1, ndim1, &
-            dim2name, lb2, ndim2, sumarea, filter, longname, units)
-#if (defined UNSTRUCTURED || defined CATCHMENT)
-      CASE ('Vector')
-         CALL aggregate_to_vector_and_write_4d ( &
-            acc_vec, file_hist, varname, itime_in_file, dim1name, lb1, ndim1, &
-            dim2name, lb2, ndim2, filter, longname, units)
-#endif
-#ifdef SinglePoint
-      CASE ('Single')
-         CALL single_write_4d (acc_vec, file_hist, varname, itime_in_file, &
-            dim1name, ndim1, dim2name, ndim2, longname, units)
-#endif
-      END select
-
-   END SUBROUTINE write_history_variable_4d
-
-
-   SUBROUTINE hist_write_time (filename, filelast, dataname, time, itime)
-
-   IMPLICIT NONE
-
-   character (len=*), intent(in) :: filename
-   character (len=*), intent(in) :: filelast
-   character (len=*), intent(in) :: dataname
-   integer, intent(in)  :: time(3)
-   integer, intent(out) :: itime
-
-      select CASE (HistForm)
-      CASE ('Gridded')
-         CALL hist_gridded_write_time (filename, filelast, dataname, time, itime)
-#if (defined UNSTRUCTURED || defined CATCHMENT)
-      CASE ('Vector')
-         CALL hist_vector_write_time  (filename, filelast, dataname, time, itime)
-#endif
-#ifdef SinglePoint
-      CASE ('Single')
-         CALL hist_single_write_time  (filename, filelast, dataname, time, itime)
-#endif
-      END select
-
-   END SUBROUTINE hist_write_time
 
 END MODULE MOD_Hist
