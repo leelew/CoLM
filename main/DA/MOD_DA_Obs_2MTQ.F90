@@ -36,7 +36,7 @@ MODULE MOD_DA_Obs_2MTQ
 
       character(len=16) :: source_name                         ! Observation source class, e.g., 'situ'
       character(len=32) :: sensor_name                         ! Station network or dataset identifier
-      character(len=16) :: var_name                            ! Observation variable: '2MT' or '2MRH'
+      character(len=16) :: var_name                            ! Observation variable: '2MT' or '2MQ'
       integer :: istream                                       ! Stream index in the shared H(x) diagnostics
 
    END type TQ_config_type

@@ -39,7 +39,7 @@ MODULE MOD_DA_Assim_2MTQ
    IMPLICIT NONE
 
    type(TQ_type) :: tq_t                      ! '2MT' streams: 2 m temperature
-   type(TQ_type) :: tq_q                      ! '2MQ' target: specific humidity analyzed using 2MRH
+   type(TQ_type) :: tq_q                      ! '2MQ' target: specific humidity analyzed using 2MQ relative humidity
 
    logical :: use_2mt = .false.               ! any '2MT' stream configured
    logical :: use_2mq = .false.               ! any '2MQ' stream configured

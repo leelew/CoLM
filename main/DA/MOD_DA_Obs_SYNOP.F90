@@ -24,7 +24,7 @@ MODULE MOD_DA_Obs_SYNOP
 !
 !    Station coordinates are read from <DEF_DA_OBS_DIR>/<sensor>/sites.nc.
 !    Hourly files <var_name>_YYYY_MM_DD_HH.nc contain 'latitude', 'longitude',
-!    'time', 'id', <var_name>, and 'r'. Variables '2MT' and '2MRH' denote
+!    'time', 'id', <var_name>, and 'r'. Variables '2MT' and '2MQ' denote
 !    temperature [K] and relative humidity [0-1]. Observation errors 'r' are
 !    standard deviations; the upper observation collection handles localization.
 !
@@ -162,7 +162,7 @@ CONTAINS
 ! 2 m relative humidity observations [0-1].
 ! H(x) is derived from specific humidity, temperature, and surface pressure.
 !-----------------------------------------------------------------------------
-      CASE ('2MRH')
+      CASE ('2MQ')
          IF (.not. allocated(tref_ens)) RETURN
          IF (.not. allocated(qref_ens)) RETURN
          IF (.not. allocated(rhref_ens)) RETURN

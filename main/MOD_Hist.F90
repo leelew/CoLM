@@ -5084,7 +5084,7 @@ ENDIF
 #endif
 
 #ifdef DataAssimilation
-         CALL save_DA_hist (file_hist, HistForm, itime_in_file, idate, &
+         CALL save_DA_hist (file_hist, itime_in_file, idate, &
             sumarea, filter)
 #endif
 
