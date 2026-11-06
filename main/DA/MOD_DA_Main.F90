@@ -118,6 +118,8 @@ CONTAINS
       integer :: i
 
 !-----------------------------------------------------------------------------
+      IF (.not. p_is_worker) RETURN
+
       ! Save the open-loop trajectory
       CALL save_member(0)
 
@@ -126,7 +128,7 @@ CONTAINS
          CALL ensemble (deltim)
          DO i = 1, DEF_DA_ENS_NUM
             CALL load_member(i)
-            IF (p_is_worker) CALL CoLMDRIVER (idate, deltim, dolai, doalb, dosst, oro)
+            CALL CoLMDRIVER (idate, deltim, dolai, doalb, dosst, oro)
             CALL save_member(i)
          ENDDO
       ENDIF
