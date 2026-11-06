@@ -152,7 +152,7 @@ CONTAINS
          CALL tq_qref%save(.false.)
       ENDIF
 
-      IF (DEF_DA_ENS_NUM <= 1) THEN
+      IF (.not. DEF_DA) THEN
          IF (allocated(tq_tref%cfgs)) CALL tq_tref%clear()
          IF (allocated(tq_qref%cfgs)) CALL tq_qref%clear()
          RETURN

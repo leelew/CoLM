@@ -52,7 +52,7 @@ CONTAINS
       real(r8), intent(in) :: deltim
 
 !-----------------------------------------------------------------------------
-      IF (DEF_DA_ENS_NUM <= 1) RETURN
+      IF (.not. DEF_DA) RETURN
 
       IF (p_is_worker) THEN
          ! Back up the ordinary river state and history accumulators.

@@ -176,7 +176,7 @@ CONTAINS
       allocate(this%hx_model(0:DEF_DA_ENS_NUM, numpatch))
       this%hx_model = spval
 
-      IF (this%y%nobs == 0 .or. numpatch == 0) RETURN
+      IF (this%y%nobs == 0) RETURN
 
       ! Map incidence angle from obs grid cells to patch-grid intersection parts.
       IF (p_is_io) THEN
@@ -223,7 +223,6 @@ CONTAINS
                   IF (theta_part(np)%val(ipart) == spval) CYCLE
 
                   DO iens = 0, DEF_DA_ENS_NUM
-                     IF (DEF_DA_ENS_NUM == 1 .and. iens == 1) CYCLE
                      CALL PM_RTM( &
                         patchtype(np), patchclass(np), dz_sno_ens(:,iens,np), &
                         forc_topo(np), htop(np), &
@@ -253,7 +252,7 @@ CONTAINS
 ! H(x) is the mean liquid volumetric soil moisture over the upper 5 cm [m3/m3].
 !-----------------------------------------------------------------------------
             CASE ('SM')
-               DO iens = 0, DEF_DA_ENS_NUM
+               DO iens = 0, merge(DEF_DA_ENS_NUM, 0, DEF_DA)
                   IF (wliq_soisno_ens(1,iens,np) == spval) CYCLE
                   this%hx_model(iens,np) = &
                      (wliq_soisno_ens(1,iens,np) + &
@@ -317,6 +316,7 @@ CONTAINS
 
       ! Compute model-space H(x).
       CALL this%calc_model()
+      IF (.not. DEF_DA) RETURN
       IF (this%y%nobs == 0) RETURN
 
       ! Keep the mapped numerator and area denominator on the same valid patches.
@@ -563,7 +563,7 @@ CONTAINS
          CALL this%sensors(is)%calc_obs(idate, deltim)
       ENDDO
 
-      CALL this%concat()
+      IF (DEF_DA) CALL this%concat()
 
    END SUBROUTINE PM_set_calc_obs
 

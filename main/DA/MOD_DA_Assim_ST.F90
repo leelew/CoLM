@@ -103,15 +103,20 @@ CONTAINS
       CALL st%calc_obs(idate, deltim)
       CALL st%save(.false.)
 
+      IF (.not. DEF_DA) THEN
+         CALL st%clear()
+         RETURN
+      ENDIF
+
       IF (p_is_worker .and. numpatch > 0) THEN
          t_soisno_ol(:,:) = t_soisno_ens(:,0,:)
-         IF (DEF_DA_ENS_NUM > 1) THEN
+         IF (DEF_DA) THEN
             t_soisno_f(:,:) = sum(t_soisno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2) / DEF_DA_ENS_NUM
          ENDIF
       ENDIF
 
       ! Apply the localized LETKF update to each eligible patch.
-      IF (p_is_worker .and. DEF_DA_ENS_NUM > 1) THEN
+      IF (p_is_worker) THEN
          DO np = 1, numpatch
             IF (patchtype(np) >= 3) CYCLE
 
@@ -144,13 +149,11 @@ CONTAINS
       ENDIF
 
       ! Save analysis diagnostics and recompute model-space H(x).
-      IF (DEF_DA_ENS_NUM > 1) THEN
-         IF (p_is_worker .and. numpatch > 0) THEN
-            t_soisno_a(:,:) = sum(t_soisno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2) / DEF_DA_ENS_NUM
-         ENDIF
-         CALL st%calc_model()
-         CALL st%save(.true.)
+      IF (p_is_worker .and. numpatch > 0) THEN
+         t_soisno_a(:,:) = sum(t_soisno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2) / DEF_DA_ENS_NUM
       ENDIF
+      CALL st%calc_model()
+      CALL st%save(.true.)
       CALL st%clear()
 
    END SUBROUTINE run_DA_ST

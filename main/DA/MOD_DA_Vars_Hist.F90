@@ -71,20 +71,20 @@ CONTAINS
       ENDIF
       IF (HistForm == 'Gridded') CALL mp2g_hist%get_sumarea (sumarea, filter)
 
-      ! Write soil and snow diagnostics.
-      CALL write_history_variable_3d ( DEF_hist_vars%DA_wliq_soisno_ol, &
-         a_wliq_soisno_ol, file_hist, 'f_wliq_soisno_ol', itime_in_file, 'soilsnow', &
-         maxsnl + 1, nl_soil - maxsnl, sumarea, filter, 'Open-loop liquid water in soil and snow layers','kg/m2')
-      CALL write_history_variable_3d ( DEF_hist_vars%DA_t_soisno_ol, &
-         a_t_soisno_ol, file_hist, 'f_t_soisno_ol', itime_in_file, 'soilsnow', &
-         maxsnl + 1, nl_soil - maxsnl, sumarea, filter, 'Open-loop temperature in soil and snow layers','K')
-      IF (DEF_DA_ENS_NUM > 1) THEN
+      IF (DEF_DA) THEN
+         ! Write soil and snow diagnostics.
+         CALL write_history_variable_3d ( DEF_hist_vars%DA_wliq_soisno_ol, &
+            a_wliq_soisno_ol, file_hist, 'f_wliq_soisno_ol', itime_in_file, 'soilsnow', &
+            maxsnl + 1, nl_soil - maxsnl, sumarea, filter, 'Open-loop liquid water in soil and snow layers','kg/m2')
          CALL write_history_variable_3d ( DEF_hist_vars%DA_wliq_soisno_f, &
             a_wliq_soisno_f, file_hist, 'f_wliq_soisno_f', itime_in_file, 'soilsnow', &
             maxsnl + 1, nl_soil - maxsnl, sumarea, filter, 'Forecast ensemble-mean liquid water in soil and snow layers','kg/m2')
          CALL write_history_variable_3d ( DEF_hist_vars%DA_wliq_soisno_a, &
             a_wliq_soisno_a, file_hist, 'f_wliq_soisno_a', itime_in_file, 'soilsnow', &
             maxsnl + 1, nl_soil - maxsnl, sumarea, filter, 'Analysis ensemble-mean liquid water in soil and snow layers','kg/m2')
+         CALL write_history_variable_3d ( DEF_hist_vars%DA_t_soisno_ol, &
+            a_t_soisno_ol, file_hist, 'f_t_soisno_ol', itime_in_file, 'soilsnow', &
+            maxsnl + 1, nl_soil - maxsnl, sumarea, filter, 'Open-loop temperature in soil and snow layers','K')
          CALL write_history_variable_3d ( DEF_hist_vars%DA_t_soisno_f, &
             a_t_soisno_f, file_hist, 'f_t_soisno_f', itime_in_file, 'soilsnow', &
             maxsnl + 1, nl_soil - maxsnl, sumarea, filter, 'Forecast ensemble-mean temperature in soil and snow layers','K')
@@ -97,11 +97,15 @@ CONTAINS
       ENDIF
 
       ! Write H(x) diagnostics, one variable per observation stream.
-      ! ANA2MTQ slots are deliberately left as spval, so they are skipped.
+      ! ANATQ slots are deliberately left as spval, so they are skipped.
       ! Streams are assumed to be contiguous namelist entries from 1, which
       ! is also how the source modules fill the hx slots.
       IF (nsource > 0) THEN
-         allocate (filter_s(numpatch))
+         IF (p_is_worker) THEN
+            allocate (filter_s(numpatch))
+         ELSE
+            allocate (filter_s(0))
+         ENDIF
          IF (HistForm == 'Gridded' .and. p_is_io) THEN
             IF (.not. allocated(sumarea_hx%blk)) CALL allocate_block_data (ghist, sumarea_hx)
          ENDIF
@@ -123,25 +127,26 @@ CONTAINS
 
             CALL write_history_variable_2d ( DEF_hist_vars%DA_hx_ol, &
                a_hx_ol(s,:), file_hist, 'f_hx_ol'//trim(stream_suffix), itime_in_file, &
-               sumarea_hx, filter_s, 'Open-loop H(x) of '//trim(stream_label), 'source-dependent')
-            IF (DEF_DA_ENS_NUM > 1) THEN
-               CALL write_history_variable_2d ( DEF_hist_vars%DA_hx_f, &
-                  a_hx_f(s,:), file_hist, 'f_hx_f'//trim(stream_suffix), itime_in_file, &
-                  sumarea_hx, filter_s, 'Prior H(x) of '//trim(stream_label), 'source-dependent')
-               CALL write_history_variable_2d ( DEF_hist_vars%DA_hx_a, &
-                  a_hx_a(s,:), file_hist, 'f_hx_a'//trim(stream_suffix), itime_in_file, &
-                  sumarea_hx, filter_s, 'Analysis H(x) of '//trim(stream_label), 'source-dependent')
-               CALL write_history_variable_3d ( DEF_hist_vars%DA_hx_f_ens, &
-                  a_hx_f_ens(s,:,:), file_hist, 'f_hx_f_ens'//trim(stream_suffix), itime_in_file, &
-                  'ens', 1, DEF_DA_ENS_NUM, sumarea, filter, 'Prior ensemble H(x) of '//trim(stream_label), 'source-dependent')
-               CALL write_history_variable_3d ( DEF_hist_vars%DA_hx_a_ens, &
-                  a_hx_a_ens(s,:,:), file_hist, 'f_hx_a_ens'//trim(stream_suffix), itime_in_file, &
-                  'ens', 1, DEF_DA_ENS_NUM, sumarea, filter, 'Analysis ensemble H(x) of '//trim(stream_label), 'source-dependent')
-            ENDIF
+               sumarea_hx, filter_s, 'Open-loop H(x) of '//trim(stream_label), 'source-dependent', nac_hx_ol(s,:))
+            IF (.not. DEF_DA) CYCLE
+            CALL write_history_variable_2d ( DEF_hist_vars%DA_hx_f, &
+               a_hx_f(s,:), file_hist, 'f_hx_f'//trim(stream_suffix), itime_in_file, &
+               sumarea_hx, filter_s, 'Prior H(x) of '//trim(stream_label), 'source-dependent')
+            CALL write_history_variable_2d ( DEF_hist_vars%DA_hx_a, &
+               a_hx_a(s,:), file_hist, 'f_hx_a'//trim(stream_suffix), itime_in_file, &
+               sumarea_hx, filter_s, 'Analysis H(x) of '//trim(stream_label), 'source-dependent')
+            CALL write_history_variable_3d ( DEF_hist_vars%DA_hx_f_ens, &
+               a_hx_f_ens(s,:,:), file_hist, 'f_hx_f_ens'//trim(stream_suffix), itime_in_file, &
+               'ens', 1, DEF_DA_ENS_NUM, sumarea, filter, 'Prior ensemble H(x) of '//trim(stream_label), 'source-dependent')
+            CALL write_history_variable_3d ( DEF_hist_vars%DA_hx_a_ens, &
+               a_hx_a_ens(s,:,:), file_hist, 'f_hx_a_ens'//trim(stream_suffix), itime_in_file, &
+               'ens', 1, DEF_DA_ENS_NUM, sumarea, filter, 'Analysis ensemble H(x) of '//trim(stream_label), 'source-dependent')
          ENDDO
 
          deallocate (filter_s)
       ENDIF
+
+      IF (.not. DEF_DA) RETURN
 
       ! Normalize and write the analysis discharge.
 #ifdef GridRiverLakeFlow
@@ -155,7 +160,7 @@ CONTAINS
          CALL ncio_write_time (file_hist_ucat, 'time', idate, itime_in_file_ucat, DEF_HIST_FREQ)
       ENDIF
 
-      IF (DEF_hist_vars%DA_discharge .and. DEF_DA_ENS_NUM > 1) THEN
+      IF (DEF_hist_vars%DA_discharge .and. DEF_DA) THEN
          IF (p_is_worker) THEN
             IF (numucat > 0) THEN
                WHERE (acctime_ucat_a > 0)

@@ -388,6 +388,8 @@ CONTAINS
       character(len=256) :: file_gridriver              ! gridriver restart filename
 
 !-----------------------------------------------------------------------------
+      IF (.not. DEF_DA) RETURN
+
       compress = DEF_REST_CompressLevel
 
       write(cyear,'(i4.4)') lc_year
@@ -504,6 +506,7 @@ CONTAINS
       logical            :: fexists                     ! ensemble river states present in restart file
 
 !-----------------------------------------------------------------------------
+      IF (.not. DEF_DA) RETURN
 
 #ifdef USEMPI
       CALL mpi_barrier(p_comm_glb, p_err)
@@ -614,6 +617,8 @@ CONTAINS
 
 !-----------------------------------------------------------------------
       IMPLICIT NONE
+
+      IF (.not. DEF_DA) RETURN
 
 #ifdef USEMPI
       CALL mpi_barrier(p_comm_glb, p_err)

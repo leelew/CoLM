@@ -4,21 +4,47 @@
 MODULE MOD_DA_Main
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
-!    Coordinate ensemble forecasts, data assimilation, and model-state updates.
+!    Coordinate ensemble forecasting, sequential data assimilation, and
+!    observation-equivalent diagnostics.
 !
 ! NOTES:
 !    Enabled analyses follow a fixed order, independent of the order of
 !    observation streams in the namelist:
-!       2 m temperature -> 2 m relative humidity -> 
+!       2 m temperature -> 2 m relative humidity ->
 !       snow -> soil moisture -> soil & snow temperature.
 !
-!    After analysis, online mode applies the ensemble mean to the model,
-!    while offline mode restores the unperturbed trajectory.
+!    After analysis, online mode applies the ensemble mean to the model
+!    for subsequent land-atmosphere coupling. while offline mode restores
+!    the unperturbed trajectory for evaluation.
 !
 ! AUTHOR:
 !     Lu Li, 12/2024: Initial implemention
-!     Zhilong Fan, Lu Li, 03/2024: Clean codes
+!     Zhilong Fan, Lu Li, 03/2025: Clean codes
 !     Lu Li, Zhilong Fan, 11/2026: DA v1.0
+!
+! VERSION:
+!    v1.0 (Lu Li, Zhilong Fan, Zhuo Wang):
+!
+!    Provides a unified workflow for observation processing, ensemble
+!    forecasting, analysis updates, diagnostic output, and model feedback.
+!    Implemented analyses include screen-level temperature and humidity,
+!    soil moisture, and soil temperature, with a common structure for
+!    extending assimilation to additional land-surface variables.
+!
+!    Organizes observations into site, grid, and pseudo-observation types.
+!    Source-specific modules construct observation equivalents, while
+!    target-specific modules select and localize observations for analysis.
+!
+!    Establishes an observation-operator library, including a passive
+!    microwave radiative-transfer operator for brightness temperatures.
+!
+!    Uses the existing ensemble-generation scheme and LETKF to update
+!    model states. Screen-level analysis products can also serve as
+!    pseudo-observations for subsequent soil moisture assimilation.
+!
+!    Manages ensemble states, forcing, fluxes, restart data, and diagnostic
+!    history within the DA modules. Supports open-loop H(x) simulation
+!    and optional analysis feedback for land-atmosphere coupling.
 !-----------------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_Spmd_task
@@ -30,14 +56,14 @@ MODULE MOD_DA_Main
    USE MOD_Grid_RiverLakeFlow
    USE MOD_Grid_RiverLakeNetwork
    USE MOD_Grid_RiverLakeTimeVars
-   USE MOD_DA_Vars_AccVars
    USE MOD_Grid_RiverLakeHist
    USE MOD_DA_Assim_DISC
+   USE MOD_DA_Vars_AccVars
 #endif
+   USE MOD_DA_Ens
    USE MOD_DA_Assim_TQ
    USE MOD_DA_Assim_SM
    USE MOD_DA_Assim_ST
-   USE MOD_DA_Ens
    IMPLICIT NONE
    SAVE
 
@@ -96,7 +122,7 @@ CONTAINS
       CALL save_member(0)
 
       ! Generate ensemble members
-      IF (DEF_DA_ENS_NUM > 1) THEN
+      IF (DEF_DA) THEN
          CALL ensemble (deltim)
          DO i = 1, DEF_DA_ENS_NUM
             CALL load_member(i)
@@ -105,9 +131,8 @@ CONTAINS
          ENDDO
       ENDIF
 
-      ! Run data assimilation
+      ! Prepare H(x) diagnostics and apply enabled analyses.
       IF (.not. is_spinup) THEN
-         CALL mpi_barrier (p_comm_glb, p_err)
          IF (use_assim_2mt .or. use_assim_2mq) CALL run_DA_TQ (idate, deltim)
          IF (use_assim_sm) CALL run_DA_SM (idate, deltim)
          IF (use_assim_st) CALL run_DA_ST (idate, deltim)
@@ -117,7 +142,7 @@ CONTAINS
       ENDIF
 
       ! Restore open-loop (if offline) or analysis (if online) to model states
-      CALL postprocess()
+      IF (DEF_DA) CALL postprocess()
 
    END SUBROUTINE run_DA
 

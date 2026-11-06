@@ -92,7 +92,6 @@ CONTAINS
 
 !-----------------------------------------------------------------------
       IF (.not. p_is_worker) RETURN
-      IF (DEF_DA_ENS_NUM == 1) RETURN
 
       ! initialize persistent variables
       IF (.not. initialized) THEN
@@ -546,7 +545,7 @@ CONTAINS
       IF (p_is_worker) THEN
          CALL load_member(0)
 
-         IF (DEF_DA_FEEDBACK .and. DEF_DA_ENS_NUM > 1) THEN
+         IF (DEF_DA_FEEDBACK) THEN
             ! Restart states
             z_sno        = sum(z_sno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2)        / DEF_DA_ENS_NUM
             dz_sno       = sum(dz_sno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2)       / DEF_DA_ENS_NUM
