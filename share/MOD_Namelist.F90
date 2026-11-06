@@ -626,7 +626,8 @@ MODULE MOD_Namelist
 !    Mainly used by passive-microwave brightness temperature operators.
 !
 ! DEF_DA_ENS_NUM
-!    Number of ensemble members used by DA.
+!    Number of perturbed ensemble members, excluding the open-loop member 0.
+!    Must be greater than 1 and even for Box-Muller ensemble sampling.
 !
 ! DEF_DA_ENS_SM
 !    Enable ensemble perturbations or ensemble DA workflow for soil moisture.
@@ -1672,10 +1673,10 @@ CONTAINS
          ENDIF
 
 #ifdef DataAssimilation
-         IF (DEF_DA_ENS_NUM > 1 .and. mod(DEF_DA_ENS_NUM, 2) /= 0) THEN
+         IF (DEF_DA_ENS_NUM <= 1 .or. mod(DEF_DA_ENS_NUM, 2) /= 0) THEN
             write(*,*) '                  *****                  '
             write(*,'(A,I0,A)') 'ERROR: DEF_DA_ENS_NUM = ', DEF_DA_ENS_NUM, &
-               ' must be even for Box-Muller ensemble sampling.'
+               ' must be greater than 1 and even for Box-Muller ensemble sampling.'
             CALL CoLM_Stop ()
          ENDIF
 #endif

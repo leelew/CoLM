@@ -111,7 +111,7 @@ CONTAINS
       ENDIF
 
       ! Apply the localized LETKF update to each eligible patch.
-      IF (p_is_worker .and. DEF_DA_ENS_NUM > 1) THEN
+      IF (p_is_worker) THEN
          DO np = 1, numpatch
             IF (patchtype(np) >= 3) CYCLE
 
@@ -167,13 +167,11 @@ CONTAINS
       ENDIF
 
       ! Save analysis diagnostics and recompute model-space H(x).
-      IF (DEF_DA_ENS_NUM > 1) THEN
-         IF (p_is_worker .and. numpatch > 0) THEN
-            wliq_soisno_a(:,:) = sum(wliq_soisno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2) / DEF_DA_ENS_NUM
-         ENDIF
-         CALL sm%calc_model()
-         CALL sm%save(.true.)
+      IF (p_is_worker .and. numpatch > 0) THEN
+         wliq_soisno_a(:,:) = sum(wliq_soisno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2) / DEF_DA_ENS_NUM
       ENDIF
+      CALL sm%calc_model()
+      CALL sm%save(.true.)
       CALL sm%clear()
 
    END SUBROUTINE run_DA_SM
