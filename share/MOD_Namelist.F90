@@ -638,6 +638,16 @@ MODULE MOD_Namelist
 ! DEF_DA_ENS_SM
 !    Enable ensemble perturbations or ensemble DA workflow for soil moisture.
 !
+! DEF_DA_ENS_SOIL_PTB
+!    Enable perturbations of the soil hydraulic parameters porsl, psi0,
+!    bsw, and hksati. The random draws are read from the const file.
+!
+! DEF_DA_ENS_SOIL_PTB_SCALE
+!    Global scaling factor of the texture-based perturbations applied to
+!    porsl, psi0, bsw, and hksati when DEF_DA_ENS_SOIL_PTB is true. Zero
+!    disables the perturbation; 1.0 reproduces the literature uncertainty
+!    of the legacy scheme.
+!
 ! DEF_DA_FEEDBACK
 !    Logical flag to write the analysis ensemble mean back to the model
 !    states and fluxes. If false, the open-loop trajectory is restored for
@@ -698,8 +708,11 @@ MODULE MOD_Namelist
    real(r8)           :: DEF_DA_OBS_FGHZ(10)       = 1.4
 
    integer            :: DEF_DA_ENS_NUM            = 20
-   logical            :: DEF_DA_ENS_SM             = .false.  ! (optional)
+   logical            :: DEF_DA_ENS_SM             = .false. ! (optional)
+   logical            :: DEF_DA_ENS_SOIL_PTB       = .false. ! (optional)
    logical            :: DEF_DA_FEEDBACK           = .false. ! (optional)
+
+   real(r8)           :: DEF_DA_ENS_SOIL_PTB_SCALE  = 0.1_r8  ! global scaling of texture-based sigma
 
    integer            :: DEF_DA_OPERATOR_RTM_DIEL  = 0
    integer            :: DEF_DA_OPERATOR_RTM_ROUGH = 0
@@ -1574,7 +1587,9 @@ CONTAINS
       DEF_DA_OBS_FGHZ,                        &
       DEF_DA_ENS_NUM,                         &
       DEF_DA_ENS_SM,                          &
+      DEF_DA_ENS_SOIL_PTB,                    &
       DEF_DA_FEEDBACK,                        &
+      DEF_DA_ENS_SOIL_PTB_SCALE,                  &
       DEF_DA_OPERATOR_RTM_DIEL,               &
       DEF_DA_OPERATOR_RTM_ROUGH,              &
       DEF_DA_ASSIM_SM_DRES,                   &
@@ -1688,8 +1703,13 @@ CONTAINS
                   ' must be greater than 1 and even for Box-Muller ensemble sampling.'
                CALL CoLM_Stop ()
             ENDIF
+            IF (DEF_DA_ENS_SOIL_PTB_SCALE < 0.0_r8 .and. DEF_DA_ENS_SOIL_PTB) &
+               CALL CoLM_Stop ('ERROR: DEF_DA_ENS_SOIL_PTB_SCALE must be non-negative.')
+            IF (DEF_DA_ENS_SOIL_PTB_SCALE == 0.0_r8) DEF_DA_ENS_SOIL_PTB = .false.
          ELSE
             DEF_DA_ENS_NUM = 0
+            DEF_DA_ENS_SOIL_PTB = .false.
+            DEF_DA_ENS_SM  = .false.
          ENDIF
 #endif
          IF (DEF_UnitCatchment_regional) THEN
@@ -2367,7 +2387,9 @@ ENDIF
       CALL mpi_bcast (DEF_DA_OBS_FGHZ                        ,10  ,mpi_real8     ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_ENS_NUM                         ,1   ,mpi_integer   ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_ENS_SM                          ,1   ,mpi_logical   ,p_address_master ,p_comm_glb ,p_err)
+      CALL mpi_bcast (DEF_DA_ENS_SOIL_PTB                    ,1   ,mpi_logical   ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_FEEDBACK                        ,1   ,mpi_logical   ,p_address_master ,p_comm_glb ,p_err)
+      CALL mpi_bcast (DEF_DA_ENS_SOIL_PTB_SCALE                  ,1   ,mpi_real8     ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_OPERATOR_RTM_DIEL               ,1   ,mpi_integer   ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_OPERATOR_RTM_ROUGH              ,1   ,mpi_integer   ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_ASSIM_SM_DRES                   ,1   ,mpi_real8     ,p_address_master ,p_comm_glb ,p_err)

@@ -22,6 +22,8 @@ MODULE MOD_DA_Ens
    USE MOD_LandPatch
    USE MOD_SPMD_Task
    USE MOD_Vars_Global
+   USE MOD_Vars_TimeInvariants, only: porsl, psi0, bsw, hksati, &
+      vf_sand, vf_clay, patchtype, z_soil_ptb
    USE MOD_Vars_1DForcing
    USE MOD_Vars_1DFluxes
    USE MOD_Vars_TimeVariables
@@ -48,12 +50,26 @@ MODULE MOD_DA_Ens
    real(r8), allocatable :: r_curr(:,:,:)                        ! current perturbation (numpatch, nvar, DEF_DA_ENS_NUM)
    logical :: initialized = .false.                              ! flag to indicate if is initialized
 
-   ! soil moisture [default set 0.002 m3/m3 disterbulance]
-   integer,  parameter :: nvar_sm = 2                            ! number of pertutated soil moisture layers
+   ! soil moisture [10-layer scheme from the legacy MOD_DA_Ensemble]
+   integer,  parameter :: nvar_sm = nl_soil                     ! number of perturbed soil moisture layers
    real(r8), parameter :: tau_sm = 3.0                           ! correlation time scale in hours
    real(r8) :: phi_sm                                            ! AR(1) autocorrelation coefficient consider time scale
    real(r8) :: sigma_eps_sm                                      ! standard deviation of noise in AR(1) process
-   real(r8), dimension(nvar_sm) :: sigma_sm = (/0.035, 0.0552/)  ! standard deviation of perturbed soil moisture (equal to 0.002 m3/m3)
+   real(r8), dimension(nvar_sm) :: sigma_sm = (/ &
+         0.105_r8, 0.166_r8, 0.102_r8, 6.61e-3_r8, 3.69e-3_r8, &
+         1.22e-3_r8, 1.83e-3_r8, 2.61e-3_r8, 3.65e-3_r8, 4.55e-3_r8 /) ! kg/m2
+   real(r8), dimension(nvar_sm,nvar_sm) :: C_sm = reshape([ &
+         1.0_r8, 0.9_r8, 0.8_r8, 0.7_r8, 0.6_r8, 0.5_r8, 0.4_r8, 0.3_r8, 0.2_r8, 0.1_r8, &
+         0.9_r8, 1.0_r8, 0.9_r8, 0.8_r8, 0.7_r8, 0.6_r8, 0.5_r8, 0.4_r8, 0.3_r8, 0.2_r8, &
+         0.8_r8, 0.9_r8, 1.0_r8, 0.9_r8, 0.8_r8, 0.7_r8, 0.6_r8, 0.5_r8, 0.4_r8, 0.3_r8, &
+         0.7_r8, 0.8_r8, 0.9_r8, 1.0_r8, 0.9_r8, 0.8_r8, 0.7_r8, 0.6_r8, 0.5_r8, 0.4_r8, &
+         0.6_r8, 0.7_r8, 0.8_r8, 0.9_r8, 1.0_r8, 0.9_r8, 0.8_r8, 0.7_r8, 0.6_r8, 0.5_r8, &
+         0.5_r8, 0.6_r8, 0.7_r8, 0.8_r8, 0.9_r8, 1.0_r8, 0.9_r8, 0.8_r8, 0.7_r8, 0.6_r8, &
+         0.4_r8, 0.5_r8, 0.6_r8, 0.7_r8, 0.8_r8, 0.9_r8, 1.0_r8, 0.9_r8, 0.8_r8, 0.7_r8, &
+         0.3_r8, 0.4_r8, 0.5_r8, 0.6_r8, 0.7_r8, 0.8_r8, 0.9_r8, 1.0_r8, 0.9_r8, 0.8_r8, &
+         0.2_r8, 0.3_r8, 0.4_r8, 0.5_r8, 0.6_r8, 0.7_r8, 0.8_r8, 0.9_r8, 1.0_r8, 0.9_r8, &
+         0.1_r8, 0.2_r8, 0.3_r8, 0.4_r8, 0.5_r8, 0.6_r8, 0.7_r8, 0.8_r8, 0.9_r8, 1.0_r8], &
+         shape=[nvar_sm, nvar_sm])                              ! cross-layer correlation
    real(r8), allocatable :: r_prev_sm(:,:,:)                     ! previous perturbation (numpatch, nvar_sm, DEF_DA_ENS_NUM)
    real(r8), allocatable :: r_curr_sm(:,:,:)                     ! current perturbation (numpatch, nvar_sm, DEF_DA_ENS_NUM)
 
@@ -82,13 +98,14 @@ CONTAINS
       real(r8) :: std_z(nvar)                                    ! std of perturbation (nvar)
       real(r8) :: zxL(nvar, DEF_DA_ENS_NUM)                      ! correlated random variables (nvar, DEF_DA_ENS_NUM)
 
-      real(r8) :: z_sm(DEF_DA_ENS_NUM)                           ! standard normal random variables
-      real(r8) :: mean_z_sm                                      ! mean of perturbation
-      real(r8) :: std_z_sm                                       ! std of perturbation
+      real(r8) :: cov_matrix_sm(nvar_sm, nvar_sm)                ! covariance matrix between soil moisture layers
+      real(r8) :: L_sm(nvar_sm, nvar_sm)                         ! Cholesky decomposition of soil moisture covariance
+      real(r8) :: z_sm(nvar_sm, DEF_DA_ENS_NUM)                  ! standard normal random variables (layer, member)
+      real(r8) :: mean_z_sm(nvar_sm)                             ! mean of perturbation (nvar_sm)
+      real(r8) :: std_z_sm(nvar_sm)                              ! std of perturbation (nvar_sm)
+      real(r8) :: zxL_sm(nvar_sm, DEF_DA_ENS_NUM)                ! correlated random variables (nvar_sm, DEF_DA_ENS_NUM)
       real(r8) :: mean_r_sm(nvar_sm)                             ! mean of perturbation for soil moisture (nvar_sm)
-      real(r8) :: std_r_sm(nvar_sm)                              ! std of perturbation for soil moisture (nvar_sm)
-      real(r8) :: a1(DEF_DA_ENS_NUM)                             ! temporary disturbed variable for soil moisture layer 1
-      real(r8) :: a2(DEF_DA_ENS_NUM)                             ! temporary disturbed variable for soil moisture layer 2
+      real(r8) :: a_sm(nvar_sm, DEF_DA_ENS_NUM)                  ! disturbed soil moisture (layer, member)
 
 !-----------------------------------------------------------------------
       IF (.not. p_is_worker) RETURN
@@ -128,6 +145,21 @@ CONTAINS
       DO i = 1, nvar
          DO j = i+1, nvar
             L(i,j) = 0.0_r8
+         ENDDO
+      ENDDO
+
+      ! calculate covariance matrix and its Cholesky decomposition for soil moisture
+      cov_matrix_sm = 0.0_r8
+      DO i = 1, nvar_sm
+         DO j = 1, nvar_sm
+            cov_matrix_sm(i,j) = C_sm(i,j) * sigma_sm(i) * sigma_sm(j)
+         ENDDO
+      ENDDO
+      L_sm = cov_matrix_sm
+      CALL dpotrf('L', nvar_sm, L_sm, nvar_sm, info)
+      DO i = 1, nvar_sm
+         DO j = i+1, nvar_sm
+            L_sm(i,j) = 0.0_r8
          ENDDO
       ENDDO
 
@@ -193,7 +225,7 @@ CONTAINS
          ENDDO
 
          ! save current perturbation as previous perturbation for next time step
-         r_prev = r_curr
+         r_prev(np,:,:) = r_curr(np,:,:)
 
          ! generate ensemble samples according different types
          DO j = 1, DEF_DA_ENS_NUM
@@ -208,22 +240,33 @@ CONTAINS
          ENDDO
 
          IF (DEF_DA_ENS_SM) THEN
-            ! generate ensemble samples (0, I) for soil moisture
-            CALL random_number(u1)
-            CALL random_number(u2)
-            DO i = 1, DEF_DA_ENS_NUM/2
-               u1(i) = max(u1(i), 1e-10)
-               z_sm(i*2-1) = sqrt(-2.0*log(u1(i))) * cos(2.0*pi*u2(i))
-               z_sm(i*2)   = sqrt(-2.0*log(u1(i))) * sin(2.0*pi*u2(i))
+            ! generate disturbance ensemble samples ~ N(0, I) for each soil layer
+            DO i = 1, nvar_sm
+               CALL random_number(u1)
+               CALL random_number(u2)
+               DO j = 1, DEF_DA_ENS_NUM/2
+                  u1(j) = max(u1(j), 1e-10)  ! ensure u1 is not zero
+                  z_sm(i,j*2-1) = sqrt(-2.0*log(u1(j))) * cos(2.0*pi*u2(j))
+                  z_sm(i,j*2)   = sqrt(-2.0*log(u1(j))) * sin(2.0*pi*u2(j))
+               ENDDO
             ENDDO
-            mean_z_sm = sum(z_sm)/DEF_DA_ENS_NUM
-            std_z_sm = sqrt(sum((z_sm - mean_z_sm)**2)/(DEF_DA_ENS_NUM - 1))
-            z_sm = (z_sm - mean_z_sm)/std_z_sm
+
+            ! normalize z to mean 0 and std 1
+            DO i = 1, nvar_sm
+               mean_z_sm(i) = sum(z_sm(i,:))/DEF_DA_ENS_NUM
+               std_z_sm(i) = sqrt(sum((z_sm(i,:) - mean_z_sm(i))**2)/(DEF_DA_ENS_NUM - 1))
+               std_z_sm(i) = max(std_z_sm(i), 1.0e-10_r8)
+               z_sm(i,:) = (z_sm(i,:) - mean_z_sm(i))/std_z_sm(i)
+            ENDDO
+
+            ! multiply by Cholesky factor to introduce cross-layer correlation (L*z)
+            CALL dgemm('N', 'N', nvar_sm, DEF_DA_ENS_NUM, nvar_sm, &
+               1.0_r8, L_sm, nvar_sm, z_sm, nvar_sm, 0.0_r8, zxL_sm, nvar_sm)
 
             ! introduce correlation using AR(1) process
             DO i = 1, nvar_sm
                DO j = 1, DEF_DA_ENS_NUM
-                  r_curr_sm(np,i,j) = phi_sm * r_prev_sm(np,i,j) + sigma_eps_sm * sigma_sm(i) * z_sm(j)
+                  r_curr_sm(np,i,j) = phi_sm * r_prev_sm(np,i,j) + sigma_eps_sm * zxL_sm(i,j)
                ENDDO
             ENDDO
 
@@ -236,23 +279,19 @@ CONTAINS
             ENDDO
 
             ! save current perturbation as previous perturbation for next time step
-            r_prev_sm = r_curr_sm
+            r_prev_sm(np,:,:) = r_curr_sm(np,:,:)
 
-            ! generate ensemble samples according different types
-            DO j = 1, DEF_DA_ENS_NUM
-               a1(j) = wliq_soisno_ens(1,j,np) + r_curr_sm(np,1,j)
-               a2(j) = wliq_soisno_ens(2,j,np) + r_curr_sm(np,2,j)
-            ENDDO
-            DO j = 1, DEF_DA_ENS_NUM
-               a1(j) = max(1e-10, a1(j))
-               a2(j) = max(1e-10, a2(j))
+            ! generate perturbed soil moisture samples
+            DO i = 1, nvar_sm
+               DO j = 1, DEF_DA_ENS_NUM
+                  a_sm(i,j) = max(1.0e-10_r8, wliq_soisno_ens(i,j,np) + r_curr_sm(np,i,j))
+               ENDDO
             ENDDO
 
             ! move residual water to water table
             DO j = 1, DEF_DA_ENS_NUM
-               wa_ens(j, np) = wa_ens(j, np) - (sum(wliq_soisno_ens(1:2, j, np)) - a1(j) - a2(j))
-               wliq_soisno_ens(1, j, np) = a1(j)
-               wliq_soisno_ens(2, j, np) = a2(j)
+               wa_ens(j, np) = wa_ens(j, np) - sum(wliq_soisno_ens(1:nvar_sm, j, np) - a_sm(:,j))
+               wliq_soisno_ens(1:nvar_sm, j, np) = a_sm(:,j)
             ENDDO
          ENDIF
       ENDDO
@@ -406,6 +445,12 @@ CONTAINS
       integer, intent(in) :: iens
 
       IF (p_is_worker) THEN
+         ! Soil hydraulic parameters
+         porsl        = porsl_ens       (  :,iens,:)
+         psi0         = psi0_ens        (  :,iens,:)
+         bsw          = bsw_ens         (  :,iens,:)
+         hksati       = hksati_ens      (  :,iens,:)
+
          ! Restart states
          z_sno        = z_sno_ens       (  :,iens,:)
          dz_sno       = dz_sno_ens      (  :,iens,:)
@@ -657,6 +702,110 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE postprocess
+
+!-----------------------------------------------------------------------------
+
+   SUBROUTINE init_soil_ptb()
+
+!-----------------------------------------------------------------------------
+! DESCRIPTION:
+!    Initialize the soil hydraulic parameter perturbation.
+!
+!    The standard normal draws are generated by mkinidata and stored in the
+!    const file. Here they are only read, normalized across the members in
+!    use, and expanded into one parameter set per member: no random number
+!    is generated at run time.
+!
+!    Each member applies one global adjustment, shared by all patches and
+!    layers, which represents the overall mean bias of the soil parameter
+!    dataset.
+!-----------------------------------------------------------------------------
+      IMPLICIT NONE
+
+      integer  :: i, iens, ipatch, il
+      real(r8) :: mean_z, std_z
+      real(r8) :: z_porsl, z_psi0, z_bsw, z_hksati
+      real(r8) :: sand_pct, clay_pct, silt_pct
+      real(r8) :: sigma_porsl, sigma_psi0, sigma_bsw, sigma_hksati
+
+      IF (.not. allocated(porsl_ens) .or. .not. DEF_DA_ENS_SOIL_PTB) RETURN
+
+      ! normalize each parameter across the members in use to mean 0 and std 1
+      DO i = 1, 4
+         mean_z = sum(z_soil_ptb(i,1:DEF_DA_ENS_NUM))/DEF_DA_ENS_NUM
+         std_z  = sqrt(sum((z_soil_ptb(i,1:DEF_DA_ENS_NUM) - mean_z)**2)/(DEF_DA_ENS_NUM - 1))
+         std_z  = max(std_z, 1.0e-10_r8)
+         z_soil_ptb(i,1:DEF_DA_ENS_NUM) = (z_soil_ptb(i,1:DEF_DA_ENS_NUM) - mean_z)/std_z
+      ENDDO
+
+      ! expand each member's global adjustment over all patches and layers
+      DO iens = 1, DEF_DA_ENS_NUM
+         z_porsl  = z_soil_ptb(1, iens)
+         z_psi0   = z_soil_ptb(2, iens)
+         z_bsw    = z_soil_ptb(3, iens)
+         z_hksati = z_soil_ptb(4, iens)
+
+         DO ipatch = 1, numpatch
+            IF (patchtype(ipatch) > 2) CYCLE
+            DO il = 1, nl_soil
+               IF (vf_sand(il,ipatch) == spval .or. vf_clay(il,ipatch) == spval) CYCLE
+
+               sand_pct = vf_sand(il,ipatch) * 100.0_r8
+               clay_pct = vf_clay(il,ipatch) * 100.0_r8
+               silt_pct = 100.0_r8 - sand_pct - clay_pct
+
+               sigma_psi0   = DEF_DA_ENS_SOIL_PTB_SCALE * 10.0_r8**(0.72_r8 - 0.0026_r8*silt_pct + 0.0012_r8*clay_pct)
+               sigma_porsl  = DEF_DA_ENS_SOIL_PTB_SCALE * (7.73_r8 - 0.073_r8*clay_pct)/100.0_r8
+               sigma_bsw    = DEF_DA_ENS_SOIL_PTB_SCALE * (0.05_r8*clay_pct + 1.34_r8)
+               sigma_hksati = DEF_DA_ENS_SOIL_PTB_SCALE * 10.0_r8**(0.459_r8 + 0.00321_r8*silt_pct)
+
+               ! porosity: additive in raw space
+               IF (porsl_ens(il,0,ipatch) /= spval) THEN
+                  porsl_ens(il,iens,ipatch) = max(0.01_r8, min(0.99_r8, &
+                     porsl_ens(il,0,ipatch) + sigma_porsl*z_porsl))
+               ENDIF
+
+               ! saturated matric potential: log-space perturbation of the magnitude
+               IF (psi0_ens(il,0,ipatch) /= spval) THEN
+                  psi0_ens(il,iens,ipatch) = -exp(log(abs(psi0_ens(il,0,ipatch))) &
+                     + sigma_psi0*z_psi0)
+               ENDIF
+
+               ! Clapp-Hornberger b: additive in raw space
+               IF (bsw_ens(il,0,ipatch) /= spval) THEN
+                  bsw_ens(il,iens,ipatch) = max(1.0_r8, min(30.0_r8, &
+                     bsw_ens(il,0,ipatch) + sigma_bsw*z_bsw))
+               ENDIF
+
+               ! saturated hydraulic conductivity: log-space perturbation
+               IF (hksati_ens(il,0,ipatch) /= spval .and. hksati_ens(il,0,ipatch) > 0.0_r8) THEN
+                  hksati_ens(il,iens,ipatch) = exp(log(hksati_ens(il,0,ipatch)) &
+                     + sigma_hksati*z_hksati)
+                  hksati_ens(il,iens,ipatch) = max(hksati_ens(il,iens,ipatch), 1.0e-10_r8)
+               ENDIF
+            ENDDO
+         ENDDO
+      ENDDO
+
+   END SUBROUTINE init_soil_ptb
+
+!-----------------------------------------------------------------------------
+
+   SUBROUTINE end_DA_Ens()
+
+!-----------------------------------------------------------------------------
+! DESCRIPTION:
+!    Release the ensemble perturbation buffers.
+!-----------------------------------------------------------------------------
+      IMPLICIT NONE
+
+      IF (allocated(r_prev))      deallocate(r_prev)
+      IF (allocated(r_curr))      deallocate(r_curr)
+      IF (allocated(r_prev_sm))   deallocate(r_prev_sm)
+      IF (allocated(r_curr_sm))   deallocate(r_curr_sm)
+      initialized = .false.
+
+   END SUBROUTINE end_DA_Ens
 
 !-----------------------------------------------------------------------------
 END MODULE MOD_DA_Ens

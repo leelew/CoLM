@@ -231,7 +231,7 @@ CONTAINS
                         snowdp_ens(iens,np), &
                         lai_ens(iens,np), sai_ens(iens,np), &
                         wf_clay(:,np), wf_sand(:,np), wf_silt(:,np), &
-                        BD_all(:,np), porsl(:,np), &
+                        BD_all(:,np), porsl_ens(:,iens,np), &
                         theta_part(np)%val(ipart), this%fghz, &
                         hx_tmp(1), hx_tmp(2))
 
