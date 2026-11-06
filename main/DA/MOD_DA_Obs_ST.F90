@@ -239,7 +239,7 @@ CONTAINS
 
       IF (this%use_pm) CALL this%pm%calc_obs(idate, deltim)
 
-      CALL this%concat()
+      IF (DEF_DA) CALL this%concat()
 
    END SUBROUTINE ST_type_calc_obs
 
@@ -312,6 +312,7 @@ CONTAINS
             ELSE
                DO np = 1, numpatch
                   hx_ol(is,np) = this%pm%sensors(ipm)%hx_model(0,np)
+                  IF (.not. DEF_DA) CYCLE
                   valid_hx = all(this%pm%sensors(ipm)%hx_model(1:DEF_DA_ENS_NUM,np) /= spval)
                   DO iens = 1, DEF_DA_ENS_NUM
                      hx_f_ens(is,iens,np) = this%pm%sensors(ipm)%hx_model(iens,np)

@@ -103,6 +103,11 @@ CONTAINS
       CALL st%calc_obs(idate, deltim)
       CALL st%save(.false.)
 
+      IF (.not. DEF_DA) THEN
+         CALL st%clear()
+         RETURN
+      ENDIF
+
       IF (p_is_worker .and. numpatch > 0) THEN
          t_soisno_ol(:,:) = t_soisno_ens(:,0,:)
          t_soisno_f (:,:) = sum(t_soisno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2) / DEF_DA_ENS_NUM

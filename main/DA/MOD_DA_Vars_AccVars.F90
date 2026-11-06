@@ -41,6 +41,7 @@ MODULE MOD_DA_Vars_AccVars
 !=============================================================================
 ! diagnostic sample sums for history output
 !=============================================================================
+   real(r8), allocatable :: nac_hx_ol         (  :,:)  ! number of valid open-loop H(x) samples                   [-]
    real(r8), allocatable :: a_hx_ol           (  :,:)  ! sum of open-loop H(x)                                    [varies]
    real(r8), allocatable :: a_hx_f_ens        (:,:,:)  ! sum of forecast H(x) for each ensemble member            [varies]
    real(r8), allocatable :: a_hx_a_ens        (:,:,:)  ! sum of analysis H(x) for each ensemble member            [varies]
@@ -78,10 +79,18 @@ CONTAINS
          IF (len_trim(DEF_DA_OBS_TARGET(i)) > 0) nsource = nsource + 1
       ENDDO
 
+      ! Empty vectors on non-worker tasks are passed to history mapping.
+      IF (p_is_worker) THEN
+         allocate (a_hx_ol(nsource,numpatch), nac_hx_ol(nsource,numpatch))
+      ELSE
+         allocate (a_hx_ol(nsource,0), nac_hx_ol(nsource,0))
+      ENDIF
+      a_hx_ol = spval
+      nac_hx_ol = 0.0_r8
+
       IF (p_is_worker) THEN
          IF (numpatch > 0) THEN
             IF (nsource > 0) THEN
-               allocate (a_hx_ol        (                          nsource,numpatch))
                allocate (a_hx_f_ens     (         nsource,  DEF_DA_ENS_NUM,numpatch))
                allocate (a_hx_a_ens     (         nsource,  DEF_DA_ENS_NUM,numpatch))
                allocate (a_hx_f         (                          nsource,numpatch))
@@ -114,9 +123,11 @@ CONTAINS
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
 
+      IF (allocated(a_hx_ol)) deallocate(a_hx_ol)
+      IF (allocated(nac_hx_ol)) deallocate(nac_hx_ol)
+
       IF (p_is_worker) THEN
          IF (numpatch > 0) THEN
-            IF (allocated(a_hx_ol          )) deallocate (a_hx_ol          )
             IF (allocated(a_hx_f_ens       )) deallocate (a_hx_f_ens       )
             IF (allocated(a_hx_a_ens       )) deallocate (a_hx_a_ens       )
             IF (allocated(a_hx_f           )) deallocate (a_hx_f           )
@@ -145,6 +156,8 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
+
+      IF (allocated(nac_hx_ol)) nac_hx_ol = 0.0_r8
 
       IF (p_is_worker) THEN
          IF (numpatch > 0) THEN
@@ -178,8 +191,13 @@ CONTAINS
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
 
+      IF (allocated(hx_ol) .and. allocated(a_hx_ol)) THEN
+         CALL acc_DA_hist (hx_ol, a_hx_ol)
+         WHERE (hx_ol /= spval) nac_hx_ol = nac_hx_ol + 1.0_r8
+      ENDIF
+      IF (.not. DEF_DA) RETURN
+
       IF (allocated(hx_f_ens) .and. allocated(a_hx_f_ens)) THEN
-         CALL acc_DA_hist (hx_ol                              , a_hx_ol          )
          CALL acc_DA_hist (hx_f_ens                           , a_hx_f_ens       )
          CALL acc_DA_hist (hx_a_ens                           , a_hx_a_ens       )
          CALL acc_DA_hist (hx_f                               , a_hx_f           )

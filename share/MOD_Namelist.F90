@@ -586,6 +586,11 @@ MODULE MOD_Namelist
 ! ----- Part 13: data assimilation -----
 ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 !---------------------------------------------------------------------------------
+! DEF_DA
+!    If true, run ensemble forecasts and sequential assimilation.
+!    If false, use the current model trajectory and prepared observations
+!    to compute and save open-loop H(x), without analysis or model feedback.
+!
 ! DEF_DA_OBS_DIR
 !    Root directory of all observation files used by data assimilation.
 !
@@ -683,6 +688,7 @@ MODULE MOD_Namelist
 !    The same set of parameters applies to both SYNOP targets, '2MT' and
 !    '2MQ'.
 !---------------------------------------------------------------------------------
+   logical            :: DEF_DA                   = .true.
    character(len=256) :: DEF_DA_OBS_DIR            = ''
    character(len=16)  :: DEF_DA_OBS_SOURCE(10)     = ''
    character(len=16)  :: DEF_DA_OBS_SENSOR(10)     = ''
@@ -1558,6 +1564,7 @@ CONTAINS
       DEF_UnitCatchment_regional,             &
       DEF_ReservoirPara_file,                 &
 
+      DEF_DA,                                 &
       DEF_DA_OBS_DIR,                         &
       DEF_DA_OBS_SOURCE,                      &
       DEF_DA_OBS_SENSOR,                      &
@@ -2346,6 +2353,7 @@ ENDIF
       CALL mpi_bcast (DEF_UnitCatchment_regional             ,1   ,mpi_logical   ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_ReservoirPara_file                 ,256 ,mpi_character ,p_address_master ,p_comm_glb ,p_err)
 
+      CALL mpi_bcast (DEF_DA                                 ,1   ,mpi_logical   ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_OBS_DIR                         ,256 ,mpi_character ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_OBS_SOURCE                      ,160,mpi_character ,p_address_master ,p_comm_glb  ,p_err)
       CALL mpi_bcast (DEF_DA_OBS_SENSOR                      ,160,mpi_character ,p_address_master ,p_comm_glb  ,p_err)

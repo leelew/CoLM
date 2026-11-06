@@ -158,7 +158,7 @@ CONTAINS
          deallocate(pm_configs)
       ENDIF
 
-      this%use_anatq = any(configs%source_name == 'ANATQ')
+      this%use_anatq = DEF_DA .and. any(configs%source_name == 'ANATQ')
       IF (this%use_anatq) THEN
          IF (.not. (any(DEF_DA_OBS_SOURCE == 'site' .and. DEF_DA_OBS_TARGET == '2MT') .and. &
                     any(DEF_DA_OBS_SOURCE == 'site' .and. DEF_DA_OBS_TARGET == '2MQ'))) &
@@ -268,7 +268,7 @@ CONTAINS
       IF (this%use_pm) CALL this%pm%calc_obs(idate, deltim)
       IF (this%use_anatq) CALL this%anatq%calc_obs()
 
-      CALL this%concat()
+      IF (DEF_DA) CALL this%concat()
 
    END SUBROUTINE SM_type_calc_obs
 
@@ -342,6 +342,7 @@ CONTAINS
             ELSE
                DO np = 1, numpatch
                   hx_ol(is,np) = this%pm%sensors(ipm)%hx_model(0,np)
+                  IF (.not. DEF_DA) CYCLE
                   valid_hx = all(this%pm%sensors(ipm)%hx_model(1:DEF_DA_ENS_NUM,np) /= spval)
                   DO iens = 1, DEF_DA_ENS_NUM
                      hx_f_ens(is,iens,np) = this%pm%sensors(ipm)%hx_model(iens,np)

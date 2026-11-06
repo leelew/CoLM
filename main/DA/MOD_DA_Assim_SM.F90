@@ -105,6 +105,11 @@ CONTAINS
       CALL sm%calc_obs(idate, deltim)
       CALL sm%save(.false.)
 
+      IF (.not. DEF_DA) THEN
+         CALL sm%clear()
+         RETURN
+      ENDIF
+
       IF (p_is_worker .and. numpatch > 0) THEN
          wliq_soisno_ol(:,:) = wliq_soisno_ens(:,0,:)
          wliq_soisno_f (:,:) = sum(wliq_soisno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2) / DEF_DA_ENS_NUM

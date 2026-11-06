@@ -51,6 +51,8 @@ CONTAINS
       real(r8), intent(in) :: deltim
 
 !-----------------------------------------------------------------------------
+      IF (.not. DEF_DA) RETURN
+
       IF (p_is_worker) THEN
          ! Back up the ordinary river state and history accumulators.
          IF (allocated(wdsrf_ucat_ol)) THEN

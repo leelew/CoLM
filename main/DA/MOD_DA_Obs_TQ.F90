@@ -205,6 +205,10 @@ CONTAINS
          IF (.not. allocated(this%synop%sensors(isynop)%hx_model)) CYCLE
 
          DO np = 1, numpatch
+            IF (.not. DEF_DA) THEN
+               hx_ol(is,np) = this%synop%sensors(isynop)%hx_model(0,np)
+               CYCLE
+            ENDIF
             valid_hx = all(this%synop%sensors(isynop)%hx_model(1:DEF_DA_ENS_NUM,np) /= spval)
             IF (is_analysis) THEN
                hx_a_ens(is,1:DEF_DA_ENS_NUM,np) = this%synop%sensors(isynop)%hx_model(1:DEF_DA_ENS_NUM,np)

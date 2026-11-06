@@ -166,7 +166,7 @@ CONTAINS
       CASE ('2MQ')
          ! Convert specific humidity to relative humidity [0-1].
          DO np = 1, numpatch
-            DO iens = 0, DEF_DA_ENS_NUM
+            DO iens = 0, merge(DEF_DA_ENS_NUM, 0, DEF_DA)
                rhref_ens(iens,np) = spval
 
                IF (tref_ens(iens,np) == spval .or. &
@@ -220,6 +220,7 @@ CONTAINS
 
       ! Compute model-space H(x).
       CALL this%calc_model()
+      IF (.not. DEF_DA) RETURN
       allocate (this%hx_obs(this%y%nobs, 1:DEF_DA_ENS_NUM))
       this%hx_obs(:,:) = spval
       IF (this%y%nobs == 0) RETURN
@@ -385,7 +386,7 @@ CONTAINS
       DO is = 1, this%nsensor
          CALL this%sensors(is)%calc_obs(idate, deltim)
       ENDDO
-      CALL this%concat()
+      IF (DEF_DA) CALL this%concat()
 
    END SUBROUTINE SYNOP_set_calc_obs
 

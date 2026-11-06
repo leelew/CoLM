@@ -152,6 +152,12 @@ CONTAINS
          CALL tq_qref%save(.false.)
       ENDIF
 
+      IF (.not. DEF_DA) THEN
+         IF (allocated(tq_tref%cfgs)) CALL tq_tref%clear()
+         IF (allocated(tq_qref%cfgs)) CALL tq_qref%clear()
+         RETURN
+      ENDIF
+
       IF (p_is_worker .and. numpatch > 0) THEN
          ! Compute relative humidity before saving the prior ensembles.
          DO np = 1, numpatch
