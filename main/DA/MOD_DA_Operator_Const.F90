@@ -38,104 +38,103 @@ MODULE MOD_DA_Operator_Const
    real(r8), parameter :: rgh_surf = 2.2        ! soil surface roughness (cm)
    complex(r8), parameter :: jj = (0., 1.)      ! imaginary unit for complex number
 
-
 #ifdef LULC_IGBP
 
    ! MODIS IGBP Land Use/Land Cover System Legend
-   !---------------------------
-   ! 0  Ocean                               
-   ! 1  Evergreen Needleleaf Forests        
-   ! 2  Evergreen Broadleaf Forests         
-   ! 3  Deciduous Needleleaf Forests        
-   ! 4  Deciduous Broadleaf Forests         
-   ! 5  Mixed Forests                       
-   ! 6  Closed Shrublands                   
-   ! 7  Open Shrublands                   
-   ! 8  Woody Savannas                      
-   ! 9  Savannas                          
-   !10  Grasslands                          
-   !11  Permanent Wetlands                  
-   !12  Croplands                           
-   !13  Urban and Built-up Lands            
-   !14  Cropland/Natural Vegetation Mosaics 
-   !15  Permanent Snow and Ice              
-   !16  Barren                              
-   !17  Water Bodies                        
+!---------------------------
+   ! 0  Ocean
+   ! 1  Evergreen Needleleaf Forests
+   ! 2  Evergreen Broadleaf Forests
+   ! 3  Deciduous Needleleaf Forests
+   ! 4  Deciduous Broadleaf Forests
+   ! 5  Mixed Forests
+   ! 6  Closed Shrublands
+   ! 7  Open Shrublands
+   ! 8  Woody Savannas
+   ! 9  Savannas
+   !10  Grasslands
+   !11  Permanent Wetlands
+   !12  Croplands
+   !13  Urban and Built-up Lands
+   !14  Cropland/Natural Vegetation Mosaics
+   !15  Permanent Snow and Ice
+   !16  Barren
+   !17  Water Bodies
 
    ! empirical parameters to account for the dependence of optical depth on incidence angle [1]
    real(r8), parameter, dimension(N_land_classification) :: tth &
       = (/0.80, 1.00, 0.80, 0.49, 0.49, &
-          1.00, 1.00, 1.00, 1.00, 1.00,  &
-          1.00, 1.00, 1.00, 1.00, 1.00,  &
-          1.00, 2.00/)
+      1.00, 1.00, 1.00, 1.00, 1.00,  &
+      1.00, 1.00, 1.00, 1.00, 1.00,  &
+      1.00, 2.00/)
    real(r8), parameter, dimension(N_land_classification) :: ttv &
       = (/0.80, 1.00, 0.80, 0.46, 0.46, &
-          1.00, 1.00, 1.00, 1.00, 1.00,  &
-          1.00, 2.00, 1.00, 2.00, 1.00,  &
-          1.00, 1.00/)
+      1.00, 1.00, 1.00, 1.00, 1.00,  &
+      1.00, 2.00, 1.00, 2.00, 1.00,  &
+      1.00, 1.00/)
 
    ! empirical roughness parameters (Table 2 in [2])
    real(r8), parameter, dimension(N_land_classification) :: hr_SMAP &
       = (/0.160, 0.160, 0.160, 0.160, 0.160, &
-          0.110, 0.110, 0.125, 0.156, 0.156, &
-          0.100, 0.108, 0.000, 0.130, 0.000, &
-          0.150, 0.000/)
+      0.110, 0.110, 0.125, 0.156, 0.156, &
+      0.100, 0.108, 0.000, 0.130, 0.000, &
+      0.150, 0.000/)
 
    real(r8), parameter, dimension(N_land_classification) :: hr_SMOS &
       = (/0.300, 0.300, 0.300, 0.300, 0.300, &
-          0.100, 0.100, 0.100, 0.100, 0.100, &
-          0.100, 0.100, 0.100, 0.100, 0.000, &
-          0.100, 0.000/)
+      0.100, 0.100, 0.100, 0.100, 0.100, &
+      0.100, 0.100, 0.100, 0.100, 0.000, &
+      0.100, 0.000/)
 
    real(r8), parameter, dimension(N_land_classification) :: hr_P16  &
       = (/0.350, 0.460, 0.430, 0.450, 0.410, &
-          0.260, 0.170, 0.350, 0.230, 0.130, &
-          0.020, 0.170, 0.190, 0.220, 0.000, &
-          0.020, 0.000/)
+      0.260, 0.170, 0.350, 0.230, 0.130, &
+      0.020, 0.170, 0.190, 0.220, 0.000, &
+      0.020, 0.000/)
 
    ! b parameters for Wigneron vegetation model (ref?)
    real(r8), parameter, dimension(N_land_classification) :: b1 &
       = (/0.2600, 0.2260, 0.2600, 0.2260, 0.2260, &
-          0.0375, 0.0375, 0.0375, 0.0375, 0.0375, &
-          0.0000, 0.0500, 0.0000, 0.0500, 0.0000, &
-          0.0000, 0.0500/)
+      0.0375, 0.0375, 0.0375, 0.0375, 0.0375, &
+      0.0000, 0.0500, 0.0000, 0.0500, 0.0000, &
+      0.0000, 0.0500/)
 
    real(r8), parameter, dimension(N_land_classification) :: b2 &
       = (/0.0060, 0.0010, 0.0060, 0.0010, 0.0010, &
-          0.0500, 0.0500, 0.0500, 0.0500, 0.0500, &
-          0.0000, 0.0000, 0.0000, 0.0000, 0.0000, &
-          0.0000, 0.0000/)
+      0.0500, 0.0500, 0.0500, 0.0500, 0.0500, &
+      0.0000, 0.0000, 0.0000, 0.0000, 0.0000, &
+      0.0000, 0.0000/)
 
    real(r8), parameter, dimension(N_land_classification) :: b3 &
       = (/0.6900, 0.7000, 0.6900, 0.7000, 0.7000, &
-          0.0000, 0.0000, 0.0000, 0.0000, 0.0000, &
-          0.0000, 0.0000, 0.0000, 0.0000, 0.0000, &
-          0.0000, 0.0000/)
+      0.0000, 0.0000, 0.0000, 0.0000, 0.0000, &
+      0.0000, 0.0000, 0.0000, 0.0000, 0.0000, &
+      0.0000, 0.0000/)
 
    ! effective diffusion albedo (Table 3 in [2])
    real(r8), parameter, dimension(N_land_classification) :: w_SMAPL2 &
       = (/0.050, 0.050, 0.050, 0.050, 0.050, &
-          0.050, 0.050, 0.050, 0.080, 0.050, &
-          0.050, 0.000, 0.065, 0.000, 0.000, &
-          0.000, 0.000/)
+      0.050, 0.050, 0.050, 0.080, 0.050, &
+      0.050, 0.000, 0.065, 0.000, 0.000, &
+      0.000, 0.000/)
 
    real(r8), parameter, dimension(N_land_classification) :: w_CMEM &
       = (/0.080, 0.095, 0.080, 0.070, 0.070, &
-          0.050, 0.050, 0.050, 0.050, 0.050, &
-          0.000, 0.000, 0.000, 0.000, 0.000, &
-          0.000, 0.000/)
+      0.050, 0.050, 0.050, 0.050, 0.050, &
+      0.000, 0.000, 0.000, 0.000, 0.000, &
+      0.000, 0.000/)
 
    real(r8), parameter, dimension(N_land_classification) :: w_K16 &
       = (/0.050, 0.050, 0.060, 0.030, 0.050, &
-          0.030, 0.050, 0.040, 0.020, 0.030, &
-          0.000, 0.040, 0.000, 0.020, 0.000, &
-          0.000, 0.000/)
+      0.030, 0.050, 0.040, 0.020, 0.030, &
+      0.000, 0.040, 0.000, 0.020, 0.000, &
+      0.000, 0.000/)
 
    real(r8), parameter, dimension(N_land_classification) :: w_SMAPL4 &
       = (/0.120, 0.080, 0.120, 0.100, 0.120, &
-          0.140, 0.110, 0.130, 0.120, 0.070, &
-          0.000, 0.120, 0.000, 0.150, 0.000, &
-          0.000, 0.000/)
+      0.140, 0.110, 0.130, 0.120, 0.070, &
+      0.000, 0.120, 0.000, 0.150, 0.000, &
+      0.000, 0.000/)
 #endif
 
 END MODULE MOD_DA_Operator_Const

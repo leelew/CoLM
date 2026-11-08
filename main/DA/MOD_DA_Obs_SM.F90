@@ -4,13 +4,13 @@
 MODULE MOD_DA_Obs_SM
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
-!    Observation aggregation module for soil-moisture data assimilation.
+!   Observation aggregation module for soil-moisture data assimilation.
 !
-!    This module provides SM_type, a soil-moisture-specific observation
-!    container used by MOD_DA_Assim_SM. It sits above source-specific
-!    observation modules such as PM, GNSS, ANATQ.
+!   This module provides SM_type, a soil-moisture-specific observation
+!   container used by MOD_DA_Assim_SM. It sits above source-specific
+!   observation modules such as PM, GNSS, ANATQ.
 !
-!    SM_type owns the soil-moisture observation workflow:
+!   SM_type owns the soil-moisture observation workflow:
 !      1. receive a unified list of observation configs from the assimilation
 !         driver;
 !      2. split configs by source and initialize the corresponding source
@@ -20,18 +20,18 @@ MODULE MOD_DA_Obs_SM
 !      4. concatenate all enabled source/sensor observations into one vector;
 !      5. prepare localized patch-level y, R, and H(x) arrays for LETKF.
 !
-!    ANATQ selects changed T and q records independently, gathers them on
-!    master, and broadcasts to all workers. Its combined vectors follow the
-!    same concatenation and localization path as the other sources.
+!   ANATQ selects changed T and q records independently, gathers them on
+!   master, and broadcasts to all workers. Its combined vectors follow the
+!   same concatenation and localization path as the other sources.
 !
-!    Source-level parameters, such as PM sensor, variable, and frequency,
-!    are passed to the corresponding source module config type.
-!    Soil-moisture assimilation parameters, such as observation search radius
-!    and localization radius, are kept in SM_type.
+!   Source-level parameters, such as PM sensor, variable, and frequency,
+!   are passed to the corresponding source module config type.
+!   Soil-moisture assimilation parameters, such as observation search radius
+!   and localization radius, are kept in SM_type.
 !
 ! HISTORY:
-!    Lu Li, 05/2026: First implementation
-!    Lu Li, Zhilong Fan, 10/2026: First operational version
+!   Lu Li, 05/2026: First implementation
+!   Lu Li, Zhilong Fan, 10/2026: First operational version
 !-----------------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_DA_Obs_PM
@@ -48,11 +48,11 @@ MODULE MOD_DA_Obs_SM
 !-----------------------------------------------------------------------------
    type :: SM_config_type
 
-      character(len=16) :: source_name                        ! Observation source, e.g., 'PM' or 'ANATQ'
-      character(len=32) :: sensor_name                        ! Sensor or dataset identifier used by the source module
-      character(len=16) :: var_name                           ! Observation variable, e.g., 'TB_H', 'TB_V' or 'SM' for PM
-      real(r8) :: fghz                                        ! Microwave frequency [GHz], used by the PM brightness temperature operator
-      integer  :: istream                                     ! Stream index in the shared hx_ol, hx_f* and hx_a* diagnostic arrays
+      character(len=16) :: source_name  ! Observation source, e.g., 'PM' or 'ANATQ'
+      character(len=32) :: sensor_name  ! Sensor or dataset identifier used by the source module
+      character(len=16) :: var_name     ! Observation variable, e.g., 'TB_H', 'TB_V' or 'SM' for PM
+      real(r8) :: fghz                  ! Microwave frequency [GHz], used by the PM brightness temperature operator
+      integer  :: istream               ! Stream index in the shared hx_ol, hx_f* and hx_a* diagnostic arrays
 
    END type SM_config_type
 
@@ -63,39 +63,38 @@ MODULE MOD_DA_Obs_SM
 !-----------------------------------------------------------------------------
    type :: SM_type
 
-      type(SM_config_type), allocatable :: cfgs(:)            ! Configuration for each observation stream
+      type(SM_config_type), allocatable :: cfgs(:)  ! Configuration for each observation stream
 
-      logical :: use_pm = .false.                             ! Include passive microwave observations
-      logical :: use_anatq = .false.                          ! Include 2 m temperature and RH analysis pseudo-observations
+      logical :: use_pm = .false.     ! Include passive microwave observations
+      logical :: use_anatq = .false.  ! Include 2 m temperature and RH analysis pseudo-observations
 
       ! Observation selection and LETKF parameters.
-      real(r8) :: dres                                        ! Maximum latitude and longitude separation from the target patch [degrees]
-      real(r8) :: locr                                        ! Gaussian localization length scale for distance-based R inflation [km]
-      real(r8) :: infl                                        ! Ensemble background covariance inflation factor
+      real(r8) :: dres  ! Maximum latitude and longitude separation from the target patch [degrees]
+      real(r8) :: locr  ! Gaussian localization length scale for distance-based R inflation [km]
+      real(r8) :: infl  ! Ensemble background covariance inflation factor
 
       ! Source-specific observation containers.
-      type(PM_set_type) :: pm                                 ! Passive microwave observations and ensemble H(x)
-      type(ANATQ_set_type) :: anatq                           ! 2 m temperature and RH pseudo-observations and ensemble H(x)
+      type(PM_set_type) :: pm        ! Passive microwave observations and ensemble H(x)
+      type(ANATQ_set_type) :: anatq  ! 2 m temperature and RH pseudo-observations and ensemble H(x)
 
       ! Combined records on all ranks; units of y, hx_obs and r depend on the variable.
-      integer :: nobs = 0                                     ! Total number of records from all enabled sources
-      real(r8), allocatable :: lat(:)                         ! Observation latitudes [nobs], degrees north
-      real(r8), allocatable :: lon(:)                         ! Observation longitudes [nobs], degrees east
-      real(r8), allocatable :: y(:)                           ! Observed values or analysis ensemble means [nobs]
-      real(r8), allocatable :: hx_obs(:,:)                    ! Current observation equivalents [nobs, DEF_DA_ENS_NUM]
-      real(r8), allocatable :: r(:)                           ! Observation error standard deviations [nobs]
+      integer :: nobs = 0                   ! Total number of records from all enabled sources
+      real(r8), allocatable :: lat(:)       ! Observation latitudes [nobs], degrees north
+      real(r8), allocatable :: lon(:)       ! Observation longitudes [nobs], degrees east
+      real(r8), allocatable :: y(:)         ! Observed values or analysis ensemble means [nobs]
+      real(r8), allocatable :: hx_obs(:,:)  ! Current observation equivalents [nobs, DEF_DA_ENS_NUM]
+      real(r8), allocatable :: r(:)         ! Observation error standard deviations [nobs]
 
    CONTAINS
 
-      procedure :: init       => SM_type_init                 ! Configure enabled sources and assimilation parameters
-      procedure :: calc_hx    => SM_type_calc_hx              ! Compute model- and observation-space H(x) from enabled sources
-      procedure :: save       => SM_type_save                 ! Copy PM patch H(x) into forecast or analysis diagnostics
-      procedure :: clear      => SM_type_clear                ! Deallocate combined records and clear source observations
-      procedure :: concat     => SM_type_concat               ! Combine enabled sources in matching y, hx_obs and r order
-      procedure :: prepare    => SM_type_prepare              ! Select nearby valid records and localize their error variances
+      procedure :: init       => SM_type_init     ! Configure enabled sources and assimilation parameters
+      procedure :: calc_hx    => SM_type_calc_hx  ! Compute model- and observation-space H(x) from enabled sources
+      procedure :: save       => SM_type_save     ! Copy PM patch H(x) into forecast or analysis diagnostics
+      procedure :: clear      => SM_type_clear    ! Deallocate combined records and clear source observations
+      procedure :: concat     => SM_type_concat   ! Combine enabled sources in matching y, hx_obs and r order
+      procedure :: prepare    => SM_type_prepare  ! Select nearby valid records and localize their error variances
 
    END type SM_type
-
 
 !-----------------------------------------------------------------------------
 
@@ -160,7 +159,7 @@ CONTAINS
       this%use_anatq = DEF_DA .and. any(configs%source_name == 'ANATQ')
       IF (this%use_anatq) THEN
          IF (.not. (any(DEF_DA_OBS_SOURCE == 'site' .and. DEF_DA_OBS_TARGET == '2MT') .and. &
-                    any(DEF_DA_OBS_SOURCE == 'site' .and. DEF_DA_OBS_TARGET == '2MQ'))) &
+            any(DEF_DA_OBS_SOURCE == 'site' .and. DEF_DA_OBS_TARGET == '2MQ'))) &
             ERROR STOP 'ANATQ requires SYNOP 2MT and 2MQ screen level analyses'
          CALL this%anatq%init()
       ENDIF
@@ -373,7 +372,7 @@ CONTAINS
          dlon = modulo(abs(this%lon(iobs) - lon_p), 360.0_r8)
          IF (dlon > 180.0_r8) dlon = 360.0_r8 - dlon
          valid(iobs) = dlat < this%dres .and. dlon < this%dres .and. &
-                       this%y(iobs) /= spval .and. all(this%hx_obs(iobs,:) /= spval)
+            this%y(iobs) /= spval .and. all(this%hx_obs(iobs,:) /= spval)
       ENDDO
       nobs_p = count(valid)
       IF (nobs_p == 0) RETURN
@@ -390,8 +389,8 @@ CONTAINS
 
       ! Convert the error standard deviation to variance, then inflate R.
       hav = sin((lat*pi/180.0_r8 - patchlatr(np))/2.0_r8)**2 + &
-            cos(lat*pi/180.0_r8)*cos(patchlatr(np))* &
-            sin((lon*pi/180.0_r8 - patchlonr(np))/2.0_r8)**2
+         cos(lat*pi/180.0_r8)*cos(patchlatr(np))* &
+         sin((lon*pi/180.0_r8 - patchlonr(np))/2.0_r8)**2
       dist = 2.0_r8*6378.1_r8*asin(sqrt(max(0.0_r8,min(1.0_r8,hav))))
       r_p = r_p**2 / max(exp(-(dist**2)/(2.0_r8*this%locr**2)), 1.0e-6_r8)
 

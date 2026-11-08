@@ -4,22 +4,22 @@
 MODULE MOD_DA_Assim_SM
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
-!    Soil-moisture assimilation driver using observations prepared by Obs_SM,
-!    including passive-microwave data and ANATQ pseudo-observations.
+!   Soil-moisture assimilation driver using observations prepared by Obs_SM,
+!   including passive-microwave data and ANATQ pseudo-observations.
 !
 ! WORKFLOW:
-!    1. Initialize observation streams from the namelist.
-!    2. Prepare observations and forecast H(x); save forecast diagnostics.
-!    3. Apply a localized LETKF update and soil-water constraints per patch.
-!    4. Save analysis diagnostics, recompute H(x), and clear time-step data.
+!   1. Initialize observation streams from the namelist.
+!   2. Prepare observations and forecast H(x); save forecast diagnostics.
+!   3. Apply a localized LETKF update and soil-water constraints per patch.
+!   4. Save analysis diagnostics, recompute H(x), and clear time-step data.
 !
 ! NOTES:
-!    The LETKF update is applied to the top two soil layers. Water-content
-!    bounds are enforced and the aquifer compensates liquid-water changes.
-!    Model feedback is handled by the DA ensemble postprocessing step.
+!   The LETKF update is applied to the top two soil layers. Water-content
+!   bounds are enforced and the aquifer compensates liquid-water changes.
+!   Model feedback is handled by the DA ensemble postprocessing step.
 !
 ! HISTORY:
-!    Lu Li, Zhilong Fan, 11/2026: DA v1.0
+!   Lu Li, Zhilong Fan, 11/2026: DA v1.0
 !-----------------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_Vars_TimeInvariants
@@ -131,8 +131,8 @@ CONTAINS
                state_f(:,iens) = wliq_soisno_ens(1:,iens,np)
             ENDDO
             CALL dgemm('N', 'N', nl_soil, DEF_DA_ENS_NUM, DEF_DA_ENS_NUM, &
-                        1.0_r8, state_f, nl_soil, trans, DEF_DA_ENS_NUM, &
-                        0.0_r8, state_a, nl_soil)
+               1.0_r8, state_f, nl_soil, trans, DEF_DA_ENS_NUM, &
+               0.0_r8, state_a, nl_soil)
             state_a = max(0.0_r8, state_a)
             DO iens = 1, DEF_DA_ENS_NUM
                wliq_soisno_ens(1:2,iens,np) = state_a(1:2,iens)
@@ -145,7 +145,7 @@ CONTAINS
                   wice_soisno_ens(il,iens,np) = max(0.0_r8, wice_soisno_ens(il,iens,np))
 
                   IF (wliq_soisno_ens(il,iens,np) == 0.0_r8 .and. &
-                      wice_soisno_ens(il,iens,np) == 0.0_r8) THEN
+                     wice_soisno_ens(il,iens,np) == 0.0_r8) THEN
                      IF (t_soisno_ens(il,iens,np) - tfrz < -5.0_r8) THEN
                         wice_soisno_ens(il,iens,np) = 1.0e-10_r8
                      ELSE

@@ -4,7 +4,7 @@
 MODULE MOD_DA_Operator_RTM
 !-----------------------------------------------------------------------
 ! DESCRIPTION:
-!    Forward modeling of brightness temperature observations
+!   Forward modeling of brightness temperature observations
 !
 ! AUTHOR:
 !   Lu Li, 12/2024: Initial version
@@ -22,18 +22,18 @@ MODULE MOD_DA_Operator_RTM
    IMPLICIT NONE
    SAVE
 
-! public functions
+   ! public functions
    PUBLIC   :: PM_RTM
 
 ! local variables (parameters depends on frequency and incidence angle of satellite)
-   real(r8) :: fghz                       ! frequency of satellite (GHz)
-   real(r8) :: theta                      ! incidence angle of satellite (rad)
-   real(r8) :: f                          ! frequency (Hz)
-   real(r8) :: omega                      ! radian frequency
-   real(r8) :: lam                        ! wavelength (m)
-   real(r8) :: k                          ! wave number (rad/m)
-   real(r8) :: kcm                        ! wave number (rad/cm)
-   real(r8) :: kr                         ! size parameter used in calcuate single-particle albedo
+   real(r8) :: fghz   ! frequency of satellite (GHz)
+   real(r8) :: theta  ! incidence angle of satellite (rad)
+   real(r8) :: f      ! frequency (Hz)
+   real(r8) :: omega  ! radian frequency
+   real(r8) :: lam    ! wavelength (m)
+   real(r8) :: k      ! wave number (rad/m)
+   real(r8) :: kcm    ! wave number (rad/cm)
+   real(r8) :: kr     ! size parameter used in calcuate single-particle albedo
 
 !-----------------------------------------------------------------------
 
@@ -82,36 +82,36 @@ CONTAINS
       real(r8), intent(out) :: tb_toa_v                         ! brightness temperature of top-of-atmosphere for V- polarization
 
 !----------------------- Local Variables -------------------------------
-      logical  :: is_low_veg                  ! flag for low vegetation
-      real(r8) :: dz_soisno(maxsnl+1:nl_soil) ! liquid water in layers [kg/m2]
-      integer  :: lb                          ! lower bound of arrays
-      real(r8) :: tau_atm                     ! atmospheric optical depth
-      real(r8) :: r_r(2)                      ! rough surface reflectivity for H and V polarizations
-      real(r8) :: r_sn(2)                     ! reflectivity between the snow and ground for H and V polarizations
-      real(r8) :: r_snow(2)                   ! reflectivity of the snow for H and V polarizations
-      real(r8) :: tb_soil(2)                  ! brightness temperature of soil for H and V polarizations
-      real(r8) :: tb_tos(2)                   ! brightness temperature of snow-covered ground for H and V polarizations
-      real(r8) :: tb_tov(2)                   ! brightness temperature of vegetation (consider snow) for H and V polarizations
-      real(r8) :: tb_tov_noad(2)              ! brightness temperature of vegetation (no downwelling radiation) for H and V polarizations
-      real(r8) :: tb_au(2)                    ! upwelling radiation (brightness temperature) of atmosphere
-      real(r8) :: tb_ad(2)                    ! downwelling radiation (brightness temperature) of atmosphere
-      real(r8) :: rho_snow                    ! snow density (g/cm3)
-      real(r8) :: liq_snow                    ! snow liquid water content (cm3/cm3)
-      real(r8) :: gamma_p(2)                  ! vegetation opacity for H- and V- polarization
-      real(r8) :: tb_veg(2)                   ! brightness temperature of vegetation for H- and V- polarization
-      real(r8) :: tb_2(2)                     ! the downwelling vegetation emission reflected by the soil and attenuated by the canopy layer
-      real(r8) :: tb_3(2)                     ! upwelling soil emission attenuated by the canopy
-      real(r8) :: tb_4(2)                     ! the downwelling cosmic ray reflected by the soil and attenuated by the canopy layer
-      real(r8) :: tb_toa(2)                   ! brightness temperature of top-of-atmosphere for H- and V- polarization
-      real(r8) :: wf_total(nl_soil)           ! total gravimetric
-      real(r8) :: BD_all_surf                 ! bulk density of soil (g/m3) at surface
-      real(r8) :: porsl_surf                  ! soil porosity at surface
-      real(r8) :: t_surf                      ! soil temperature at surface (C)
-      real(r8) :: t_deep                      ! soil temperature at deep layer (C)
-      real(r8) :: liq_surf                    ! liquid volumetric water content at surface (m3/m3)
-      real(r8) :: ice_surf                    ! ice volumetric water content at surface (m3/m3)
-      real(r8) :: wf_clay_surf                ! gravimetric clay percent fraction(%) at surface
-      real(r8) :: wf_sand_surf                ! gravimetric sand percent fraction(%) at surface
+      logical  :: is_low_veg                   ! flag for low vegetation
+      real(r8) :: dz_soisno(maxsnl+1:nl_soil)  ! liquid water in layers [kg/m2]
+      integer  :: lb                           ! lower bound of arrays
+      real(r8) :: tau_atm                      ! atmospheric optical depth
+      real(r8) :: r_r(2)                       ! rough surface reflectivity for H and V polarizations
+      real(r8) :: r_sn(2)                      ! reflectivity between the snow and ground for H and V polarizations
+      real(r8) :: r_snow(2)                    ! reflectivity of the snow for H and V polarizations
+      real(r8) :: tb_soil(2)                   ! brightness temperature of soil for H and V polarizations
+      real(r8) :: tb_tos(2)                    ! brightness temperature of snow-covered ground for H and V polarizations
+      real(r8) :: tb_tov(2)                    ! brightness temperature of vegetation (consider snow) for H and V polarizations
+      real(r8) :: tb_tov_noad(2)               ! brightness temperature of vegetation (no downwelling radiation) for H and V polarizations
+      real(r8) :: tb_au(2)                     ! upwelling radiation (brightness temperature) of atmosphere
+      real(r8) :: tb_ad(2)                     ! downwelling radiation (brightness temperature) of atmosphere
+      real(r8) :: rho_snow                     ! snow density (g/cm3)
+      real(r8) :: liq_snow                     ! snow liquid water content (cm3/cm3)
+      real(r8) :: gamma_p(2)                   ! vegetation opacity for H- and V- polarization
+      real(r8) :: tb_veg(2)                    ! brightness temperature of vegetation for H- and V- polarization
+      real(r8) :: tb_2(2)                      ! the downwelling vegetation emission reflected by the soil and attenuated by the canopy layer
+      real(r8) :: tb_3(2)                      ! upwelling soil emission attenuated by the canopy
+      real(r8) :: tb_4(2)                      ! the downwelling cosmic ray reflected by the soil and attenuated by the canopy layer
+      real(r8) :: tb_toa(2)                    ! brightness temperature of top-of-atmosphere for H- and V- polarization
+      real(r8) :: wf_total(nl_soil)            ! total gravimetric
+      real(r8) :: BD_all_surf                  ! bulk density of soil (g/m3) at surface
+      real(r8) :: porsl_surf                   ! soil porosity at surface
+      real(r8) :: t_surf                       ! soil temperature at surface (C)
+      real(r8) :: t_deep                       ! soil temperature at deep layer (C)
+      real(r8) :: liq_surf                     ! liquid volumetric water content at surface (m3/m3)
+      real(r8) :: ice_surf                     ! ice volumetric water content at surface (m3/m3)
+      real(r8) :: wf_clay_surf                 ! gravimetric clay percent fraction(%) at surface
+      real(r8) :: wf_sand_surf                 ! gravimetric sand percent fraction(%) at surface
       integer  :: i
 
 !-----------------------------------------------------------------------
@@ -174,11 +174,11 @@ CONTAINS
 
 !#############################################################################
 ! vegetation and snow module
-!    We categorized four different cases for the calculations:
-!    1) no vegetation and no snow
-!    2) no vegetation with snow
-!    3) vegetation without snow
-!    4) vegetation with snow
+!   We categorized four different cases for the calculations:
+!   1) no vegetation and no snow
+!   2) no vegetation with snow
+!   3) vegetation without snow
+!   4) vegetation with snow
 !#############################################################################
          ! roughly judge low or high vegetation (only for IGBP)
          is_low_veg = .true.
@@ -198,22 +198,22 @@ CONTAINS
          END IF
 
          ! main procedures
-         ! --------------------------------------------------------------------
-         ! 1) no veg and no snow
-         !    two components:
-         !       (1) brightness temperature of soil
-         !       (2) the downwelling radiation reflected by the soil
-         ! --------------------------------------------------------------------
+! --------------------------------------------------------------------
+! 1) no veg and no snow
+!   two components:
+!      (1) brightness temperature of soil
+!      (2) the downwelling radiation reflected by the soil
+! --------------------------------------------------------------------
          IF ((lai + sai < 1e-6) .and. (snowdp < 0.01)) THEN
             tb_tov = tb_soil + tb_ad*r_r
             tb_tov_noad = tb_soil
 
-         ! --------------------------------------------------------------------
-         ! 2) no veg and has snow
-         !    two components:
-         !       (1) brightness temperature of snow
-         !       (2) the downwelling radiation reflected by the snow
-         ! --------------------------------------------------------------------
+! --------------------------------------------------------------------
+! 2) no veg and has snow
+!   two components:
+!      (1) brightness temperature of snow
+!      (2) the downwelling radiation reflected by the snow
+! --------------------------------------------------------------------
          ELSE IF ((lai + sai < 1e-6) .and. (snowdp > 0.01)) THEN
             ! calculate brightness temperature of snow-covered ground
             CALL snow(t_soisno(1), t_soisno(1), snowdp, rho_snow, liq_snow, r_r, r_snow, tb_tos)
@@ -221,14 +221,14 @@ CONTAINS
             tb_tov = tb_tos + tb_ad*r_snow
             tb_tov_noad = tb_tos
 
-         ! --------------------------------------------------------------------
-         ! 3) has veg and no snow
-         !    four components:
-         !       (1) the direct upwelling vegetation emission,
-         !       (2) the downwelling vegetation emission reflected by the soil and attenuated by the canopy layer
-         !       (3) upwelling soil emission attenuated by the canopy
-         !       (4) the downwelling reflected by the soil and attenuated by the canopy layer
-         ! --------------------------------------------------------------------
+! --------------------------------------------------------------------
+! 3) has veg and no snow
+!   four components:
+!      (1) the direct upwelling vegetation emission,
+!      (2) the downwelling vegetation emission reflected by the soil and attenuated by the canopy layer
+!      (3) upwelling soil emission attenuated by the canopy
+!      (4) the downwelling reflected by the soil and attenuated by the canopy layer
+! --------------------------------------------------------------------
          ELSE IF ((lai + sai > 1e-6) .and. (snowdp < 0.01)) THEN
             ! calculate brightness temperature of vegetation
             CALL veg(patchclass, lai, htop, 0.0, tleaf, tb_veg, gamma_p)
@@ -241,26 +241,26 @@ CONTAINS
                tb_tov_noad(i) = tb_veg(i) + tb_2(i) + tb_3(i)
             END DO
 
-         ! --------------------------------------------------------------------
-         ! 4) has veg and has snow
-         !    We need to determine the positional relationship between vegetation and snow.
-         !
-         !    If vegetation is higher than snow,
-         !    we first calculate brightness temperature of snow (soil boundary), then calculate
-         !    four components to derive brightness temperature of top of vegetation:
-         !       (1) the direct upwelling vegetation emission,
-         !       (2) the downwelling vegetation emission reflected by the snow and attenuated by the canopy layer
-         !       (3) upwelling snow emission attenuated by the canopy
-         !       (4) the downwelling reflected by the snow and attenuated by the canopy layer
-         !
-         !    If vegetation is lower than snow
-         !    we first calculate brightness temperature of top of vegetation (soil boundary), then calculate
-         !    four components to derive brightness temperature of top of snow:
-         !       (1) the direct upwelling vegetation emission,
-         !       (2) the downwelling vegetation emission reflected by the soil and attenuated by the canopy layer
-         !       (3) upwelling soil emission attenuated by the canopy
-         !       (4) the downwelling reflected by the soil and attenuated by the canopy layer
-         ! --------------------------------------------------------------------
+! --------------------------------------------------------------------
+! 4) has veg and has snow
+!   We need to determine the positional relationship between vegetation and snow.
+!
+!   If vegetation is higher than snow,
+!   we first calculate brightness temperature of snow (soil boundary), then calculate
+!   four components to derive brightness temperature of top of vegetation:
+!      (1) the direct upwelling vegetation emission,
+!      (2) the downwelling vegetation emission reflected by the snow and attenuated by the canopy layer
+!      (3) upwelling snow emission attenuated by the canopy
+!      (4) the downwelling reflected by the snow and attenuated by the canopy layer
+!
+!   If vegetation is lower than snow
+!   we first calculate brightness temperature of top of vegetation (soil boundary), then calculate
+!   four components to derive brightness temperature of top of snow:
+!      (1) the direct upwelling vegetation emission,
+!      (2) the downwelling vegetation emission reflected by the soil and attenuated by the canopy layer
+!      (3) upwelling soil emission attenuated by the canopy
+!      (4) the downwelling reflected by the soil and attenuated by the canopy layer
+! --------------------------------------------------------------------
          ELSE IF ((lai + sai > 1e-6) .and. (snowdp > 0.01)) THEN
             IF (htop < snowdp) THEN
                ! calculate brightness temperature of low vegetation
@@ -315,7 +315,6 @@ CONTAINS
 
    END SUBROUTINE PM_RTM
 
-
 !-----------------------------------------------------------------------
 
    SUBROUTINE calc_parameters (sat_theta, sat_fghz)
@@ -354,15 +353,15 @@ CONTAINS
       IMPLICIT NONE
 
 !------------------------ Dummy Argument ------------------------------
-      real(r8), intent(in)  :: z            ! altitude (m)
-      real(r8), intent(in)  :: tref         ! 2m air temperature (K)
-      real(r8), intent(out) :: tau_atm      ! atmospheric optical depth
-      real(r8), intent(out) :: tb_au(2)     ! upwelling radiation (brightness temperature) of atmosphere
-      real(r8), intent(out) :: tb_ad(2)     ! downwelling radiation (brightness temperature) of atmosphere
+      real(r8), intent(in)  :: z         ! altitude (m)
+      real(r8), intent(in)  :: tref      ! 2m air temperature (K)
+      real(r8), intent(out) :: tau_atm   ! atmospheric optical depth
+      real(r8), intent(out) :: tb_au(2)  ! upwelling radiation (brightness temperature) of atmosphere
+      real(r8), intent(out) :: tb_ad(2)  ! downwelling radiation (brightness temperature) of atmosphere
 
 !----------------------- Local Variables -------------------------------
-      real(r8) :: t_sky = 2.7    ! cosmic ray radiation (K)
-      real(r8) :: t_eq           ! equivalent layer temperature
+      real(r8) :: t_sky = 2.7  ! cosmic ray radiation (K)
+      real(r8) :: t_eq         ! equivalent layer temperature
       real(r8) :: gossat
 
 !-----------------------------------------------------------------------
@@ -403,27 +402,27 @@ CONTAINS
       IMPLICIT NONE
 
 !------------------------ Dummy Argument ------------------------------
-      integer, intent(in)   :: patchclass               ! land cover class
-      real(r8), intent(in)  :: t_surf                   ! soil temperature at surface (C)
-      real(r8), intent(in)  :: t_deep                   ! soil temperature at deep layer (C)
-      real(r8), intent(in)  :: liq_surf                 ! liquid volumetric water content at surface (m3/m3)
-      real(r8), intent(in)  :: ice_surf                 ! ice volumetric water content at surface (m3/m3)
-      real(r8), intent(in)  :: wf_sand_surf             ! gravimetric sand percent fraction(%) at surface
-      real(r8), intent(in)  :: wf_clay_surf             ! gravimetric clay percent fraction(%) at surface
-      real(r8), intent(in)  :: BD_all_surf              ! bulk density of soil (g/m3) at surface
-      real(r8), intent(in)  :: porsl_surf               ! soil porosity at surface
-      real(r8), intent(out) :: r_r(2)                   ! rough surface reflectivity for H and V polarizations
-      real(r8), intent(out) :: tb_soil(2)               ! brightness temperature of soil
+      integer, intent(in)   :: patchclass    ! land cover class
+      real(r8), intent(in)  :: t_surf        ! soil temperature at surface (C)
+      real(r8), intent(in)  :: t_deep        ! soil temperature at deep layer (C)
+      real(r8), intent(in)  :: liq_surf      ! liquid volumetric water content at surface (m3/m3)
+      real(r8), intent(in)  :: ice_surf      ! ice volumetric water content at surface (m3/m3)
+      real(r8), intent(in)  :: wf_sand_surf  ! gravimetric sand percent fraction(%) at surface
+      real(r8), intent(in)  :: wf_clay_surf  ! gravimetric clay percent fraction(%) at surface
+      real(r8), intent(in)  :: BD_all_surf   ! bulk density of soil (g/m3) at surface
+      real(r8), intent(in)  :: porsl_surf    ! soil porosity at surface
+      real(r8), intent(out) :: r_r(2)        ! rough surface reflectivity for H and V polarizations
+      real(r8), intent(out) :: tb_soil(2)    ! brightness temperature of soil
 
 !----------------------- Local Variables -------------------------------
-      real(r8)    :: t_eff(2)                   ! effective temperature for H and V polarizations, [K]
-      complex(r8) :: eps_soil                   ! dielectric constant of soil for H and V polarizations
-      real(r8)    :: r_s(2)                     ! smooth surface reflectivity for H and V polarizations
-      complex(r8) :: ew                         ! dielectric constant of water
-      logical     :: is_desert                  ! flag for desert soil
-      real(r8)    :: ffrz                       ! fraction of frozen soil
-      complex(r8) :: eps_f = (5.0, 0.5)         ! dielectric constant of frozen soil
-      real(r8)    :: sal_soil = 0.0             ! soil salinity (psu)
+      real(r8)    :: t_eff(2)            ! effective temperature for H and V polarizations, [K]
+      complex(r8) :: eps_soil            ! dielectric constant of soil for H and V polarizations
+      real(r8)    :: r_s(2)              ! smooth surface reflectivity for H and V polarizations
+      complex(r8) :: ew                  ! dielectric constant of water
+      logical     :: is_desert           ! flag for desert soil
+      real(r8)    :: ffrz                ! fraction of frozen soil
+      complex(r8) :: eps_f = (5.0, 0.5)  ! dielectric constant of frozen soil
+      real(r8)    :: sal_soil = 0.0      ! soil salinity (psu)
 
 !-----------------------------------------------------------------------
 
@@ -435,9 +434,9 @@ CONTAINS
 
       ! calculate ratio of freezed soil
       IF (liq_surf + ice_surf <= 0.0d0) THEN
-        ffrz = 0.0d0
+         ffrz = 0.0d0
       ELSE
-        ffrz = ice_surf / (liq_surf + ice_surf)
+         ffrz = ice_surf / (liq_surf + ice_surf)
       ENDIF
 
       ! caculate effective temperature
@@ -505,25 +504,25 @@ CONTAINS
       IMPLICIT NONE
 
 ! ------------------------ Dummy Argument ------------------------------
-      real(r8), intent(in)  :: wc_surf        ! soil moisture at surface (m3/m3)
-      real(r8), intent(in)  :: t_surf         ! soil temperature (C) at surface
-      real(r8), intent(in)  :: t_deep         ! soil temperature (C) at deep layer
-      real(r8), intent(out) :: t_eff(2)       ! effective temperature for H and V polarizations, [K]
+      real(r8), intent(in)  :: wc_surf   ! soil moisture at surface (m3/m3)
+      real(r8), intent(in)  :: t_surf    ! soil temperature (C) at surface
+      real(r8), intent(in)  :: t_deep    ! soil temperature (C) at deep layer
+      real(r8), intent(out) :: t_eff(2)  ! effective temperature for H and V polarizations, [K]
 
 !----------------------- Local Variables -------------------------------
-      real(r8) :: C             ! parameter depending mainly on frequency
-                                ! and soil moisture to describe the impact of
-                                ! surface temperature on the effective temperature;
-                                ! soil moisture increase, C large, teff close to tsurf
-                                ! soil moisture decrease, C small, tdeep impact teff more
-      real(r8) :: w0 = 0.30     ! parameter
-      real(r8) :: bw = 0.30     ! parameter
+      real(r8) :: C  ! parameter depending mainly on frequency
+      ! and soil moisture to describe the impact of
+      ! surface temperature on the effective temperature;
+      ! soil moisture increase, C large, teff close to tsurf
+      ! soil moisture decrease, C small, tdeep impact teff more
+      real(r8) :: w0 = 0.30  ! parameter
+      real(r8) :: bw = 0.30  ! parameter
 !-----------------------------------------------------------------------
 
       IF (wc_surf < 0.0) THEN
-        C = 0.001
+         C = 0.001
       ELSE
-        C = max(0.001, (wc_surf/w0)**bw)
+         C = max(0.001, (wc_surf/w0)**bw)
       ENDIF
       t_eff(:) = t_deep + (t_surf - t_deep)*C + tfrz
 
@@ -544,18 +543,18 @@ CONTAINS
       IMPLICIT NONE
 
 !------------------------ Dummy Argument ------------------------------
-      real(r8), intent(in)  :: t             ! temperature (C)
-      complex(r8), intent(out) :: eps_i      ! dielectric constant of ice water
+      real(r8), intent(in)  :: t         ! temperature (C)
+      complex(r8), intent(out) :: eps_i  ! dielectric constant of ice water
 
 !----------------------- Local Variables -------------------------------
-      real(r8) :: betam                ! beta parameter by Mishima et al. (1983)
-      real(r8) :: dbeta                ! corrected delta beta parameter
-      real(r8) :: beta                 ! beta parameter
-      real(r8) :: t_inv                ! modified inverse temperature
-      real(r8) :: tk                   ! temperature (K)
-      real(r8) :: alpha                ! alpha parameter
-      real(r8) :: eps_i_r              ! real part of pure ice dielectric constant
-      real(r8) :: eps_i_i              ! imaginary part of pure ice dielectric constant
+      real(r8) :: betam    ! beta parameter by Mishima et al. (1983)
+      real(r8) :: dbeta    ! corrected delta beta parameter
+      real(r8) :: beta     ! beta parameter
+      real(r8) :: t_inv    ! modified inverse temperature
+      real(r8) :: tk       ! temperature (K)
+      real(r8) :: alpha    ! alpha parameter
+      real(r8) :: eps_i_r  ! real part of pure ice dielectric constant
+      real(r8) :: eps_i_i  ! imaginary part of pure ice dielectric constant
 
 !-----------------------------------------------------------------------
 
@@ -606,20 +605,20 @@ CONTAINS
       IMPLICIT NONE
 
 !------------------------ Dummy Argument ------------------------------
-      integer, intent(in)      :: type       ! type of water, 0: pure water, 1: sea water, 2: soil water
-      real(r8), intent(in)     :: swc        ! soil water content (m3/m3)
-      real(r8), intent(in)     :: t          ! soil temperature (C)
-      real(r8), intent(in)     :: wf_sand    ! gravimetric sand percent fraction(%)
-      real(r8), intent(in)     :: wf_clay    ! gravimetric clay percent fraction(%)
-      real(r8), intent(in)     :: BD_all     ! bulk density(g/cm3)
-      real(r8), intent(in)     :: sal        ! water salinity (psu)
-      complex(r8), intent(out) :: eps_w      ! dielectric constant of soil water
+      integer, intent(in)      :: type     ! type of water, 0: pure water, 1: sea water, 2: soil water
+      real(r8), intent(in)     :: swc      ! soil water content (m3/m3)
+      real(r8), intent(in)     :: t        ! soil temperature (C)
+      real(r8), intent(in)     :: wf_sand  ! gravimetric sand percent fraction(%)
+      real(r8), intent(in)     :: wf_clay  ! gravimetric clay percent fraction(%)
+      real(r8), intent(in)     :: BD_all   ! bulk density(g/cm3)
+      real(r8), intent(in)     :: sal      ! water salinity (psu)
+      complex(r8), intent(out) :: eps_w    ! dielectric constant of soil water
 
 !----------------------- Local Variables -------------------------------
-      real(r8) :: sigma               ! ionic conductivity (S/m)
-      real(r8) :: a, b                ! parameters
-      real(r8) :: tau_w               ! relaxation time of pure water
-      real(r8) :: eps_w0              ! static dielectric constant of pure water
+      real(r8) :: sigma   ! ionic conductivity (S/m)
+      real(r8) :: a, b    ! parameters
+      real(r8) :: tau_w   ! relaxation time of pure water
+      real(r8) :: eps_w0  ! static dielectric constant of pure water
       real(r8) :: wc
 
 !-----------------------------------------------------------------------
@@ -675,36 +674,36 @@ CONTAINS
 !
 ! REFERENCES:
 !   [1]  Matzler, C. (1998). Microwave permittivity of dry sand.
-!   IEEE Transactions on Geoscience and Remote Sensing, 36(1), 317-319.
+!        IEEE Transactions on Geoscience and Remote Sensing, 36(1), 317-319.
 !
 !   [2]  Wang and Schmugge, 1980: An empirical model for the
-!   complex dielectric permittivity of soils as a function of water
-!   content. IEEE Trans. Geosci. Rem. Sens., GE-18, No. 4, 288-295.
+!        complex dielectric permittivity of soils as a function of water
+!        content. IEEE Trans. Geosci. Rem. Sens., GE-18, No. 4, 288-295.
 !-----------------------------------------------------------------------
       IMPLICIT NONE
 
 ! ------------------------ Dummy Argument ------------------------------
-      real(r8), intent(in)  :: t                        ! soil temperature (C)
-      real(r8), intent(in)  :: wc                       ! volumetric soil moisture (m3/m3)
-      real(r8), intent(in)  :: wf_sand                  ! gravimetric sand percent fraction(%)
-      real(r8), intent(in)  :: wf_clay                  ! gravimetric clay percent fraction(%)
-      real(r8), intent(in)  :: porsl                    ! soil porosity at surface
-      complex(r8), intent(in)  :: ew                    ! dielectric constant of water
+      real(r8), intent(in)  :: t        ! soil temperature (C)
+      real(r8), intent(in)  :: wc       ! volumetric soil moisture (m3/m3)
+      real(r8), intent(in)  :: wf_sand  ! gravimetric sand percent fraction(%)
+      real(r8), intent(in)  :: wf_clay  ! gravimetric clay percent fraction(%)
+      real(r8), intent(in)  :: porsl    ! soil porosity at surface
+      complex(r8), intent(in)  :: ew    ! dielectric constant of water
       complex(r8), intent(out) :: eps
 
 !----------------------- Local Variables -------------------------------
-      real(r8) :: wp                       ! wilting point
-      real(r8) :: wt                       ! transition moisture point (cm3/cm3)
-      real(r8) :: gamma                    ! fitting parameter
-      real(r8) :: ecl                      ! conductivity loss
-      real(r8) :: alpha                    ! conductivity loss parameter
-      real(r8) :: sal_sea = 32.5           ! sea water salinity (psu)
-      real(r8) :: sal_soil = 0.0           ! soil salinity (psu)
-      complex(r8) :: eps_x                 ! dielectric constant of the initially absorbed water
-      complex(r8) :: eps_a = (1.0, 0.0)    ! dielectric constant of air,  [2]IV
-      complex(r8) :: eps_r = (5.5, 0.2)    ! dielectric constant of rock, [2]IV
-      complex(r8) :: eps_i = (3.2, 0.1)    ! dielectric constant of ice,  [2]IV
-      complex(r8) :: eps_f = (5.0, 0.5)    ! dielectric constant of frozen soil
+      real(r8) :: wp                     ! wilting point
+      real(r8) :: wt                     ! transition moisture point (cm3/cm3)
+      real(r8) :: gamma                  ! fitting parameter
+      real(r8) :: ecl                    ! conductivity loss
+      real(r8) :: alpha                  ! conductivity loss parameter
+      real(r8) :: sal_sea = 32.5         ! sea water salinity (psu)
+      real(r8) :: sal_soil = 0.0         ! soil salinity (psu)
+      complex(r8) :: eps_x               ! dielectric constant of the initially absorbed water
+      complex(r8) :: eps_a = (1.0, 0.0)  ! dielectric constant of air,  [2]IV
+      complex(r8) :: eps_r = (5.5, 0.2)  ! dielectric constant of rock, [2]IV
+      complex(r8) :: eps_i = (3.2, 0.1)  ! dielectric constant of ice,  [2]IV
+      complex(r8) :: eps_f = (5.0, 0.5)  ! dielectric constant of frozen soil
 
 !-----------------------------------------------------------------------
 
@@ -719,11 +718,11 @@ CONTAINS
 
       ! calculate dielectric constant of wet soil (when all soil freeze, eps_x = eps_i)
       IF (wc <= wt) THEN
-        eps_x = eps_i + (ew - eps_i)*(wc/wt)*gamma                                ! [2](3)
-        eps = wc*eps_x + (porsl - wc)*eps_a + (1.-porsl)*eps_r                    ! [2](2)
+         eps_x = eps_i + (ew - eps_i)*(wc/wt)*gamma                                ! [2](3)
+         eps = wc*eps_x + (porsl - wc)*eps_a + (1.-porsl)*eps_r                    ! [2](2)
       ELSE
-        eps_x = eps_i + (ew - eps_i)*gamma                                        ! [2](5)
-        eps = wt*eps_x + (wc - wt)*ew + (porsl - wc)*eps_a + (1.-porsl)*eps_r     ! [2](4)
+         eps_x = eps_i + (ew - eps_i)*gamma                                        ! [2](5)
+         eps = wt*eps_x + (wc - wt)*ew + (porsl - wc)*eps_a + (1.-porsl)*eps_r     ! [2](4)
       END IF
 
       ! add conductivity loss for imaginary part
@@ -753,8 +752,8 @@ CONTAINS
       IMPLICIT NONE
 
 ! ------------------------ Dummy Argument ------------------------------
-      real(r8), intent(in)  :: wc          ! soil moisture (m3/m3)
-      real(r8), intent(in)  :: wf_clay     ! gravimetric clay percent fraction(%)
+      real(r8), intent(in)  :: wc       ! soil moisture (m3/m3)
+      real(r8), intent(in)  :: wf_clay  ! gravimetric clay percent fraction(%)
       complex(r8), intent(out) :: eps
 
 !----------------------- Local Variables -------------------------------
@@ -765,7 +764,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------
 !------------------------------------------------------------------------
-!  Initializing the GRMDM spectroscopic parameters with clay (fraction)
+!   Initializing the GRMDM spectroscopic parameters with clay (fraction)
 !------------------------------------------------------------------------
       ! RI & NAC of dry soils
       znd = 1.634 - 0.539 * (wf_clay/100) + 0.2748 * (wf_clay/100) ** 2
@@ -832,9 +831,9 @@ CONTAINS
       IMPLICIT NONE
 
 ! ------------------------ Dummy Argument ------------------------------
-      real(r8), intent(in)  :: t               ! soil temperature
-      real(r8), intent(in)  :: wc              ! soil moisture (m3/m3)
-      real(r8), intent(in)  :: wf_clay         ! weighted fraction (%)
+      real(r8), intent(in)  :: t        ! soil temperature
+      real(r8), intent(in)  :: wc       ! soil moisture (m3/m3)
+      real(r8), intent(in)  :: wf_clay  ! weighted fraction (%)
       complex(r8), intent(out) :: eps
 
 !----------------------- Local Variables -------------------------------
@@ -844,7 +843,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------
 !------------------------------------------------------------------------
-!  Initializing the GRMDM spectroscopic parameters with clay (fraction)
+!   Initializing the GRMDM spectroscopic parameters with clay (fraction)
 !------------------------------------------------------------------------
       ! RI & NAC of dry soils
       nd = 1.634 - 0.539e-2 * wf_clay + 0.2748e-4 * (wf_clay ** 2)   ! [1](11)
@@ -873,31 +872,31 @@ CONTAINS
       sigmab  = sigmabt + Bsgb*(t-ts)                                                       ! [1](10)
 
       ! unbound (free) water parameters
-      !-------------------
-      !  eu0 computation
-      !-------------------
+!-------------------
+!   eu0 computation
+!-------------------
       e0u  = 100.                                                                                                    ! [1](16)
       Bu   = 1.11e-4 - 1.603e-7 *wf_clay + 1.239e-9 *(wf_clay**2) + 8.33e-13 *(wf_clay**3) - 1.007e-14*(wf_clay**4)  ! [1](17)
       Bsgu = 0.00108 + 0.1413e-2*wf_clay - 0.2555e-4*(wf_clay**2) + 0.2147e-6*(wf_clay**3) - 0.0711e-8*(wf_clay**4)  ! [1](25)
       Fu   = log((e0u - 1)/(e0u + 2))                                                                                ! [1](8)(ep0->e0p)
       eu0  = (1 + 2*exp(Fu-Bu*(t-ts))) / (1-exp(Fu-Bu*(t-ts)))                                                       ! [1](7))e0p->ep0)
 
-      !--------------------
-      !  tauu computation
-      !--------------------
+!--------------------
+!   tauu computation
+!--------------------
       dHuR = 2231 - 143.1e-2 *wf_clay + 223.2e-4*(wf_clay**2) - 142.1e-6*(wf_clay**3) + 27.14e-8 *(wf_clay**4)       ! [1](20)
       dSuR = 3.649 - 0.4894e-2*wf_clay + 0.763e-4*(wf_clay**2) - 0.4859e-6*(wf_clay**3) + 0.0928e-8*(wf_clay**4)     ! [1](21)
       tauu = 48e-12 * exp(dHuR/(t+tfrz)-dSuR)/(t+tfrz)                                                               ! [1](9)
 
-      !----------------------
-      !  sigmau computation
-      !----------------------
+!----------------------
+!   sigmau computation
+!----------------------
       sigmaut = 0.05 + 1.4*(1.0 - (1.0 - wf_clay*1.e-2)**4.664)                                                      ! [1](24)
       sigmau  = sigmaut + Bsgu*(t-ts)                                                                                ! [1](10)
 
-      !--------------------------------------------------
-      !  computation of epsilon water (bound & unbound)
-      !--------------------------------------------------
+!--------------------------------------------------
+!   computation of epsilon water (bound & unbound)
+!--------------------------------------------------
       cxb  = (eb0-eps_w_inf) / (1+(2*pi*f*taub)**2)           ! [1](6), [2](16)
       eb_r = eps_w_inf + cxb                                  ! [1](6), [2](16)
       eb_i = cxb*(2*pi*f*taub) + sigmab/(2*pi*eps_0*f)        ! [1](6), [2](16)
@@ -905,17 +904,17 @@ CONTAINS
       eu_r = eps_w_inf + cxu                                  ! [1](6), [2](16)
       eu_i = cxu*(2*pi*f*tauu) + sigmau/(2*pi*eps_0*f)        ! [1](6), [2](16)
 
-      !--------------------------------------------------------------
-      !  computation of refractive index of water (bound & unbound)
-      !--------------------------------------------------------------
+!--------------------------------------------------------------
+!   computation of refractive index of water (bound & unbound)
+!--------------------------------------------------------------
       nb = sqrt(sqrt(eb_r**2+eb_i**2)+eb_r) / sqrt(2.0)       ! [1](5)
       kb = sqrt(sqrt(eb_r**2+eb_i**2)-eb_r) / sqrt(2.0)       ! [1](5)
       nu = sqrt(sqrt(eu_r**2+eu_i**2)+eu_r) / sqrt(2.0)       ! [1](5)
       ku = sqrt(sqrt(eu_r**2+eu_i**2)-eu_r) / sqrt(2.0)       ! [1](5)
 
-      !--------------------------------------------------
-      !  computation of soil refractive index (nm & km)
-      !--------------------------------------------------
+!--------------------------------------------------
+!   computation of soil refractive index (nm & km)
+!--------------------------------------------------
       IF (wc <= mvt) THEN
          nm = nd + (nb-1)*wc                                  ! [2](12)
          km = kd + kb*wc                                      ! [2](13)
@@ -924,9 +923,9 @@ CONTAINS
          km = kd + kb*mvt + ku*(wc-mvt)                       ! [2](13)
       ENDIF
 
-      !-------------------------------------------
-      !  computation of soil dielectric constant
-      !-------------------------------------------
+!-------------------------------------------
+!   computation of soil dielectric constant
+!-------------------------------------------
       eps_r = nm**2 - km**2                                   ! [1](4)
       eps_i = 2* nm * km                                      ! [1](4)
       eps   = cmplx(eps_r, eps_i, kind=r8)
@@ -938,31 +937,31 @@ CONTAINS
    SUBROUTINE diel_soil_D85(ew, swc, wf_sand, wf_clay, BD_all, eps)
 
 !-----------------------------------------------------------------------
-! DESCRIPTION:
-!   Calculate the dielectric constant of a wet soil Developed and validated for 1.4 and 18 GHz.
+      ! DESCRIPTION:
+      !   Calculate the dielectric constant of a wet soil Developed and validated for 1.4 and 18 GHz.
 
 ! REFERENCES:
 !   [1] Dobson et al., 1985: Microwave Dielectric behavior of
 !       wet soil - part II: Dielectric mixing models,
 !       IEEE Trans. Geosc. Rem. Sens., GE-23, No. 1, 35-46.
 
-!   [2] N. R. Peplinski, F. T. Ulaby, and M. C. Dobson,
-!       Dielectric Properties of Soils in the 0.3-1.3-GHz Range,
-!       IEEE Trans. Geosc. Rem. Sens., vol. 33, pp. 803-807, May 1995
+      !   [2] N. R. Peplinski, F. T. Ulaby, and M. C. Dobson,
+      !       Dielectric Properties of Soils in the 0.3-1.3-GHz Range,
+      !       IEEE Trans. Geosc. Rem. Sens., vol. 33, pp. 803-807, May 1995
 
-!   [3] N. R. Peplinski, F. T. Ulaby, and M. C. Dobson,
-!       Corrections to “Dielectric Properties of Soils in the 0.3-1.3-GHz Range",
-!       IEEE Trans. Geosc. Rem. Sens., vol. 33, p. 1340, November 1995
+      !   [3] N. R. Peplinski, F. T. Ulaby, and M. C. Dobson,
+      !       Corrections to “Dielectric Properties of Soils in the 0.3-1.3-GHz Range",
+      !       IEEE Trans. Geosc. Rem. Sens., vol. 33, p. 1340, November 1995
 
 !-----------------------------------------------------------------------
       IMPLICIT NONE
 
 ! ------------------------ Dummy Argument ------------------------------
-      complex(r8), intent(in)  :: ew                     ! dielectric constant of water
-      real(r8), intent(in)  :: swc                       ! soil moisture
-      real(r8), intent(in)  :: wf_sand                   ! gravimetric sand percent fraction(%)
-      real(r8), intent(in)  :: wf_clay                   ! gravimetric clay percent fraction(%)
-      real(r8), intent(in)  :: BD_all                    ! soil bulk density (g/cm3)
+      complex(r8), intent(in)  :: ew    ! dielectric constant of water
+      real(r8), intent(in)  :: swc      ! soil moisture
+      real(r8), intent(in)  :: wf_sand  ! gravimetric sand percent fraction(%)
+      real(r8), intent(in)  :: wf_clay  ! gravimetric clay percent fraction(%)
+      real(r8), intent(in)  :: BD_all   ! soil bulk density (g/cm3)
       complex(r8), intent(out) :: eps
 
 !----------------------- Local Variables -------------------------------
@@ -975,7 +974,7 @@ CONTAINS
       eps_s = (1.01_r8 + 0.44_r8 * rho_soil)**2.0_r8 - 0.062_r8                 ! [1](22)
       beta  = (127.48_r8 - 0.519_r8 * wf_sand - 0.152_r8 * wf_clay) / 100.0_r8  ! [1](30)
       eaa   = 1.0_r8 + (BD_all / rho_soil) * (eps_s ** alphas - 1.0_r8) &
-      &      + (wc ** beta) * (real(ew) ** alphas) - wc                         ! [1](28)
+         &      + (wc ** beta) * (real(ew) ** alphas) - wc                         ! [1](28)
       epsr  = eaa ** (1.0_r8/alphas)                                            ! [2](2),[3]
       beta  = (133.797_r8 - 0.603_r8 * wf_sand - 0.166_r8 * wf_clay) / 100.0_r8 ! [1](31) 1.33797 -> 133.797, [2](5)
       eaa   = (wc ** beta) * (abs(aimag(ew)) ** alphas)                         ! [2](3)
@@ -1000,11 +999,11 @@ CONTAINS
       IMPLICIT NONE
 
 !------------------------ Dummy Argument ------------------------------
-      complex(r8), intent(in) :: eps       ! dielectric constant of the surface
-      real(r8), intent(out)   :: r_s(2)    ! reflectivities of flat surfaces for H and V polarizations
+      complex(r8), intent(in) :: eps     ! dielectric constant of the surface
+      real(r8), intent(out)   :: r_s(2)  ! reflectivities of flat surfaces for H and V polarizations
 
 !----------------------- Local Variables -------------------------------
-      complex(r8) :: g                     ! parameter in Fresnel Law
+      complex(r8) :: g  ! parameter in Fresnel Law
 
 !-----------------------------------------------------------------------
 
@@ -1041,10 +1040,10 @@ CONTAINS
       real(r8), intent(out) :: r_r(2)      ! reflectivities of rough surfaces for H and V polarizations
 
 !----------------------- Local Variables -------------------------------
-      real(r8) :: Q                          ! parameter for polarization mixing
-      real(r8) :: hr(N_land_classification)  ! roughness parameter
-      real(r8) :: nrh(N_land_classification) ! parameter for H polarization
-      real(r8) :: nrv(N_land_classification) ! parameter for V polarization
+      real(r8) :: Q                           ! parameter for polarization mixing
+      real(r8) :: hr(N_land_classification)   ! roughness parameter
+      real(r8) :: nrh(N_land_classification)  ! parameter for H polarization
+      real(r8) :: nrv(N_land_classification)  ! parameter for V polarization
 
 !-----------------------------------------------------------------------
 
@@ -1093,9 +1092,9 @@ CONTAINS
 !   Calculate desert emissivity using Grody and Weng, 2008
 !
 ! REFERENCES:
-!  [1] Grody, N. C., & Weng, F. (2008). Microwave emission and scattering from deserts:
-!      Theory compared with satellite measurements.
-!      IEEE Transactions on Geoscience and Remote Sensing, 46, 361–375.
+!   [1] Grody, N. C., & Weng, F. (2008). Microwave emission and scattering from deserts:
+!       Theory compared with satellite measurements.
+!       IEEE Transactions on Geoscience and Remote Sensing, 46, 361–375.
 !-----------------------------------------------------------------------
       IMPLICIT NONE
 
@@ -1106,16 +1105,16 @@ CONTAINS
       real(r8), intent(out)   :: tb_desert(2)  ! brightness temperature of soil for H- and V- polarization
 
 !----------------------- Local Variables -------------------------------
-      real(r8) :: f0 = 0.7                      ! the fractional volume of spherical particles
-                                                ! (f = (4/3)*pi*r^3*n0),
-                                                ! r : the particle radius = 0.5 (mm)
-                                                ! n0 : the number of particles per unit volume.
-      real(r8) :: w     ! single-particle albedo
-      real(r8) :: g     ! asymmetry parameter
-      real(r8) :: a     ! similarity parameter
-      real(r8) :: em(2) ! desert soil emissivity
-      real(r8) :: y_r   ! real part of y-parameters
-      real(r8) :: y_i   ! imaginary part of y-parameters
+      real(r8) :: f0 = 0.7  ! the fractional volume of spherical particles
+      ! (f = (4/3)*pi*r^3*n0),
+      ! r : the particle radius = 0.5 (mm)
+      ! n0 : the number of particles per unit volume.
+      real(r8) :: w      ! single-particle albedo
+      real(r8) :: g      ! asymmetry parameter
+      real(r8) :: a      ! similarity parameter
+      real(r8) :: em(2)  ! desert soil emissivity
+      real(r8) :: y_r    ! real part of y-parameters
+      real(r8) :: y_i    ! imaginary part of y-parameters
 
 !-----------------------------------------------------------------------
       ! calculate y-parameters (eq.A15)
@@ -1157,16 +1156,16 @@ CONTAINS
       IMPLICIT NONE
 
 !------------------------ Dummy Argument ------------------------------
-      integer, intent(in)   :: patchclass     ! land cover class
-      real(r8), intent(in)  :: lai            ! leaf area index
-      real(r8), intent(in)  :: tleaf          ! leaf temperature (K)
-      real(r8), intent(out) :: tb_veg(2)      ! brightness temperature of vegetation for H- and V- polarization
-      real(r8), intent(out) :: gamma_p(2)     ! vegetation opacity for H- and V- polarization
+      integer, intent(in)   :: patchclass  ! land cover class
+      real(r8), intent(in)  :: lai         ! leaf area index
+      real(r8), intent(in)  :: tleaf       ! leaf temperature (K)
+      real(r8), intent(out) :: tb_veg(2)   ! brightness temperature of vegetation for H- and V- polarization
+      real(r8), intent(out) :: gamma_p(2)  ! vegetation opacity for H- and V- polarization
       real(r8), intent(in)  :: htop, snowdp
 
 !----------------------- Local Variables -------------------------------
-      real(r8) :: tau_nadir    ! vegetation opacity at nadir
-      real(r8) :: tau_veg(2)   ! vegetation opacity for H- and V- polarization
+      real(r8) :: tau_nadir   ! vegetation opacity at nadir
+      real(r8) :: tau_veg(2)  ! vegetation opacity for H- and V- polarization
       integer  :: i
 
 !-----------------------------------------------------------------------
@@ -1214,14 +1213,14 @@ CONTAINS
       IMPLICIT NONE
 
 !------------------------ Dummy Argument ------------------------------
-      real(r8), intent(in)  :: t_snow       ! average snow temperature (K)
-      real(r8), intent(in)  :: t            ! temperature at bottom of snow (K), i.e., soil or leaf
-      real(r8), intent(in)  :: snowdp       ! snow depth (m)
-      real(r8), intent(in)  :: rho_snow     ! snow density (g/cm3)
-      real(r8), intent(in)  :: liq_snow     ! snow liquid water content (cm3/cm3)
-      real(r8), intent(in)  :: r_sn(2)      ! reflectivity between the snow and ground at (1, H-POL. 2, V.)
-      real(r8), intent(out) :: r_snow(2)    ! reflectivity between the snow and air for H- and V- polarization
-      real(r8), intent(out) :: tb_tos(2)    ! brightness temperature of snow-cover ground for H- and V- polarization
+      real(r8), intent(in)  :: t_snow     ! average snow temperature (K)
+      real(r8), intent(in)  :: t          ! temperature at bottom of snow (K), i.e., soil or leaf
+      real(r8), intent(in)  :: snowdp     ! snow depth (m)
+      real(r8), intent(in)  :: rho_snow   ! snow density (g/cm3)
+      real(r8), intent(in)  :: liq_snow   ! snow liquid water content (cm3/cm3)
+      real(r8), intent(in)  :: r_sn(2)    ! reflectivity between the snow and ground at (1, H-POL. 2, V.)
+      real(r8), intent(out) :: r_snow(2)  ! reflectivity between the snow and air for H- and V- polarization
+      real(r8), intent(out) :: tb_tos(2)  ! brightness temperature of snow-cover ground for H- and V- polarization
 
 !----------------------- Local Variables -------------------------------
       real(r8) :: sal_snow = 0.0                   ! snow salinity (pmm)

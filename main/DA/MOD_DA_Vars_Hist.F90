@@ -30,7 +30,7 @@ MODULE MOD_DA_Vars_Hist
    IMPLICIT NONE
    SAVE
 
-   type(block_data_real8_2d) :: sumarea_hx ! mapped area of each H(x) stream
+   type(block_data_real8_2d) :: sumarea_hx  ! mapped area of each H(x) stream
 
 !-----------------------------------------------------------------------------
 

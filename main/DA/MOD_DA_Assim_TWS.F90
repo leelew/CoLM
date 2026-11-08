@@ -4,7 +4,7 @@
 MODULE MOD_DA_Assim_TWS
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
-!    Data assimilation of terrestrial water storge from GRACE satellite
+!   Data assimilation of terrestrial water storge from GRACE satellite
 !
 ! AUTHOR:
 !   Shupeng Zhang: Initial version
@@ -18,8 +18,8 @@ MODULE MOD_DA_Assim_TWS
    PUBLIC :: run_DA_GRACE
    PUBLIC :: end_DA_GRACE
 
-   real(r8), allocatable, PUBLIC :: fslp_k_mon (:,:) ! slope factor of runoff
-   real(r8), allocatable, PUBLIC :: fslp_k (:) ! slope factor of runoff
+   real(r8), allocatable, PUBLIC :: fslp_k_mon (:,:)  ! slope factor of runoff
+   real(r8), allocatable, PUBLIC :: fslp_k (:)        ! slope factor of runoff
 
    PRIVATE
 
@@ -62,30 +62,30 @@ MODULE MOD_DA_Assim_TWS
 
 CONTAINS
 
-   ! ----------
+! ----------
    SUBROUTINE init_DA_GRACE ()
 
-   USE MOD_Spmd_Task
-   USE MOD_Namelist, only : DEF_DA_OBS_DIR
-   USE MOD_Grid
-   USE MOD_NetCDFSerial
-   USE MOD_Mesh,     only : numelm
-   USE MOD_LandElm,  only : landelm
-   USE MOD_LandPatch
+      USE MOD_Spmd_Task
+      USE MOD_Namelist, only : DEF_DA_OBS_DIR
+      USE MOD_Grid
+      USE MOD_NetCDFSerial
+      USE MOD_Mesh,     only : numelm
+      USE MOD_LandElm,  only : landelm
+      USE MOD_LandPatch
 #ifdef CROP
-   USE MOD_LandCrop
+      USE MOD_LandCrop
 #endif
-   USE MOD_Pixelset
-   USE MOD_Vars_TimeInvariants, only : patchtype
-   USE MOD_Forcing, only : forcmask_pch
-   USE MOD_RangeCheck
-   IMPLICIT NONE
+      USE MOD_Pixelset
+      USE MOD_Vars_TimeInvariants, only : patchtype
+      USE MOD_Forcing, only : forcmask_pch
+      USE MOD_RangeCheck
+      IMPLICIT NONE
 
-   ! Local Variables
+! Local Variables
 
-   real(r8), allocatable :: time_real8(:)
-   integer :: itime
-   character(len=64) :: logmsg
+      real(r8), allocatable :: time_real8(:)
+      integer :: itime
+      character(len=64) :: logmsg
 
       file_grace = trim(DEF_DA_OBS_DIR) &
          // '/GRACE_JPL/GRCTellus.JPL.200204_202207.GLO.RL06M.MSCNv02CRI.nc'
@@ -153,7 +153,6 @@ CONTAINS
          ENDIF
       ENDIF
 
-
       has_prev_grace_obs = .false.
 
       nac_grace_this = 0
@@ -172,34 +171,34 @@ CONTAINS
 
    END SUBROUTINE init_DA_GRACE
 
-   ! ----------
+! ----------
    SUBROUTINE run_DA_GRACE (idate, deltim)
 
-   USE MOD_Spmd_task
-   USE MOD_TimeManager
-   USE MOD_NetCDFBlock
-   USE MOD_Mesh
-   USE MOD_LandElm
-   USE MOD_LandPatch
-   USE MOD_Vars_1DFluxes,       only : rnof, rsur
-   USE MOD_Vars_TimeVariables,  only : wat, wa, wdsrf, zwt
-   USE MOD_RangeCheck
-   USE MOD_UserDefFun
-   IMPLICIT NONE
+      USE MOD_Spmd_task
+      USE MOD_TimeManager
+      USE MOD_NetCDFBlock
+      USE MOD_Mesh
+      USE MOD_LandElm
+      USE MOD_LandPatch
+      USE MOD_Vars_1DFluxes,       only : rnof, rsur
+      USE MOD_Vars_TimeVariables,  only : wat, wa, wdsrf, zwt
+      USE MOD_RangeCheck
+      USE MOD_UserDefFun
+      IMPLICIT NONE
 
-   integer,  intent(in) :: idate(3)
-   real(r8), intent(in) :: deltim
+      integer,  intent(in) :: idate(3)
+      real(r8), intent(in) :: deltim
 
-   ! Local Variables
-   logical :: is_obs_time
-   integer :: month, mday, itime, ielm, istt, iend, nextmonth
+! Local Variables
+      logical :: is_obs_time
+      integer :: month, mday, itime, ielm, istt, iend, nextmonth
 
-   real(r8) :: sumpct
-   real(r8) :: w1, w0, r1, r0, var_o, var_m, dw_f, dw_o, dw_a, rr, zwt_ave
-   real(r8) :: fscal, fprev, fthis
+      real(r8) :: sumpct
+      real(r8) :: w1, w0, r1, r0, var_o, var_m, dw_f, dw_o, dw_a, rr, zwt_ave
+      real(r8) :: fscal, fprev, fthis
 
-   type(block_data_real8_2d) :: f_grace_lwe ! unit: cm
-   type(block_data_real8_2d) :: f_grace_err ! unit: cm
+      type(block_data_real8_2d) :: f_grace_lwe  ! unit: cm
+      type(block_data_real8_2d) :: f_grace_err  ! unit: cm
 
       CALL julian2monthday (idate(1), idate(2), month, mday)
 
@@ -295,7 +294,6 @@ CONTAINS
                   zwt_ave = sum(zwt_acc_prev_m(istt:iend) * elm_patch%subfrc(istt:iend), &
                      mask = rnofmask(istt:iend)) / sumpct
 
-
                   var_o = err_obs_this(ielm)**2 + err_obs_prev(ielm)**2
 
                   dw_f = w1 - w0
@@ -324,8 +322,8 @@ CONTAINS
                         fslp_k_mon(month_prev,istt:iend) = fthis
 
                         ! write(12,'(I4,I3,I8,8ES11.2)') idate(1), month, landelm%eindex(ielm), &
-                        !    dw_o, sqrt(var_o), dw_f, sqrt(var_m), dw_a, &
-                        !    rr, zwt_ave, fscal
+                        !   dw_o, sqrt(var_o), dw_f, sqrt(var_m), dw_a, &
+                        !   rr, zwt_ave, fscal
 
                      ENDIF
 
@@ -370,13 +368,12 @@ CONTAINS
          ENDIF
       ENDIF
 
-
    END SUBROUTINE run_DA_GRACE
 
-   ! ---------
+! ---------
    SUBROUTINE end_DA_GRACE ()
 
-   IMPLICIT NONE
+      IMPLICIT NONE
 
       IF (allocated(lwe_obs_this))    deallocate(lwe_obs_this)
       IF (allocated(err_obs_this))    deallocate(err_obs_this)
@@ -399,16 +396,16 @@ CONTAINS
 
    END SUBROUTINE end_DA_GRACE
 
-   ! ---------
+! ---------
    SUBROUTINE retrieve_yymm_from_days (days, yy, mm)
 
-   IMPLICIT NONE
-   real(r8), intent(in)  :: days
-   integer,  intent(out) :: yy, mm
+      IMPLICIT NONE
+      real(r8), intent(in)  :: days
+      integer,  intent(out) :: yy, mm
 
-   ! Local Variables
-   real(r8) :: resday
-   integer  :: mdays(12)
+! Local Variables
+      real(r8) :: resday
+      integer  :: mdays(12)
 
       yy = 2002
       mm = 1

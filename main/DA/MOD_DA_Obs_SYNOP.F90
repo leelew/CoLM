@@ -4,33 +4,33 @@
 MODULE MOD_DA_Obs_SYNOP
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
-!    SYNOP observation handling for 2 m temperature and humidity assimilation.
+!   SYNOP observation handling for 2 m temperature and humidity assimilation.
 !
-!    SYNOP_type represents one source/sensor/variable stream. SYNOP_set_type
-!    applies the observation workflow to all configured streams and combines
-!    their observations, metadata, errors, and H(x) for assimilation.
+!   SYNOP_type represents one source/sensor/variable stream. SYNOP_set_type
+!   applies the observation workflow to all configured streams and combines
+!   their observations, metadata, errors, and H(x) for assimilation.
 !
-!    The observation-space workflow is:
+!   The observation-space workflow is:
 !      1. clear time-step data and read observations through site_obs_type;
 !      2. compute model-space H(x) on local patches;
 !      3. extract H(x) at the mapped station patches;
 !      4. share observation-space H(x) across MPI ranks;
 !      5. concatenate SYNOP streams in configuration order.
 !
-!    Temperature H(x) is tref_ens; humidity H(x) is relative humidity derived
-!    from qref_ens, tref_ens, and surface pressure. The assimilation driver
-!    analyzes temperature before humidity, so the humidity operator uses the
-!    updated temperature.
+!   Temperature H(x) is tref_ens; humidity H(x) is relative humidity derived
+!   from qref_ens, tref_ens, and surface pressure. The assimilation driver
+!   analyzes temperature before humidity, so the humidity operator uses the
+!   updated temperature.
 !
-!    Station coordinates are read from <DEF_DA_OBS_DIR>/<sensor>/sites.nc.
-!    Hourly files <var_name>_YYYY_MM_DD_HH.nc contain 'latitude', 'longitude',
-!    'time', 'id', <var_name>, and 'r'. Variables '2MT' and '2MQ' denote
-!    temperature [K] and relative humidity [0-1]. Observation errors 'r' are
-!    standard deviations; the upper observation collection handles localization.
+!   Station coordinates are read from <DEF_DA_OBS_DIR>/<sensor>/sites.nc.
+!   Hourly files <var_name>_YYYY_MM_DD_HH.nc contain 'latitude', 'longitude',
+!   'time', 'id', <var_name>, and 'r'. Variables '2MT' and '2MQ' denote
+!   temperature [K] and relative humidity [0-1]. Observation errors 'r' are
+!   standard deviations; the upper observation collection handles localization.
 !
 ! HISTORY:
-!    Lu Li, 05/2026: Initial implementation
-!    Lu Li, Zhilong Fan, 11/2026: DA v1.0
+!   Lu Li, 05/2026: Initial implementation
+!   Lu Li, Zhilong Fan, 11/2026: DA v1.0
 !-----------------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_LandPatch
@@ -49,19 +49,19 @@ MODULE MOD_DA_Obs_SYNOP
    type :: SYNOP_type
 
       ! Model-space H(x) on local patches, retained for diagnostic output.
-      real(r8), allocatable :: hx_model(:,:)                  ! [0:ens, patch]
+      real(r8), allocatable :: hx_model(:,:)  ! [0:ens, patch]
 
       ! Observations and metadata at the locations read for this time step.
       type(site_obs_type)   :: y
 
       ! Model equivalents at observation locations; unmapped values are spval.
-      real(r8), allocatable :: hx_obs(:,:)                    ! [nobs, ens]
+      real(r8), allocatable :: hx_obs(:,:)  ! [nobs, ens]
 
    CONTAINS
 
-      procedure, PUBLIC :: init       => SYNOP_init           ! Initialize the observation reader and patch mapping
-      procedure, PUBLIC :: calc_hx    => SYNOP_calc_hx        ! Compute patch H(x) and map it to observation locations
-      procedure, PUBLIC :: clear      => SYNOP_clear          ! Clear time-step data while retaining the mapping
+      procedure, PUBLIC :: init       => SYNOP_init     ! Initialize the observation reader and patch mapping
+      procedure, PUBLIC :: calc_hx    => SYNOP_calc_hx  ! Compute patch H(x) and map it to observation locations
+      procedure, PUBLIC :: clear      => SYNOP_clear    ! Clear time-step data while retaining the mapping
 
    END type SYNOP_type
 
@@ -70,9 +70,9 @@ MODULE MOD_DA_Obs_SYNOP
 !-----------------------------------------------------------------------------
    type :: SYNOP_config_type
 
-      character(len=16) :: source_name                        ! Observation source class
-      character(len=32) :: sensor_name                        ! Sensor or station network name
-      character(len=16) :: var_name                           ! Observation variable and file prefix
+      character(len=16) :: source_name  ! Observation source class
+      character(len=32) :: sensor_name  ! Sensor or station network name
+      character(len=16) :: var_name     ! Observation variable and file prefix
 
    END type SYNOP_config_type
 
@@ -81,24 +81,24 @@ MODULE MOD_DA_Obs_SYNOP
 !-----------------------------------------------------------------------------
    type :: SYNOP_set_type
 
-      integer :: nsensor = 0                                  ! Number of configured observation streams
-      type(SYNOP_type), allocatable :: sensors(:)             ! Stream objects [nsensor]
-      type(SYNOP_config_type), allocatable :: cfgs(:)         ! Stream configurations [nsensor]
+      integer :: nsensor = 0                           ! Number of configured observation streams
+      type(SYNOP_type), allocatable :: sensors(:)      ! Stream objects [nsensor]
+      type(SYNOP_config_type), allocatable :: cfgs(:)  ! Stream configurations [nsensor]
 
       ! Current time-step data concatenated in stream order for assimilation.
-      integer :: nobs = 0                                     ! Total number of observations
-      real(r8), allocatable :: lat(:)                         ! Observation latitude [nobs], degrees
-      real(r8), allocatable :: lon(:)                         ! Observation longitude [nobs], degrees
-      real(r8), allocatable :: y(:)                           ! Observation values [nobs]
-      real(r8), allocatable :: r(:)                           ! Observation error standard deviations [nobs]
-      real(r8), allocatable :: hx_obs(:,:)                    ! Model equivalents at y locations [nobs, ens]
+      integer :: nobs = 0                   ! Total number of observations
+      real(r8), allocatable :: lat(:)       ! Observation latitude [nobs], degrees
+      real(r8), allocatable :: lon(:)       ! Observation longitude [nobs], degrees
+      real(r8), allocatable :: y(:)         ! Observation values [nobs]
+      real(r8), allocatable :: r(:)         ! Observation error standard deviations [nobs]
+      real(r8), allocatable :: hx_obs(:,:)  ! Model equivalents at y locations [nobs, ens]
 
    CONTAINS
 
-      procedure, PUBLIC :: init       => SYNOP_set_init       ! Initialize all streams from their configurations
-      procedure, PUBLIC :: calc_hx    => SYNOP_set_calc_hx    ! Compute both H(x) representations and combine streams
-      procedure, PUBLIC :: concat     => SYNOP_set_concat     ! Combine stream data into the set-level arrays
-      procedure, PUBLIC :: clear      => SYNOP_set_clear      ! Clear time-step data while retaining configurations
+      procedure, PUBLIC :: init       => SYNOP_set_init     ! Initialize all streams from their configurations
+      procedure, PUBLIC :: calc_hx    => SYNOP_set_calc_hx  ! Compute both H(x) representations and combine streams
+      procedure, PUBLIC :: concat     => SYNOP_set_concat   ! Combine stream data into the set-level arrays
+      procedure, PUBLIC :: clear      => SYNOP_set_clear    ! Clear time-step data while retaining configurations
 
    END type SYNOP_set_type
 
@@ -138,14 +138,14 @@ CONTAINS
       real(r8), intent(in) :: deltim
 
 !------------------------ Local Variables ------------------------------------
-      integer :: iobs                                         ! Observation index
-      integer :: isite                                        ! Site-table index
-      integer :: np                                           ! Local patch index
-      integer :: iens                                         ! Ensemble member index
-      real(r8) :: tc                                          ! 2 m air temperature [degrees Celsius]
-      real(r8) :: es                                          ! Saturation vapor pressure [hPa]
-      real(r8) :: e                                           ! Water vapor pressure [hPa]
-      integer, allocatable :: owner(:)                        ! Number of workers contributing to each observation
+      integer :: iobs                   ! Observation index
+      integer :: isite                  ! Site-table index
+      integer :: np                     ! Local patch index
+      integer :: iens                   ! Ensemble member index
+      real(r8) :: tc                    ! 2 m air temperature [degrees Celsius]
+      real(r8) :: es                    ! Saturation vapor pressure [hPa]
+      real(r8) :: e                     ! Water vapor pressure [hPa]
+      integer, allocatable :: owner(:)  ! Number of workers contributing to each observation
 
 !-----------------------------------------------------------------------------
       ! Reuse observations until clear is called at the end of the time step.
@@ -178,14 +178,14 @@ CONTAINS
                      rhref_ens(iens,np) = spval
 
                      IF (tref_ens(iens,np) == spval .or. &
-                         qref_ens(iens,np) == spval .or. &
-                         forc_psrf(np)    == spval .or. &
-                         forc_psrf(np)    <= 0.0_r8) CYCLE
+                        qref_ens(iens,np) == spval .or. &
+                        forc_psrf(np)    == spval .or. &
+                        forc_psrf(np)    <= 0.0_r8) CYCLE
 
                      tc = tref_ens(iens,np) - 273.15_r8
                      es = 6.112_r8 * exp((17.67_r8*tc)/(tc + 243.5_r8))
                      e  = (qref_ens(iens,np)*forc_psrf(np)/100.0_r8) / &
-                          (0.378_r8*qref_ens(iens,np) + 0.622_r8)
+                        (0.378_r8*qref_ens(iens,np) + 0.622_r8)
                      IF (es > 0.0_r8) THEN
                         rhref_ens(iens,np) = max(min(1.0_r8, e/es), 0.0_r8)
                      ENDIF

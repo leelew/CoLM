@@ -4,47 +4,47 @@
 MODULE MOD_DA_Main
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
-!    Coordinate ensemble forecasting, sequential data assimilation, and
-!    observation-equivalent diagnostics.
+!   Coordinate ensemble forecasting, sequential data assimilation, and
+!   observation-equivalent diagnostics.
 !
 ! NOTES:
-!    Enabled analyses follow a fixed order, independent of the order of
-!    observation streams in the namelist:
-!       2 m temperature -> 2 m relative humidity -> 
-!       snow -> soil moisture -> soil & snow temperature.
+!   Enabled analyses follow a fixed order, independent of the order of
+!   observation streams in the namelist:
+!      2 m temperature -> 2 m relative humidity ->
+!      snow -> soil moisture -> soil & snow temperature.
 !
-!    After analysis, online mode applies the ensemble mean to the model
-!    for subsequent land-atmosphere coupling. while offline mode restores 
-!    the unperturbed trajectory for evaluation.
+!   After analysis, online mode applies the ensemble mean to the model
+!   for subsequent land-atmosphere coupling. while offline mode restores
+!   the unperturbed trajectory for evaluation.
 !
 ! AUTHOR:
-!     Lu Li, 12/2024: Initial implemention
-!     Zhilong Fan, Lu Li, 03/2025: Clean codes
-!     Lu Li, Zhilong Fan, 11/2026: DA v1.0
-! 
+!   Lu Li, 12/2024: Initial implemention
+!   Zhilong Fan, Lu Li, 03/2025: Clean codes
+!   Lu Li, Zhilong Fan, 11/2026: DA v1.0
+!
 ! VERSION:
-!    v1.0 (Lu Li, Zhilong Fan, Zhuo Wang): 
+!   v1.0 (Lu Li, Zhilong Fan, Zhuo Wang):
 !
-!    Provides a unified workflow for observation processing, ensemble
-!    forecasting, analysis updates, diagnostic output, and model feedback.
-!    Implemented analyses include screen-level temperature and humidity,
-!    soil moisture, and soil temperature, with a common structure for
-!    extending assimilation to additional land-surface variables.
+!   Provides a unified workflow for observation processing, ensemble
+!   forecasting, analysis updates, diagnostic output, and model feedback.
+!   Implemented analyses include screen-level temperature and humidity,
+!   soil moisture, and soil temperature, with a common structure for
+!   extending assimilation to additional land-surface variables.
 !
-!    Organizes observations into site, grid, and pseudo-observation types.
-!    Source-specific modules construct observation equivalents, while
-!    target-specific modules select and localize observations for analysis.
+!   Organizes observations into site, grid, and pseudo-observation types.
+!   Source-specific modules construct observation equivalents, while
+!   target-specific modules select and localize observations for analysis.
 !
-!    Establishes an observation-operator library, including a passive
-!    microwave radiative-transfer operator for brightness temperatures.
+!   Establishes an observation-operator library, including a passive
+!   microwave radiative-transfer operator for brightness temperatures.
 !
-!    Uses the existing ensemble-generation scheme and LETKF to update
-!    model states. Screen-level analysis products can also serve as
-!    pseudo-observations for subsequent soil moisture assimilation.
+!   Uses the existing ensemble-generation scheme and LETKF to update
+!   model states. Screen-level analysis products can also serve as
+!   pseudo-observations for subsequent soil moisture assimilation.
 !
-!    Manages ensemble states, forcing, fluxes, restart data, and diagnostic
-!    history within the DA modules. Supports open-loop H(x) simulation
-!    and optional analysis feedback for land-atmosphere coupling.
+!   Manages ensemble states, forcing, fluxes, restart data, and diagnostic
+!   history within the DA modules. Supports open-loop H(x) simulation
+!   and optional analysis feedback for land-atmosphere coupling.
 !-----------------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_Spmd_task
@@ -153,7 +153,7 @@ CONTAINS
    SUBROUTINE end_DA ()
 
 !-----------------------------------------------------------------------------
-   IMPLICIT NONE
+      IMPLICIT NONE
 
 !-----------------------------------------------------------------------------
 

@@ -4,21 +4,21 @@
 MODULE MOD_DA_Vars_TimeVars
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
-!    Defines and manages the time-varying model variables required by the data
-!    assimilation workflow.
+!   Defines and manages the time-varying model variables required by the data
+!   assimilation workflow.
 !
-!    This module stores the DA ensemble copies of prognostic state variables,
-!    other diagnostic variables, and perturbed forcing variables on local
-!    worker patches.
+!   This module stores the DA ensemble copies of prognostic state variables,
+!   other diagnostic variables, and perturbed forcing variables on local
+!   worker patches.
 !
-!    Member 0 is kept in memory and in restart files so the model can restore
-!    the open-loop trajectory after running ensemble forecasts. Assimilation
-!    algorithms should use only members expect 0.
+!   Member 0 is kept in memory and in restart files so the model can restore
+!   the open-loop trajectory after running ensemble forecasts. Assimilation
+!   algorithms should use only members expect 0.
 !
 ! HISTORY:
-!    Lu Li, 12/2024, 05/2025: Initial DA ensemble storage
-!    Lu Li, 05/2026: Store open-loop member as ensemble index 0
-!    Lu Li, Zhilong Fan, 11/2026: DA v1.0
+!   Lu Li, 12/2024, 05/2025: Initial DA ensemble storage
+!   Lu Li, 05/2026: Store open-loop member as ensemble index 0
+!   Lu Li, Zhilong Fan, 11/2026: DA v1.0
 !-----------------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_Namelist
@@ -377,17 +377,17 @@ CONTAINS
       IMPLICIT NONE
 
 !------------------------ Dummy Arguments ------------------------------------
-      integer,          intent(in) :: idate(3)          ! current model date (year, day, seconds)
-      integer,          intent(in) :: lc_year           ! land-cover year
-      character(len=*), intent(in) :: site              ! case/site name used in restart filename
-      character(len=*), intent(in) :: dir_restart       ! restart output directory
+      integer,          intent(in) :: idate(3)     ! current model date (year, day, seconds)
+      integer,          intent(in) :: lc_year      ! land-cover year
+      character(len=*), intent(in) :: site         ! case/site name used in restart filename
+      character(len=*), intent(in) :: dir_restart  ! restart output directory
 
 !------------------------ Local Variables ------------------------------------
-      character(len=256) :: file_restart                ! full DA restart filename
-      character(len=14)  :: cdate                       ! date string used in restart path
-      character(len=256) :: cyear                       ! land-cover year string
-      integer :: compress                               ! NetCDF compression level
-      character(len=256) :: file_gridriver              ! gridriver restart filename
+      character(len=256) :: file_restart    ! full DA restart filename
+      character(len=14)  :: cdate           ! date string used in restart path
+      character(len=256) :: cyear           ! land-cover year string
+      integer :: compress                   ! NetCDF compression level
+      character(len=256) :: file_gridriver  ! gridriver restart filename
 
 !-----------------------------------------------------------------------------
       IF (.not. DEF_DA) RETURN
@@ -504,8 +504,8 @@ CONTAINS
       character(len=256) :: file_restart
       character(len=14)  :: cdate
       character(len=14)  :: cyear
-      character(len=256) :: file_gridriver              ! gridriver restart filename
-      logical            :: fexists                     ! ensemble river states present in restart file
+      character(len=256) :: file_gridriver  ! gridriver restart filename
+      logical            :: fexists         ! ensemble river states present in restart file
 
 !-----------------------------------------------------------------------------
       IF (.not. DEF_DA) RETURN

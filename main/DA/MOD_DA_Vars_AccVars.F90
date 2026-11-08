@@ -4,17 +4,17 @@
 MODULE MOD_DA_Vars_AccVars
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
-!    Stores diagnostic sums for DA history output and temporary backups of
-!    river-routing accumulators.
+!   Stores diagnostic sums for DA history output and temporary backups of
+!   river-routing accumulators.
 !
-!    Current diagnostic values are provided by MOD_DA_Vars_TimeVars.
-!    Valid samples are summed here; the history output procedure converts
-!    these sums to means. Discharge is integrated over routing time and
-!    normalized by the accumulated duration when written to history.
+!   Current diagnostic values are provided by MOD_DA_Vars_TimeVars.
+!   Valid samples are summed here; the history output procedure converts
+!   these sums to means. Discharge is integrated over routing time and
+!   normalized by the accumulated duration when written to history.
 !
 ! AUTHOR:
-!    Zhilong Fan, 10/2026
-!    Lu Li, Zhilong Fan, 11/2026: DA v1.0
+!   Zhilong Fan, 10/2026
+!   Lu Li, Zhilong Fan, 11/2026: DA v1.0
 !-----------------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_Vars_Global
@@ -213,16 +213,6 @@ CONTAINS
 
    END SUBROUTINE accumulate_DA_AccVars
 
-
-
-
-
-
-
-
-
-
-
 !-----------------------------------------------------------------------------
 ! WARNING (duplicated codes):
 !   Keep DA history definitions, accumulation, and output within DA modules
@@ -238,11 +228,11 @@ CONTAINS
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
 
-      real(r8), intent(in)    :: var (  :,:)           
-      real(r8), intent(inout) :: s   (  :,:)           
+      real(r8), intent(in)    :: var (  :,:)
+      real(r8), intent(inout) :: s   (  :,:)
 
-      integer :: i1                                   
-      integer :: i2                                 
+      integer :: i1
+      integer :: i2
 
 !-----------------------------------------------------------------------------
 
@@ -267,12 +257,12 @@ CONTAINS
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
 
-      real(r8), intent(in)    :: var (:,:,:)          
-      real(r8), intent(inout) :: s   (:,:,:)           
+      real(r8), intent(in)    :: var (:,:,:)
+      real(r8), intent(inout) :: s   (:,:,:)
 
-      integer :: i1                                    
-      integer :: i2                                   
-      integer :: i3                                  
+      integer :: i1
+      integer :: i2
+      integer :: i3
 
 !-----------------------------------------------------------------------------
 

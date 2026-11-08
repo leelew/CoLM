@@ -4,14 +4,14 @@
 MODULE MOD_DA_Obs_ANATQ
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
-!    2 m temperature and relative humidity analysis means as pseudo-observations
+!   2 m temperature and relative humidity analysis means as pseudo-observations
 !
-!    Each ANATQ_type handles one variable and stores its pseudo-observations
-!    and observation-space H(x). ANATQ_set_type combines the fixed temperature
-!    and relative humidity collections for land-surface assimilation.
+!   Each ANATQ_type handles one variable and stores its pseudo-observations
+!   and observation-space H(x). ANATQ_set_type combines the fixed temperature
+!   and relative humidity collections for land-surface assimilation.
 !
 ! HISTORY:
-!    Lu Li, 11/2026: DA v1.0
+!   Lu Li, 11/2026: DA v1.0
 !-----------------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_Namelist
@@ -31,14 +31,14 @@ MODULE MOD_DA_Obs_ANATQ
 !-----------------------------------------------------------------------------
    type :: ANATQ_type
 
-      type(pseudo_obs_type) :: y                    ! Pseudo-observations and metadata for one variable
-      real(r8), allocatable :: hx_obs(:,:)          ! Forecast values at y locations [nobs, ens]
+      type(pseudo_obs_type) :: y            ! Pseudo-observations and metadata for one variable
+      real(r8), allocatable :: hx_obs(:,:)  ! Forecast values at y locations [nobs, ens]
 
    CONTAINS
 
-      procedure :: init     => ANATQ_init           ! Initialize an empty observation collection
-      procedure :: calc_hx => ANATQ_calc_hx         ! Construct y and matching observation-space H(x)
-      procedure :: clear    => ANATQ_clear          ! Clear observations and H(x) for this variable
+      procedure :: init     => ANATQ_init    ! Initialize an empty observation collection
+      procedure :: calc_hx => ANATQ_calc_hx  ! Construct y and matching observation-space H(x)
+      procedure :: clear    => ANATQ_clear   ! Clear observations and H(x) for this variable
 
    END type ANATQ_type
 
@@ -47,22 +47,22 @@ MODULE MOD_DA_Obs_ANATQ
 !-----------------------------------------------------------------------------
    type :: ANATQ_set_type
 
-      type(ANATQ_type) :: tref                      ! 2 m temperature pseudo-observations [K]
-      type(ANATQ_type) :: rhref                     ! 2 m relative humidity pseudo-observations [0-1]
+      type(ANATQ_type) :: tref   ! 2 m temperature pseudo-observations [K]
+      type(ANATQ_type) :: rhref  ! 2 m relative humidity pseudo-observations [0-1]
 
-      integer :: nobs = 0                           ! Total record count: tref%y%nobs + rhref%y%nobs
-      real(r8), allocatable :: lat(:)               ! Patch latitudes [nobs], degrees
-      real(r8), allocatable :: lon(:)               ! Patch longitudes [nobs], degrees
-      real(r8), allocatable :: y(:)                 ! Analysis ensemble means [nobs]
-      real(r8), allocatable :: r(:)                 ! Observation error standard deviations [nobs]
-      real(r8), allocatable :: hx_obs(:,:)          ! Forecast values at y locations [nobs, ens]
+      integer :: nobs = 0                   ! Total record count: tref%y%nobs + rhref%y%nobs
+      real(r8), allocatable :: lat(:)       ! Patch latitudes [nobs], degrees
+      real(r8), allocatable :: lon(:)       ! Patch longitudes [nobs], degrees
+      real(r8), allocatable :: y(:)         ! Analysis ensemble means [nobs]
+      real(r8), allocatable :: r(:)         ! Observation error standard deviations [nobs]
+      real(r8), allocatable :: hx_obs(:,:)  ! Forecast values at y locations [nobs, ens]
 
    CONTAINS
 
-      procedure :: init     => ANATQ_set_init       ! Initialize the temperature and humidity collections
-      procedure :: calc_hx => ANATQ_set_calc_hx     ! Prepare both variables and combine their records
-      procedure :: concat   => ANATQ_set_concat     ! Combine temperature records followed by humidity
-      procedure :: clear    => ANATQ_set_clear      ! Clear both variables and their combined arrays
+      procedure :: init     => ANATQ_set_init    ! Initialize the temperature and humidity collections
+      procedure :: calc_hx => ANATQ_set_calc_hx  ! Prepare both variables and combine their records
+      procedure :: concat   => ANATQ_set_concat  ! Combine temperature records followed by humidity
+      procedure :: clear    => ANATQ_set_clear   ! Clear both variables and their combined arrays
 
    END type ANATQ_set_type
 
@@ -97,17 +97,17 @@ CONTAINS
       character(len=*), intent(in) :: var_name
 
 !------------------------ Local Variables ------------------------------------
-      real(r8) :: r                                 ! Observation error standard deviation
-      integer :: iens                               ! Ensemble member index
-      integer :: iproc                              ! Global process rank
-      integer :: nlocal                             ! Selected-patch count on this rank
-      integer :: nobs                               ! Global observation count for this variable
-      logical, allocatable :: mask(:)               ! Local patches with changed analysis means
-      real(r8), allocatable :: y(:)                 ! Analysis means at patch observation locations
-      real(r8), allocatable :: hx_obs(:,:)          ! Local observation-space H(x) on each worker [ens, nlocal]
-      real(r8), allocatable :: hx_recv(:,:)         ! Gathered H(x) receive buffer [ens, nobs]
-      integer, allocatable :: counts(:)             ! Selected-patch counts by rank
-      integer, allocatable :: displs(:)             ! Receive offsets in patch units
+      real(r8) :: r                          ! Observation error standard deviation
+      integer :: iens                        ! Ensemble member index
+      integer :: iproc                       ! Global process rank
+      integer :: nlocal                      ! Selected-patch count on this rank
+      integer :: nobs                        ! Global observation count for this variable
+      logical, allocatable :: mask(:)        ! Local patches with changed analysis means
+      real(r8), allocatable :: y(:)          ! Analysis means at patch observation locations
+      real(r8), allocatable :: hx_obs(:,:)   ! Local observation-space H(x) on each worker [ens, nlocal]
+      real(r8), allocatable :: hx_recv(:,:)  ! Gathered H(x) receive buffer [ens, nobs]
+      integer, allocatable :: counts(:)      ! Selected-patch counts by rank
+      integer, allocatable :: displs(:)      ! Receive offsets in patch units
 
 !-----------------------------------------------------------------------------
       CALL this%clear()

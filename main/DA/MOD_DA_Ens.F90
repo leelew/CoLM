@@ -4,18 +4,18 @@
 MODULE MOD_DA_Ens
 !-----------------------------------------------------------------------
 ! DESCRIPTION:
-!    Provide procedures for ensemble generation and management in data
-!    assimilation, including perturbation generation, member state exchange,
-!    and analysis feedback to the model.
+!   Provide procedures for ensemble generation and management in data
+!   assimilation, including perturbation generation, member state exchange,
+!   and analysis feedback to the model.
 !
 ! REFERENCES:
-!    [1] Algorithm Theoretical Basis Document Level 4 Surface and Root
-!        Zone Soil Moisture (L4_SM) Data Product
+!   [1] Algorithm Theoretical Basis Document Level 4 Surface and Root
+!       Zone Soil Moisture (L4_SM) Data Product
 !
 ! AUTHOR:
-!    Lu Li, 12/2024: Initial version
-!    Lu Li, 10/2025: Consider correlation & AR(1) process
-!    Lu Li, Zhilong Fan, 11/2026: DA v1.0
+!   Lu Li, 12/2024: Initial version
+!   Lu Li, 10/2025: Consider correlation & AR(1) process
+!   Lu Li, Zhilong Fan, 11/2026: DA v1.0
 !-----------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_Namelist
@@ -30,32 +30,32 @@ MODULE MOD_DA_Ens
    SAVE
 
    ! parameters
-   real(r8) :: dt                                                         ! time step in hours
+   real(r8) :: dt  ! time step in hours
 
    ! forcing [parameters used here is consistent with SMAP L4 (Table 4 in [1])]
-   integer,  parameter :: nvar_forc = 4                                   ! number of pertutated forcing variables
-   real(r8), parameter :: tau_forc = 24.0                                 ! correlation time scale in hours
+   integer,  parameter :: nvar_forc = 4    ! number of pertutated forcing variables
+   real(r8), parameter :: tau_forc = 24.0  ! correlation time scale in hours
 
-   real(r8) :: phi_forc                                                   ! AR(1) autocorrelation coefficient consider time scale
-   real(r8) :: sigma_eps_forc                                             ! standard deviation of noise in AR(1) process
-   real(r8), dimension(nvar_forc) :: sigma_forc = (/0.5, 0.3, 20.0, 1.0/) ! standard deviation of perturbed forcing variables (prcp, sw, lw, t)
+   real(r8) :: phi_forc                                                    ! AR(1) autocorrelation coefficient consider time scale
+   real(r8) :: sigma_eps_forc                                              ! standard deviation of noise in AR(1) process
+   real(r8), dimension(nvar_forc) :: sigma_forc = (/0.5, 0.3, 20.0, 1.0/)  ! standard deviation of perturbed forcing variables (prcp, sw, lw, t)
    real(r8), dimension(nvar_forc, nvar_forc) :: C = reshape([ &
-         1.0, -0.8,  0.5, 0.0, &
-        -0.8,  1.0, -0.5, 0.4, &
-         0.5, -0.5,  1.0, 0.4, &
-         0.0,  0.4,  0.4, 1.0], shape=[nvar_forc, nvar_forc])             ! cross-correlation matrix between perturbed forcing variables
-   real(r8), allocatable :: r_prev_forc(:,:,:)                            ! Previous step forcing perturbations
-   real(r8), allocatable :: r_curr_forc(:,:,:)                            ! Current step forcing perturbations 
-   logical :: initialized = .false.                                       ! flag to indicate if is initialized
+      1.0, -0.8,  0.5, 0.0, &
+      -0.8,  1.0, -0.5, 0.4, &
+      0.5, -0.5,  1.0, 0.4, &
+      0.0,  0.4,  0.4, 1.0], shape=[nvar_forc, nvar_forc])                 ! cross-correlation matrix between perturbed forcing variables
+   real(r8), allocatable :: r_prev_forc(:,:,:)                             ! Previous step forcing perturbations
+   real(r8), allocatable :: r_curr_forc(:,:,:)                             ! Current step forcing perturbations
+   logical :: initialized = .false.                                        ! flag to indicate if is initialized
 
    ! soil moisture [default set 0.002 m3/m3 disterbulance]
-   integer,  parameter :: nvar_sm = 2                                     ! number of pertutated soil moisture layers
-   real(r8), parameter :: tau_sm = 3.0                                    ! correlation time scale in hours
-   real(r8) :: phi_sm                                                     ! AR(1) autocorrelation coefficient consider time scale
-   real(r8) :: sigma_eps_sm                                               ! standard deviation of noise in AR(1) process
-   real(r8), dimension(nvar_sm) :: sigma_sm = (/0.035, 0.0552/)           ! standard deviation of perturbed soil moisture (equal to 0.002 m3/m3)
-   real(r8), allocatable :: r_prev_sm(:,:,:)                              ! previous step soil moisture perturbation 
-   real(r8), allocatable :: r_curr_sm(:,:,:)                              ! current step soil moisture perturbation 
+   integer,  parameter :: nvar_sm = 2                            ! number of pertutated soil moisture layers
+   real(r8), parameter :: tau_sm = 3.0                           ! correlation time scale in hours
+   real(r8) :: phi_sm                                            ! AR(1) autocorrelation coefficient consider time scale
+   real(r8) :: sigma_eps_sm                                      ! standard deviation of noise in AR(1) process
+   real(r8), dimension(nvar_sm) :: sigma_sm = (/0.035, 0.0552/)  ! standard deviation of perturbed soil moisture (equal to 0.002 m3/m3)
+   real(r8), allocatable :: r_prev_sm(:,:,:)                     ! previous step soil moisture perturbation
+   real(r8), allocatable :: r_curr_sm(:,:,:)                     ! current step soil moisture perturbation
 
 !-----------------------------------------------------------------------
 
@@ -73,21 +73,21 @@ CONTAINS
 !------------------------ Local Variables ------------------------------
       integer  ::  np, i, j
 
-      real(r8) :: u1(DEF_DA_ENS_NUM/2), u2(DEF_DA_ENS_NUM/2)              ! uniform random variables
+      real(r8) :: u1(DEF_DA_ENS_NUM/2), u2(DEF_DA_ENS_NUM/2)  ! uniform random variables
 
-      real(r8) :: cov_matrix(nvar_forc, nvar_forc)                        ! covariance matrix between perturbed forcing variables
-      real(r8) :: L(nvar_forc, nvar_forc)                                 ! Cholesky factor of the forcing covariance matrix
-      integer  :: info                                                    ! info flag for Cholesky decomposition
-      real(r8) :: z_forc(nvar_forc, DEF_DA_ENS_NUM)                       ! standard normal random variables
-      real(r8) :: mean_z_forc(nvar_forc)                                  ! Ensemble means of raw forcing normal samples
-      real(r8) :: std_z_forc(nvar_forc)                                   ! Sample standard deviations of raw forcing normal samples
-      real(r8) :: mean_r_forc(nvar_forc)                                  ! Ensemble means of forcing perturbations after AR(1)
-      real(r8) :: zxL(nvar_forc, DEF_DA_ENS_NUM)                          ! Correlated forcing innovations [variable, ens]
+      real(r8) :: cov_matrix(nvar_forc, nvar_forc)   ! covariance matrix between perturbed forcing variables
+      real(r8) :: L(nvar_forc, nvar_forc)            ! Cholesky factor of the forcing covariance matrix
+      integer  :: info                               ! info flag for Cholesky decomposition
+      real(r8) :: z_forc(nvar_forc, DEF_DA_ENS_NUM)  ! standard normal random variables
+      real(r8) :: mean_z_forc(nvar_forc)             ! Ensemble means of raw forcing normal samples
+      real(r8) :: std_z_forc(nvar_forc)              ! Sample standard deviations of raw forcing normal samples
+      real(r8) :: mean_r_forc(nvar_forc)             ! Ensemble means of forcing perturbations after AR(1)
+      real(r8) :: zxL(nvar_forc, DEF_DA_ENS_NUM)     ! Correlated forcing innovations [variable, ens]
 
-      real(r8) :: z_sm(DEF_DA_ENS_NUM)                                    ! standard normal random variables
-      real(r8) :: mean_z_sm                                               ! mean of perturbation
-      real(r8) :: std_z_sm                                                ! std of perturbation
-      real(r8) :: mean_r_sm(nvar_sm)                                      ! mean of perturbation for soil moisture (nvar_sm)
+      real(r8) :: z_sm(DEF_DA_ENS_NUM)  ! standard normal random variables
+      real(r8) :: mean_z_sm             ! mean of perturbation
+      real(r8) :: std_z_sm              ! std of perturbation
+      real(r8) :: mean_r_sm(nvar_sm)    ! mean of perturbation for soil moisture (nvar_sm)
 
 !-----------------------------------------------------------------------
       ! initialize persistent variables
@@ -171,8 +171,8 @@ CONTAINS
 
          ! Apply the Cholesky factor to introduce forcing cross-correlations.
          CALL dgemm('N', 'N', nvar_forc, DEF_DA_ENS_NUM, nvar_forc, &
-                    1.0_r8, L, nvar_forc, z_forc, nvar_forc, &
-                    0.0_r8, zxL, nvar_forc)
+            1.0_r8, L, nvar_forc, z_forc, nvar_forc, &
+            0.0_r8, zxL, nvar_forc)
 
          ! introduce correlation using AR(1) process
          DO i = 1, nvar_forc
@@ -240,7 +240,7 @@ CONTAINS
             ! Apply layer perturbations and the existing groundwater adjustment.
             wa_ens(1:DEF_DA_ENS_NUM,np) = wa_ens(1:DEF_DA_ENS_NUM,np) + &
                sum(max(1e-10, wliq_soisno_ens(1:nvar_sm,1:DEF_DA_ENS_NUM,np) + r_curr_sm(np,:,:)) - &
-                   wliq_soisno_ens(1:nvar_sm,1:DEF_DA_ENS_NUM,np), dim=1)
+               wliq_soisno_ens(1:nvar_sm,1:DEF_DA_ENS_NUM,np), dim=1)
             wliq_soisno_ens(1:nvar_sm,1:DEF_DA_ENS_NUM,np) = &
                max(1e-10, wliq_soisno_ens(1:nvar_sm,1:DEF_DA_ENS_NUM,np) + r_curr_sm(np,:,:))
          ENDIF
@@ -254,8 +254,8 @@ CONTAINS
 
 !-----------------------------------------------------------------------
 ! DESCRIPTION:
-!    Save the current model states, forcing, and diagnostic and flux
-!    outputs into ensemble member.
+!   Save the current model states, forcing, and diagnostic and flux
+!   outputs into ensemble member.
 !-----------------------------------------------------------------------
       IMPLICIT NONE
       integer, intent(in) :: iens
@@ -386,8 +386,8 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
-!    Load the states, forcing, and flux outputs of an ensemble member
-!    into the model variables.
+!   Load the states, forcing, and flux outputs of an ensemble member
+!   into the model variables.
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
       integer, intent(in) :: iens
@@ -518,12 +518,12 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
-!    Set the final model states and outputs after data assimilation.
+!   Set the final model states and outputs after data assimilation.
 !
-!    When land-atmosphere feedback is enabled, apply the analysis
-!    ensemble means for restart states and fluxes.
+!   When land-atmosphere feedback is enabled, apply the analysis
+!   ensemble means for restart states and fluxes.
 !
-!    Otherwise, restore the open-loop trajectory for diagnostic.
+!   Otherwise, restore the open-loop trajectory for diagnostic.
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
 

@@ -4,19 +4,19 @@
 MODULE MOD_DA_Obs_TQ
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
-!    Observation collection for 2 m temperature and humidity assimilation.
+!   Observation collection for 2 m temperature and humidity assimilation.
 !
-!    This module manages SYNOP observations for one 2 m analysis target.
-!    SYNOP stores the combined observations and H(x); this module selects
-!    nearby records and localizes their observation error variances without
-!    copying the source arrays.
+!   This module manages SYNOP observations for one 2 m analysis target.
+!   SYNOP stores the combined observations and H(x); this module selects
+!   nearby records and localizes their observation error variances without
+!   copying the source arrays.
 !
-!    The assimilation driver uses separate collections for temperature and
-!    humidity and controls their analysis order. Source modules compute H(x);
-!    this collection saves their model-space H(x) in the shared diagnostics.
+!   The assimilation driver uses separate collections for temperature and
+!   humidity and controls their analysis order. Source modules compute H(x);
+!   this collection saves their model-space H(x) in the shared diagnostics.
 !
 ! HISTORY:
-!    Lu Li, 11/2026: DA v1.0
+!   Lu Li, 11/2026: DA v1.0
 !-----------------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_LandPatch
@@ -34,10 +34,10 @@ MODULE MOD_DA_Obs_TQ
 !-----------------------------------------------------------------------------
    type :: TQ_config_type
 
-      character(len=16) :: source_name                         ! Observation source class, e.g., 'site'
-      character(len=32) :: sensor_name                         ! Station network or dataset identifier
-      character(len=16) :: var_name                            ! Observation variable: '2MT' or '2MQ'
-      integer :: istream                                       ! Stream index in the shared H(x) diagnostics
+      character(len=16) :: source_name  ! Observation source class, e.g., 'site'
+      character(len=32) :: sensor_name  ! Station network or dataset identifier
+      character(len=16) :: var_name     ! Observation variable: '2MT' or '2MQ'
+      integer :: istream                ! Stream index in the shared H(x) diagnostics
 
    END type TQ_config_type
 
@@ -46,24 +46,24 @@ MODULE MOD_DA_Obs_TQ
 !-----------------------------------------------------------------------------
    type :: TQ_type
 
-      type(TQ_config_type), allocatable :: cfgs(:)             ! Observation stream configurations
-      logical :: use_synop = .false.                           ! Include SYNOP station observations
+      type(TQ_config_type), allocatable :: cfgs(:)  ! Observation stream configurations
+      logical :: use_synop = .false.                ! Include SYNOP station observations
 
       ! Observation selection and LETKF parameters.
-      real(r8) :: dres                                         ! Observation search half-width [degrees]
-      real(r8) :: locr                                         ! Gaussian localization length scale [km]
-      real(r8) :: infl                                         ! Ensemble covariance inflation factor [-]
+      real(r8) :: dres  ! Observation search half-width [degrees]
+      real(r8) :: locr  ! Gaussian localization length scale [km]
+      real(r8) :: infl  ! Ensemble covariance inflation factor [-]
 
       ! Source-specific observation containers.
-      type(SYNOP_set_type) :: synop                            ! Station observations and ensemble H(x)
+      type(SYNOP_set_type) :: synop  ! Station observations and ensemble H(x)
 
    CONTAINS
 
-      procedure :: init       => TQ_type_init                  ! Configure sources and assimilation parameters
-      procedure :: calc_hx    => TQ_type_calc_hx               ! Compute model- and observation-space H(x) from enabled sources
-      procedure :: save       => TQ_type_save                  ! Copy model-space H(x) into shared diagnostics
-      procedure :: clear      => TQ_type_clear                 ! Clear time-step data while retaining configurations
-      procedure :: prepare    => TQ_type_prepare               ! Select nearby observations and localize error variances
+      procedure :: init       => TQ_type_init     ! Configure sources and assimilation parameters
+      procedure :: calc_hx    => TQ_type_calc_hx  ! Compute model- and observation-space H(x) from enabled sources
+      procedure :: save       => TQ_type_save     ! Copy model-space H(x) into shared diagnostics
+      procedure :: clear      => TQ_type_clear    ! Clear time-step data while retaining configurations
+      procedure :: prepare    => TQ_type_prepare  ! Select nearby observations and localize error variances
 
    END type TQ_type
 
@@ -161,7 +161,7 @@ CONTAINS
 !------------------------ Local Variables ------------------------------------
       integer :: i
       integer :: is
-      integer :: isynop                                        
+      integer :: isynop
       integer :: np
       logical :: valid_hx
 
@@ -242,7 +242,7 @@ CONTAINS
          dlon = modulo(abs(this%synop%lon(iobs) - lon_p), 360.0_r8)
          IF (dlon > 180.0_r8) dlon = 360.0_r8 - dlon
          valid(iobs) = dlat < this%dres .and. dlon < this%dres .and. &
-                       this%synop%y(iobs) /= spval .and. all(this%synop%hx_obs(iobs,:) /= spval)
+            this%synop%y(iobs) /= spval .and. all(this%synop%hx_obs(iobs,:) /= spval)
       ENDDO
       nobs_p = count(valid)
       IF (nobs_p == 0) RETURN
@@ -259,8 +259,8 @@ CONTAINS
 
       ! Convert the error standard deviation to variance, then inflate R.
       hav = sin((lat*pi/180.0_r8 - patchlatr(np))/2.0_r8)**2 + &
-            cos(lat*pi/180.0_r8)*cos(patchlatr(np))* &
-            sin((lon*pi/180.0_r8 - patchlonr(np))/2.0_r8)**2
+         cos(lat*pi/180.0_r8)*cos(patchlatr(np))* &
+         sin((lon*pi/180.0_r8 - patchlonr(np))/2.0_r8)**2
       dist = 2.0_r8*6378.1_r8*asin(sqrt(max(0.0_r8,min(1.0_r8,hav))))
       r_p = r_p**2 / max(exp(-(dist**2)/(2.0_r8*this%locr**2)), 1.0e-6_r8)
 

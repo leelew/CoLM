@@ -4,19 +4,19 @@
 MODULE MOD_DA_Obs_PseudoType
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
-!    Handle one patch-based pseudo-observation variable derived from model
-!    analyses.
+!   Handle one patch-based pseudo-observation variable derived from model
+!   analyses.
 !
-!    In operational forecasting systems, screen-level temperature and humidity
-!    analyses can provide observational constraints on land-surface variables,
-!    supporting land-atmosphere coupled data assimilation.
+!   In operational forecasting systems, screen-level temperature and humidity
+!   analyses can provide observational constraints on land-surface variables,
+!   supporting land-atmosphere coupled data assimilation.
 !
-!    Following SYNOP 2 m temperature and humidity assimilation, patch-level
-!    analysis values with nonzero analysis increments are treated as
-!    pseudo-observations for subsequent land-surface data assimilation.
+!   Following SYNOP 2 m temperature and humidity assimilation, patch-level
+!   analysis values with nonzero analysis increments are treated as
+!   pseudo-observations for subsequent land-surface data assimilation.
 !
 ! HISTORY:
-!    Lu Li, 11/2026: DA v1.0
+!   Lu Li, 11/2026: DA v1.0
 !-----------------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_LandPatch
@@ -30,17 +30,17 @@ MODULE MOD_DA_Obs_PseudoType
 !-----------------------------------------------------------------------------
    type :: pseudo_obs_type
 
-      integer :: nobs = 0                            ! Number of selected patches across all workers
-      real(r8), allocatable :: lat(:)                ! Patch latitude [nobs], degrees
-      real(r8), allocatable :: lon(:)                ! Patch longitude [nobs], degrees
-      real(r8), allocatable :: y(:)                  ! Analysis ensemble means [nobs]
-      real(r8), allocatable :: r(:)                  ! Observation error standard deviations [nobs]
+      integer :: nobs = 0              ! Number of selected patches across all workers
+      real(r8), allocatable :: lat(:)  ! Patch latitude [nobs], degrees
+      real(r8), allocatable :: lon(:)  ! Patch longitude [nobs], degrees
+      real(r8), allocatable :: y(:)    ! Analysis ensemble means [nobs]
+      real(r8), allocatable :: r(:)    ! Observation error standard deviations [nobs]
 
    CONTAINS
 
-      procedure, PUBLIC :: init  => pseudo_obs_init  ! Initialize an empty pseudo-observation collection
-      procedure, PUBLIC :: read  => pseudo_obs_read  ! Gather and broadcast selected patch observations
-      procedure, PUBLIC :: clear => pseudo_obs_clear ! Deallocate observation arrays and reset nobs
+      procedure, PUBLIC :: init  => pseudo_obs_init   ! Initialize an empty pseudo-observation collection
+      procedure, PUBLIC :: read  => pseudo_obs_read   ! Gather and broadcast selected patch observations
+      procedure, PUBLIC :: clear => pseudo_obs_clear  ! Deallocate observation arrays and reset nobs
 
    END type pseudo_obs_type
 
@@ -76,14 +76,14 @@ CONTAINS
       real(r8), intent(in) :: r                      ! Observation error standard deviation
 
 !------------------------ Local Variables ------------------------------------
-      integer :: np                                  ! Local patch index
-      integer :: nlocal                              ! Number of selected patches on this rank
-      integer :: iobs                                ! Selected-patch index in send buffers
-      real(r8), allocatable :: obs(:,:)              ! Send buffer: lat, lon, y, r [4, nlocal]
-      real(r8), allocatable :: obs_global(:,:)       ! Gathered lat, lon, y, r on master [4, nobs]
-      integer :: iproc                               ! Rank index in p_comm_glb
-      integer, allocatable :: counts(:)              ! Selected-patch count per rank [0:p_np_glb-1]
-      integer, allocatable :: displs(:)              ! Receive offset per rank, in patch units [0:p_np_glb-1]
+      integer :: np                             ! Local patch index
+      integer :: nlocal                         ! Number of selected patches on this rank
+      integer :: iobs                           ! Selected-patch index in send buffers
+      real(r8), allocatable :: obs(:,:)         ! Send buffer: lat, lon, y, r [4, nlocal]
+      real(r8), allocatable :: obs_global(:,:)  ! Gathered lat, lon, y, r on master [4, nobs]
+      integer :: iproc                          ! Rank index in p_comm_glb
+      integer, allocatable :: counts(:)         ! Selected-patch count per rank [0:p_np_glb-1]
+      integer, allocatable :: displs(:)         ! Receive offset per rank, in patch units [0:p_np_glb-1]
 
 !-----------------------------------------------------------------------------
       CALL this%clear()

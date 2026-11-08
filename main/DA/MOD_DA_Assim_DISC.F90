@@ -4,23 +4,23 @@
 MODULE MOD_DA_Assim_DISC
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
-!    Discharge diagnostic driver using ensemble-mean forecast runoff.
+!   Discharge diagnostic driver using ensemble-mean forecast runoff.
 !
 ! WORKFLOW:
-!    1. Back up the ordinary river state and discharge accumulators.
-!    2. Load the retained DA river state and ensemble-mean forecast runoff.
-!    3. Advance river routing and accumulate discharge diagnostics.
-!    4. Retain the updated DA river state and restore the ordinary river state.
+!   1. Back up the ordinary river state and discharge accumulators.
+!   2. Load the retained DA river state and ensemble-mean forecast runoff.
+!   3. Advance river routing and accumulate discharge diagnostics.
+!   4. Retain the updated DA river state and restore the ordinary river state.
 !
 ! NOTES:
-!    No discharge observations are assimilated. The additional routing uses
-!    forecast runoff; land-state analysis does not recompute runoff here.
-!    The suffix _a denotes the separate DA routing trajectory, rather than
-!    a direct discharge-observation analysis. Vars modules manage its storage.
+!   No discharge observations are assimilated. The additional routing uses
+!   forecast runoff; land-state analysis does not recompute runoff here.
+!   The suffix _a denotes the separate DA routing trajectory, rather than
+!   a direct discharge-observation analysis. Vars modules manage its storage.
 !
 ! HISTORY:
-!    Lu Li, 05/2026: Initial implementation
-!    Lu Li, Zhilong Fan, 11/2026: DA v1.0
+!   Lu Li, 05/2026: Initial implementation
+!   Lu Li, Zhilong Fan, 11/2026: DA v1.0
 !-----------------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_SPMD_Task

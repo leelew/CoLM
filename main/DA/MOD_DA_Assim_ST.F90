@@ -4,22 +4,22 @@
 MODULE MOD_DA_Assim_ST
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
-!    Soil-temperature assimilation driver using observations prepared by Obs_ST.
+!   Soil-temperature assimilation driver using observations prepared by Obs_ST.
 !
 ! WORKFLOW:
-!    1. Initialize observation streams from the namelist.
-!    2. Prepare observations and forecast H(x); save forecast diagnostics.
-!    3. Apply a localized LETKF update and temperature constraints per patch.
-!    4. Save analysis diagnostics, recompute H(x), and clear time-step data.
+!   1. Initialize observation streams from the namelist.
+!   2. Prepare observations and forecast H(x); save forecast diagnostics.
+!   3. Apply a localized LETKF update and temperature constraints per patch.
+!   4. Save analysis diagnostics, recompute H(x), and clear time-step data.
 !
 ! NOTES:
-!    The LETKF update is applied to the top two soil layers, with temperature
-!    increments limited to +/-20 K. Source modules provide the H(x) operators.
-!    Model feedback is handled by the DA ensemble postprocessing step.
+!   The LETKF update is applied to the top two soil layers, with temperature
+!   increments limited to +/-20 K. Source modules provide the H(x) operators.
+!   Model feedback is handled by the DA ensemble postprocessing step.
 !
 ! HISTORY:
-!    Lu Li, 05/2026: First implementation
-!    Lu Li, Zhilong Fan, 11/2026: DA v1.0
+!   Lu Li, 05/2026: First implementation
+!   Lu Li, Zhilong Fan, 11/2026: DA v1.0
 !-----------------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_Vars_TimeInvariants
@@ -132,8 +132,8 @@ CONTAINS
                state_f(:,iens) = t_soisno_ens(1:,iens,np)
             ENDDO
             CALL dgemm('N', 'N', nl_soil, DEF_DA_ENS_NUM, DEF_DA_ENS_NUM, &
-                        1.0_r8, state_f, nl_soil, trans, DEF_DA_ENS_NUM, &
-                        0.0_r8, state_a, nl_soil)
+               1.0_r8, state_f, nl_soil, trans, DEF_DA_ENS_NUM, &
+               0.0_r8, state_a, nl_soil)
 
             ! limit the temperature increment to keep the analysis physical
             DO iens = 1, DEF_DA_ENS_NUM

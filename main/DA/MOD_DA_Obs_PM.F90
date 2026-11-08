@@ -4,14 +4,14 @@
 MODULE MOD_DA_Obs_PM
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
-!    Passive-microwave observation handling for data assimilation.
+!   Passive-microwave observation handling for data assimilation.
 !
-!    This module defines one passive-microwave observation stream (PM_type)
-!    and a collection of streams (PM_set_type). A PM_type instance represents
-!    one source/sensor/variable configuration and owns the observation reader,
-!    patch-space forward calculation, and mapping to observation-grid cells.
+!   This module defines one passive-microwave observation stream (PM_type)
+!   and a collection of streams (PM_set_type). A PM_type instance represents
+!   one source/sensor/variable configuration and owns the observation reader,
+!   patch-space forward calculation, and mapping to observation-grid cells.
 !
-!    The observation-space workflow is:
+!   The observation-space workflow is:
 !      1. clear time-step data and read current observations through
 !         grid_obs_type;
 !      2. map observation incidence angle from grid cells to patch-grid
@@ -24,17 +24,17 @@ MODULE MOD_DA_Obs_PM
 !      6. gather IO-task results on the master and broadcast this%hx_obs so all
 !         MPI tasks share the same observation-space H(x).
 !
-!    PM_set_type applies this workflow to all configured PM streams and
-!    concatenates their observation values, errors, metadata, and H(x) into
-!    set-level arrays for assimilation.
+!   PM_set_type applies this workflow to all configured PM streams and
+!   concatenates their observation values, errors, metadata, and H(x) into
+!   set-level arrays for assimilation.
 !
-!    PM observation operator supports both satellite brightness temperature
-!    assimilation through microwave radiative transfer modeling and the direct
-!    assimilation of retrieved soil moisture products.
+!   PM observation operator supports both satellite brightness temperature
+!   assimilation through microwave radiative transfer modeling and the direct
+!   assimilation of retrieved soil moisture products.
 !
 ! HISTORY:
-!    Lu Li, 05/2026: First implementation
-!    Lu Li, Zhilong Fan, 11/2026: DA v1.0
+!   Lu Li, 05/2026: First implementation
+!   Lu Li, Zhilong Fan, 11/2026: DA v1.0
 !-----------------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_Const_Physical
@@ -63,22 +63,21 @@ MODULE MOD_DA_Obs_PM
       real(r8)              :: fghz
 
       ! Model-space H(x) on local patches, retained for diagnostic output.
-      real(r8), allocatable :: hx_model(:,:)               ! [0:ens, patch]
+      real(r8), allocatable :: hx_model(:,:)  ! [0:ens, patch]
 
       ! Observations and metadata at the locations read for this time step.
-      type(grid_obs_type)   :: y                           ! Observation reader and grid mapping
+      type(grid_obs_type)   :: y  ! Observation reader and grid mapping
 
       ! Model equivalents at observation locations; unmapped values are spval.
-      real(r8), allocatable :: hx_obs(:,:)                 ! [nobs, ens]
+      real(r8), allocatable :: hx_obs(:,:)  ! [nobs, ens]
 
    CONTAINS
 
-      procedure, PUBLIC :: init       => PM_init           ! Initialize the observation reader and grid mapping
-      procedure, PUBLIC :: calc_hx    => PM_calc_hx        ! Compute H(x) on patches and map it to observation locations
-      procedure, PUBLIC :: clear      => PM_clear          ! Clear time-step data while retaining the mapping
+      procedure, PUBLIC :: init       => PM_init     ! Initialize the observation reader and grid mapping
+      procedure, PUBLIC :: calc_hx    => PM_calc_hx  ! Compute H(x) on patches and map it to observation locations
+      procedure, PUBLIC :: clear      => PM_clear    ! Clear time-step data while retaining the mapping
 
    END type PM_type
-
 
    type :: PM_config_type
 
@@ -95,27 +94,26 @@ MODULE MOD_DA_Obs_PM
    type :: PM_set_type
 
       ! Each stream represents one source/sensor/variable configuration.
-      integer :: nsensor = 0                               ! Number of configured observation streams
-      type(PM_type), allocatable :: sensors(:)             ! Stream objects [nsensor]
-      type(PM_config_type), allocatable :: cfgs(:)         ! Corresponding stream configurations [nsensor]
+      integer :: nsensor = 0                        ! Number of configured observation streams
+      type(PM_type), allocatable :: sensors(:)      ! Stream objects [nsensor]
+      type(PM_config_type), allocatable :: cfgs(:)  ! Corresponding stream configurations [nsensor]
 
       ! Current time-step data concatenated in stream order for assimilation.
-      integer :: nobs = 0                                  ! Total number of observations across streams in the combined arrays
-      real(r8), allocatable :: lat(:)                      ! Observation latitude [nobs], degrees
-      real(r8), allocatable :: lon(:)                      ! Observation longitude [nobs], degrees
-      real(r8), allocatable :: y(:)                        ! Actual observation values [nobs]
-      real(r8), allocatable :: r(:)                        ! Observation error standard deviations [nobs]
-      real(r8), allocatable :: hx_obs(:,:)                 ! Simulated observations at y locations [nobs, ens]
+      integer :: nobs = 0                   ! Total number of observations across streams in the combined arrays
+      real(r8), allocatable :: lat(:)       ! Observation latitude [nobs], degrees
+      real(r8), allocatable :: lon(:)       ! Observation longitude [nobs], degrees
+      real(r8), allocatable :: y(:)         ! Actual observation values [nobs]
+      real(r8), allocatable :: r(:)         ! Observation error standard deviations [nobs]
+      real(r8), allocatable :: hx_obs(:,:)  ! Simulated observations at y locations [nobs, ens]
 
    CONTAINS
 
-      procedure, PUBLIC :: init       => PM_set_init       ! Initialize all streams from their configurations
-      procedure, PUBLIC :: concat     => PM_set_concat     ! Combine stream data into the set-level arrays
-      procedure, PUBLIC :: calc_hx    => PM_set_calc_hx    ! Compute both H(x) representations and combine streams
-      procedure, PUBLIC :: clear      => PM_set_clear      ! Clear time-step data while retaining stream configurations
+      procedure, PUBLIC :: init       => PM_set_init     ! Initialize all streams from their configurations
+      procedure, PUBLIC :: concat     => PM_set_concat   ! Combine stream data into the set-level arrays
+      procedure, PUBLIC :: calc_hx    => PM_set_calc_hx  ! Compute both H(x) representations and combine streams
+      procedure, PUBLIC :: clear      => PM_set_clear    ! Clear time-step data while retaining stream configurations
 
    END type PM_set_type
-
 
 !-----------------------------------------------------------------------------
 
@@ -130,11 +128,11 @@ CONTAINS
 
 !------------------------ Dummy Arguments ------------------------------------
       class(PM_type),      intent(inout) :: this
-      type(pixelset_type), intent(in)    :: pixelset       ! target pixel/patch set
-      character(len=*),    intent(in)    :: source_name    ! observation source class, e.g., "PM"
-      character(len=*),    intent(in)    :: sensor_name    ! sensor/subdirectory name
-      character(len=*),    intent(in)    :: var_name       ! observation variable/file prefix
-      real(r8),            intent(in)    :: fghz           ! frequency [GHz]
+      type(pixelset_type), intent(in)    :: pixelset     ! target pixel/patch set
+      character(len=*),    intent(in)    :: source_name  ! observation source class, e.g., "PM"
+      character(len=*),    intent(in)    :: sensor_name  ! sensor/subdirectory name
+      character(len=*),    intent(in)    :: var_name     ! observation variable/file prefix
+      real(r8),            intent(in)    :: fghz         ! frequency [GHz]
 
 !-----------------------------------------------------------------------------
       CALL this%y%init(pixelset, source_name, sensor_name, var_name)
@@ -155,32 +153,32 @@ CONTAINS
       real(r8),           intent(in)    :: deltim
 
 !------------------------ Local Variables ------------------------------------
-      integer :: iobs                                      ! observation index in this%y
-      integer :: ip                                        ! IO task loop index on master
-      integer :: ib, jb                                    ! block indices of an observation grid cell
-      integer :: il, jl                                    ! local indices inside the block
+      integer :: iobs    ! observation index in this%y
+      integer :: ip      ! IO task loop index on master
+      integer :: ib, jb  ! block indices of an observation grid cell
+      integer :: il, jl  ! local indices inside the block
 
-      integer :: ndata                                     ! valid obs count handled by one IO task
-      integer :: isrc                                      ! MPI source rank for received obs data
-      integer :: smesg(2)                                  ! IO-to-master message header: rank, ndata
-      integer :: rmesg(2)                                  ! master receive message header: rank, ndata
+      integer :: ndata     ! valid obs count handled by one IO task
+      integer :: isrc      ! MPI source rank for received obs data
+      integer :: smesg(2)  ! IO-to-master message header: rank, ndata
+      integer :: rmesg(2)  ! master receive message header: rank, ndata
 
-      real(r8) :: area_obs                                 ! mapped patch area in one observation grid cell
-      type(block_data_real8_2d) :: area_wgrid              ! mapped patch area on obs world grid (this%y%grid)
-      type(block_data_real8_3d) :: hx_wgrid                ! ensemble H(x) mapped to obs world grid (this%y%grid)
+      real(r8) :: area_obs                     ! mapped patch area in one observation grid cell
+      type(block_data_real8_2d) :: area_wgrid  ! mapped patch area on obs world grid (this%y%grid)
+      type(block_data_real8_3d) :: hx_wgrid    ! ensemble H(x) mapped to obs world grid (this%y%grid)
 
-      integer,  allocatable :: iloc(:)                     ! obs indices handled by one IO task
-      integer,  allocatable :: tmp_idx(:)                  ! obs indices received by master
-      real(r8), allocatable :: tmp_data(:,:)               ! H(x) values sent/received by MPI
-      logical,  allocatable :: filter(:)                   ! local patch mask used for mapping
-      integer :: iens                                      ! Ensemble member index
-      integer :: np                                        ! Patch index
-      integer :: ipart                                     ! Patch-grid intersection part index
-      integer :: ipol                                      ! Polarization index
-      real(r8) :: hx_tmp(2)                                ! Brightness temperatures for both polarizations
-      real(r8) :: sumarea(0:DEF_DA_ENS_NUM)                ! Valid part area for each member
-      type(block_data_real8_2d) :: theta_wgrid             ! Incidence angles on the observation grid
-      type(pointer_real8_1d), allocatable :: theta_part(:) ! Incidence angles on patch-grid parts
+      integer,  allocatable :: iloc(:)                      ! obs indices handled by one IO task
+      integer,  allocatable :: tmp_idx(:)                   ! obs indices received by master
+      real(r8), allocatable :: tmp_data(:,:)                ! H(x) values sent/received by MPI
+      logical,  allocatable :: filter(:)                    ! local patch mask used for mapping
+      integer :: iens                                       ! Ensemble member index
+      integer :: np                                         ! Patch index
+      integer :: ipart                                      ! Patch-grid intersection part index
+      integer :: ipol                                       ! Polarization index
+      real(r8) :: hx_tmp(2)                                 ! Brightness temperatures for both polarizations
+      real(r8) :: sumarea(0:DEF_DA_ENS_NUM)                 ! Valid part area for each member
+      type(block_data_real8_2d) :: theta_wgrid              ! Incidence angles on the observation grid
+      type(pointer_real8_1d), allocatable :: theta_part(:)  ! Incidence angles on patch-grid parts
 
 !-----------------------------------------------------------------------------
       ! Reuse observations within the time step; clear releases them after analysis.
@@ -271,8 +269,8 @@ CONTAINS
                   IF (wliq_soisno_ens(1,iens,np) == spval) CYCLE
                   this%hx_model(iens,np) = &
                      (wliq_soisno_ens(1,iens,np) + &
-                      wliq_soisno_ens(2,iens,np) + &
-                      wliq_soisno_ens(3,iens,np)*(0.05-0.0451)/(0.0906-0.0451)) / &
+                     wliq_soisno_ens(2,iens,np) + &
+                     wliq_soisno_ens(3,iens,np)*(0.05-0.0451)/(0.0906-0.0451)) / &
                      (0.05*denh2o)
                ENDDO
             CASE DEFAULT
