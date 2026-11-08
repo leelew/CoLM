@@ -144,11 +144,11 @@ CONTAINS
 
       ! Prepare both observation operators before updating either state.
       IF (allocated(tq_tref%cfgs)) THEN
-         CALL tq_tref%calc_obs(idate, deltim)
+         CALL tq_tref%calc_hx(idate, deltim)
          CALL tq_tref%save(.false.)
       ENDIF
       IF (allocated(tq_qref%cfgs)) THEN
-         CALL tq_qref%calc_obs(idate, deltim)
+         CALL tq_qref%calc_hx(idate, deltim)
          CALL tq_qref%save(.false.)
       ENDIF
 
@@ -241,7 +241,7 @@ CONTAINS
          ENDDO
       ENDDO
 
-      ! Publish the completed analyses and save model-space H(x) diagnostics.
+      ! Publish completed analyses and recompute H(x) diagnostics.
       ! Patches without temperature or RH updates retain their forecast values.
       IF (p_is_worker .and. numpatch > 0) THEN
          ! Convert analyzed RH to specific humidity using analyzed temperature.
@@ -267,11 +267,11 @@ CONTAINS
          rhref_ens_a(:,:) = rhref_ens
       ENDIF
       IF (allocated(tq_tref%cfgs)) THEN
-         CALL tq_tref%calc_model()
+         CALL tq_tref%calc_hx(idate, deltim)
          CALL tq_tref%save(.true.)
       ENDIF
       IF (allocated(tq_qref%cfgs)) THEN
-         CALL tq_qref%calc_model()
+         CALL tq_qref%calc_hx(idate, deltim)
          CALL tq_qref%save(.true.)
       ENDIF
       IF (allocated(tq_tref%cfgs)) CALL tq_tref%clear()

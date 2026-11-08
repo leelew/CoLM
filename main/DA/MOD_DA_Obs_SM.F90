@@ -82,14 +82,13 @@ MODULE MOD_DA_Obs_SM
       real(r8), allocatable :: lat(:)                         ! Observation latitudes [nobs], degrees north
       real(r8), allocatable :: lon(:)                         ! Observation longitudes [nobs], degrees east
       real(r8), allocatable :: y(:)                           ! Observed values or analysis ensemble means [nobs]
-      real(r8), allocatable :: hx_obs(:,:)                    ! Forecast observation equivalents [nobs, DEF_DA_ENS_NUM]
+      real(r8), allocatable :: hx_obs(:,:)                    ! Current observation equivalents [nobs, DEF_DA_ENS_NUM]
       real(r8), allocatable :: r(:)                           ! Observation error standard deviations [nobs]
 
    CONTAINS
 
       procedure :: init       => SM_type_init                 ! Configure enabled sources and assimilation parameters
-      procedure :: calc_obs   => SM_type_calc_obs             ! Prepare observation-space y and H(x) from enabled sources
-      procedure :: calc_model => SM_type_calc_model           ! Recompute PM model-space H(x) after state updates
+      procedure :: calc_hx    => SM_type_calc_hx              ! Compute model- and observation-space H(x) from enabled sources
       procedure :: save       => SM_type_save                 ! Copy PM patch H(x) into forecast or analysis diagnostics
       procedure :: clear      => SM_type_clear                ! Deallocate combined records and clear source observations
       procedure :: concat     => SM_type_concat               ! Combine enabled sources in matching y, hx_obs and r order
@@ -253,39 +252,22 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE SM_type_calc_obs(this, idate, deltim)
+   SUBROUTINE SM_type_calc_hx(this, idate, deltim)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
 
-      class(SM_type), intent(inout) :: this
-      integer,        intent(in)    :: idate(3)
-      real(r8),       intent(in)    :: deltim
+      class(SM_type),     intent(inout) :: this
+      integer,            intent(in)    :: idate(3)
+      real(r8),           intent(in)    :: deltim
 
 !-----------------------------------------------------------------------------
-      CALL this%clear()
-
-      IF (this%use_pm) CALL this%pm%calc_obs(idate, deltim)
-      IF (this%use_anatq) CALL this%anatq%calc_obs()
+      IF (this%use_pm) CALL this%pm%calc_hx(idate, deltim)
+      IF (this%use_anatq .and. .not. allocated(this%anatq%y)) CALL this%anatq%calc_hx()
 
       IF (DEF_DA) CALL this%concat()
 
-   END SUBROUTINE SM_type_calc_obs
-
-!-----------------------------------------------------------------------------
-
-   SUBROUTINE SM_type_calc_model(this)
-
-!-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
-!------------------------ Dummy Arguments ------------------------------------
-      class(SM_type), intent(inout) :: this
-
-!-----------------------------------------------------------------------------
-      IF (this%use_pm) CALL this%pm%calc_model()
-
-   END SUBROUTINE SM_type_calc_model
+   END SUBROUTINE SM_type_calc_hx
 
 !-----------------------------------------------------------------------------
 

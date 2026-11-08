@@ -75,14 +75,13 @@ MODULE MOD_DA_Obs_ST
       real(r8), allocatable :: lat(:)                   ! Observation latitudes [nobs], degrees north
       real(r8), allocatable :: lon(:)                   ! Observation longitudes [nobs], degrees east
       real(r8), allocatable :: y(:)                     ! Observed values [nobs]
-      real(r8), allocatable :: hx_obs(:,:)              ! Forecast observation equivalents [nobs, DEF_DA_ENS_NUM]
+      real(r8), allocatable :: hx_obs(:,:)              ! Current observation equivalents [nobs, DEF_DA_ENS_NUM]
       real(r8), allocatable :: r(:)                     ! Observation error standard deviations [nobs]
 
    CONTAINS
 
       procedure :: init       => ST_type_init           ! Configure enabled sources and assimilation parameters
-      procedure :: calc_obs   => ST_type_calc_obs       ! Prepare observation-space y and H(x) from enabled sources
-      procedure :: calc_model => ST_type_calc_model     ! Recompute PM model-space H(x) after state updates
+      procedure :: calc_hx    => ST_type_calc_hx        ! Compute model- and observation-space H(x) from enabled sources
       procedure :: save       => ST_type_save           ! Copy PM patch H(x) into forecast or analysis diagnostics
       procedure :: clear      => ST_type_clear          ! Deallocate combined records and clear source observations
       procedure :: concat     => ST_type_concat         ! Combine enabled sources in matching y, hx_obs and r order
@@ -224,7 +223,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE ST_type_calc_obs(this, idate, deltim)
+   SUBROUTINE ST_type_calc_hx(this, idate, deltim)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -235,28 +234,11 @@ CONTAINS
       real(r8),       intent(in)    :: deltim
 
 !-----------------------------------------------------------------------------
-      CALL this%clear()
-
-      IF (this%use_pm) CALL this%pm%calc_obs(idate, deltim)
+      IF (this%use_pm) CALL this%pm%calc_hx(idate, deltim)
 
       IF (DEF_DA) CALL this%concat()
 
-   END SUBROUTINE ST_type_calc_obs
-
-!-----------------------------------------------------------------------------
-
-   SUBROUTINE ST_type_calc_model(this)
-
-!-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
-!------------------------ Dummy Arguments ------------------------------------
-      class(ST_type), intent(inout) :: this
-
-!-----------------------------------------------------------------------------
-      IF (this%use_pm) CALL this%pm%calc_model()
-
-   END SUBROUTINE ST_type_calc_model
+   END SUBROUTINE ST_type_calc_hx
 
 !-----------------------------------------------------------------------------
 

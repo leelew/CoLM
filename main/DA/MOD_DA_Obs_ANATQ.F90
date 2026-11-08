@@ -37,7 +37,7 @@ MODULE MOD_DA_Obs_ANATQ
    CONTAINS
 
       procedure :: init     => ANATQ_init           ! Initialize an empty observation collection
-      procedure :: calc_obs => ANATQ_calc_obs       ! Construct y and matching observation-space H(x)
+      procedure :: calc_hx => ANATQ_calc_hx         ! Construct y and matching observation-space H(x)
       procedure :: clear    => ANATQ_clear          ! Clear observations and H(x) for this variable
 
    END type ANATQ_type
@@ -60,7 +60,7 @@ MODULE MOD_DA_Obs_ANATQ
    CONTAINS
 
       procedure :: init     => ANATQ_set_init       ! Initialize the temperature and humidity collections
-      procedure :: calc_obs => ANATQ_set_calc_obs   ! Prepare both variables and combine their records
+      procedure :: calc_hx => ANATQ_set_calc_hx     ! Prepare both variables and combine their records
       procedure :: concat   => ANATQ_set_concat     ! Combine temperature records followed by humidity
       procedure :: clear    => ANATQ_set_clear      ! Clear both variables and their combined arrays
 
@@ -87,7 +87,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE ANATQ_calc_obs (this, var_name)
+   SUBROUTINE ANATQ_calc_hx (this, var_name)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -193,7 +193,7 @@ CONTAINS
          p_address_master, p_comm_glb, p_err)
       deallocate(hx_obs, hx_recv)
 
-   END SUBROUTINE ANATQ_calc_obs
+   END SUBROUTINE ANATQ_calc_hx
 
 !-----------------------------------------------------------------------------
 
@@ -228,7 +228,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE ANATQ_set_calc_obs (this)
+   SUBROUTINE ANATQ_set_calc_hx (this)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -237,11 +237,11 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
       CALL this%clear()
-      CALL this%tref%calc_obs('2MT')
-      CALL this%rhref%calc_obs('2MRH')
+      CALL this%tref%calc_hx('2MT')
+      CALL this%rhref%calc_hx('2MRH')
       CALL this%concat()
 
-   END SUBROUTINE ANATQ_set_calc_obs
+   END SUBROUTINE ANATQ_set_calc_hx
 
 !-----------------------------------------------------------------------------
 

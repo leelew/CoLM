@@ -60,8 +60,7 @@ MODULE MOD_DA_Obs_SYNOP
    CONTAINS
 
       procedure, PUBLIC :: init       => SYNOP_init           ! Initialize the observation reader and patch mapping
-      procedure, PUBLIC :: calc_model => SYNOP_calc_model     ! Compute model-space H(x) on local patches
-      procedure, PUBLIC :: calc_obs   => SYNOP_calc_obs       ! Read y, compute H(x), and map to observation space
+      procedure, PUBLIC :: calc_hx    => SYNOP_calc_hx        ! Compute patch H(x) and map it to observation locations
       procedure, PUBLIC :: clear      => SYNOP_clear          ! Clear time-step data while retaining the mapping
 
    END type SYNOP_type
@@ -97,8 +96,7 @@ MODULE MOD_DA_Obs_SYNOP
    CONTAINS
 
       procedure, PUBLIC :: init       => SYNOP_set_init       ! Initialize all streams from their configurations
-      procedure, PUBLIC :: calc_model => SYNOP_set_calc_model ! Recompute model-space H(x) for all streams
-      procedure, PUBLIC :: calc_obs   => SYNOP_set_calc_obs   ! Prepare observation-space y and H(x), then combine streams
+      procedure, PUBLIC :: calc_hx    => SYNOP_set_calc_hx    ! Compute both H(x) representations and combine streams
       procedure, PUBLIC :: concat     => SYNOP_set_concat     ! Combine stream data into the set-level arrays
       procedure, PUBLIC :: clear      => SYNOP_set_clear      ! Clear time-step data while retaining configurations
 
@@ -129,74 +127,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE SYNOP_calc_model (this)
-
-!-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
-!------------------------ Dummy Arguments ------------------------------------
-      class(SYNOP_type), intent(inout) :: this
-
-!------------------------ Local Variables ------------------------------------
-      integer :: np                                           ! Local patch index
-      integer :: iens                                         ! Ensemble member index
-      real(r8) :: tc                                          ! 2 m air temperature [degrees Celsius]
-      real(r8) :: es                                          ! Saturation vapor pressure [hPa]
-      real(r8) :: e                                           ! Water vapor pressure [hPa]
-
-!-----------------------------------------------------------------------------
-      IF (.not. p_is_worker) RETURN
-      IF (allocated(this%hx_model)) deallocate(this%hx_model)
-      allocate(this%hx_model(0:DEF_DA_ENS_NUM, numpatch))
-      this%hx_model = spval
-      IF (numpatch == 0) RETURN
-
-      SELECT CASE (trim(this%y%var_name))
-!-----------------------------------------------------------------------------
-! 2 m air temperature observations [K].
-! H(x) is the model 2 m air temperature.
-!-----------------------------------------------------------------------------
-      CASE ('2MT')
-         this%hx_model = tref_ens
-
-!-----------------------------------------------------------------------------
-! 2 m relative humidity observations [0-1].
-! H(x) is derived from specific humidity, temperature, and surface pressure.
-!-----------------------------------------------------------------------------
-      CASE ('2MQ')
-         ! Convert specific humidity to relative humidity [0-1].
-         DO np = 1, numpatch
-            DO iens = 0, merge(DEF_DA_ENS_NUM, 0, DEF_DA)
-               rhref_ens(iens,np) = spval
-
-               IF (tref_ens(iens,np) == spval .or. &
-                   qref_ens(iens,np) == spval .or. &
-                   forc_psrf(np)    == spval .or. &
-                   forc_psrf(np)    <= 0.0_r8) CYCLE
-
-               tc = tref_ens(iens,np) - 273.15_r8
-               es = 6.112_r8 * exp((17.67_r8*tc)/(tc + 243.5_r8))
-               e  = (qref_ens(iens,np)*forc_psrf(np)/100.0_r8) / &
-                    (0.378_r8*qref_ens(iens,np) + 0.622_r8)
-               IF (es > 0.0_r8) THEN
-                  rhref_ens(iens,np) = max(min(1.0_r8, e/es), 0.0_r8)
-               ENDIF
-            ENDDO
-         ENDDO
-         this%hx_model = rhref_ens
-
-!-----------------------------------------------------------------------------
-! snow depth.
-!-----------------------------------------------------------------------------
-      CASE ('SD')
-         RETURN
-      END SELECT
-
-   END SUBROUTINE SYNOP_calc_model
-
-!-----------------------------------------------------------------------------
-
-   SUBROUTINE SYNOP_calc_obs (this, idate, deltim)
+   SUBROUTINE SYNOP_calc_hx (this, idate, deltim)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -210,16 +141,66 @@ CONTAINS
       integer :: iobs                                         ! Observation index
       integer :: isite                                        ! Site-table index
       integer :: np                                           ! Local patch index
+      integer :: iens                                         ! Ensemble member index
+      real(r8) :: tc                                          ! 2 m air temperature [degrees Celsius]
+      real(r8) :: es                                          ! Saturation vapor pressure [hPa]
+      real(r8) :: e                                           ! Water vapor pressure [hPa]
       integer, allocatable :: owner(:)                        ! Number of workers contributing to each observation
 
 !-----------------------------------------------------------------------------
-      CALL this%clear()
+      ! Reuse observations until clear is called at the end of the time step.
+      IF (.not. allocated(this%y%y)) CALL this%y%read(idate, deltim)
+      IF (allocated(this%hx_obs)) deallocate(this%hx_obs)
 
-      ! Read current observations.
-      CALL this%y%read(idate, deltim)
+      ! Compute local patch H(x); all ranks then participate in observation mapping.
+      IF (p_is_worker) THEN
+         IF (numpatch > 0) THEN
+            IF (allocated(this%hx_model)) deallocate(this%hx_model)
+            allocate(this%hx_model(0:DEF_DA_ENS_NUM, numpatch))
+            this%hx_model = spval
 
-      ! Compute model-space H(x).
-      CALL this%calc_model()
+            SELECT CASE (trim(this%y%var_name))
+!-----------------------------------------------------------------------------
+! 2 m air temperature observations [K].
+! H(x) is the model 2 m air temperature.
+!-----------------------------------------------------------------------------
+            CASE ('2MT')
+               this%hx_model = tref_ens
+
+!-----------------------------------------------------------------------------
+! 2 m relative humidity observations [0-1].
+! H(x) is derived from specific humidity, temperature, and surface pressure.
+!-----------------------------------------------------------------------------
+            CASE ('2MQ')
+               ! Convert specific humidity to relative humidity [0-1].
+               DO np = 1, numpatch
+                  DO iens = 0, merge(DEF_DA_ENS_NUM, 0, DEF_DA)
+                     rhref_ens(iens,np) = spval
+
+                     IF (tref_ens(iens,np) == spval .or. &
+                         qref_ens(iens,np) == spval .or. &
+                         forc_psrf(np)    == spval .or. &
+                         forc_psrf(np)    <= 0.0_r8) CYCLE
+
+                     tc = tref_ens(iens,np) - 273.15_r8
+                     es = 6.112_r8 * exp((17.67_r8*tc)/(tc + 243.5_r8))
+                     e  = (qref_ens(iens,np)*forc_psrf(np)/100.0_r8) / &
+                          (0.378_r8*qref_ens(iens,np) + 0.622_r8)
+                     IF (es > 0.0_r8) THEN
+                        rhref_ens(iens,np) = max(min(1.0_r8, e/es), 0.0_r8)
+                     ENDIF
+                  ENDDO
+               ENDDO
+               this%hx_model = rhref_ens
+
+!-----------------------------------------------------------------------------
+! snow depth.
+!-----------------------------------------------------------------------------
+            CASE ('SD')
+               CONTINUE
+            END SELECT
+         ENDIF
+      ENDIF
       IF (.not. DEF_DA) RETURN
       allocate (this%hx_obs(this%y%nobs, 1:DEF_DA_ENS_NUM))
       this%hx_obs(:,:) = spval
@@ -260,7 +241,7 @@ CONTAINS
 
       deallocate (owner)
 
-   END SUBROUTINE SYNOP_calc_obs
+   END SUBROUTINE SYNOP_calc_hx
 
 !-----------------------------------------------------------------------------
 
@@ -346,28 +327,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE SYNOP_set_calc_model (this)
-
-!-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
-!------------------------ Dummy Arguments ------------------------------------
-      class(SYNOP_set_type), intent(inout) :: this
-
-!------------------------ Local Variables ------------------------------------
-      integer :: is
-
-!-----------------------------------------------------------------------------
-      IF (.not. allocated(this%sensors)) RETURN
-      DO is = 1, this%nsensor
-         CALL this%sensors(is)%calc_model()
-      ENDDO
-
-   END SUBROUTINE SYNOP_set_calc_model
-
-!-----------------------------------------------------------------------------
-
-   SUBROUTINE SYNOP_set_calc_obs (this, idate, deltim)
+   SUBROUTINE SYNOP_set_calc_hx (this, idate, deltim)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -381,14 +341,13 @@ CONTAINS
       integer :: is
 
 !-----------------------------------------------------------------------------
-      CALL this%clear()
       IF (.not. allocated(this%sensors)) RETURN
       DO is = 1, this%nsensor
-         CALL this%sensors(is)%calc_obs(idate, deltim)
+         CALL this%sensors(is)%calc_hx(idate, deltim)
       ENDDO
       IF (DEF_DA) CALL this%concat()
 
-   END SUBROUTINE SYNOP_set_calc_obs
+   END SUBROUTINE SYNOP_set_calc_hx
 
 !-----------------------------------------------------------------------------
 

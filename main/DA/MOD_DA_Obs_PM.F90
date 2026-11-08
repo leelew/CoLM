@@ -74,8 +74,7 @@ MODULE MOD_DA_Obs_PM
    CONTAINS
 
       procedure, PUBLIC :: init       => PM_init           ! Initialize the observation reader and grid mapping
-      procedure, PUBLIC :: calc_model => PM_calc_model     ! Compute model-space H(x) on local patches
-      procedure, PUBLIC :: calc_obs   => PM_calc_obs       ! Read y, compute model-space H(x), and map to observation space
+      procedure, PUBLIC :: calc_hx    => PM_calc_hx        ! Compute H(x) on patches and map it to observation locations
       procedure, PUBLIC :: clear      => PM_clear          ! Clear time-step data while retaining the mapping
 
    END type PM_type
@@ -111,9 +110,8 @@ MODULE MOD_DA_Obs_PM
    CONTAINS
 
       procedure, PUBLIC :: init       => PM_set_init       ! Initialize all streams from their configurations
-      procedure, PUBLIC :: calc_model => PM_set_calc_model ! Recompute model-space H(x) for all streams
       procedure, PUBLIC :: concat     => PM_set_concat     ! Combine stream data into the set-level arrays
-      procedure, PUBLIC :: calc_obs   => PM_set_calc_obs   ! Prepare observation-space y and H(x), then combine streams
+      procedure, PUBLIC :: calc_hx    => PM_set_calc_hx    ! Compute both H(x) representations and combine streams
       procedure, PUBLIC :: clear      => PM_set_clear      ! Clear time-step data while retaining stream configurations
 
    END type PM_set_type
@@ -146,32 +144,49 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE PM_calc_model (this)
+   SUBROUTINE PM_calc_hx (this, idate, deltim)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
 
 !------------------------ Dummy Arguments ------------------------------------
-      class(PM_type), intent(inout) :: this
+      class(PM_type),      intent(inout) :: this
+      integer,            intent(in)    :: idate(3)
+      real(r8),           intent(in)    :: deltim
 
 !------------------------ Local Variables ------------------------------------
-      integer :: iobs                                      ! observation index
-      integer :: iens                                      ! ensemble member index
-      integer :: np                                        ! patch index
-      integer :: ipart                                     ! patch-grid intersection part index
+      integer :: iobs                                      ! observation index in this%y
+      integer :: ip                                        ! IO task loop index on master
       integer :: ib, jb                                    ! block indices of an observation grid cell
       integer :: il, jl                                    ! local indices inside the block
-      integer :: ipol                                      ! polarization selected by the observation variable
 
-      real(r8) :: hx_tmp(2)                                ! H(x) for H and V pol from one part-level RTM call
-      real(r8) :: sumarea(0:DEF_DA_ENS_NUM)                ! valid part area accumulated for each ensemble
+      integer :: ndata                                     ! valid obs count handled by one IO task
+      integer :: isrc                                      ! MPI source rank for received obs data
+      integer :: smesg(2)                                  ! IO-to-master message header: rank, ndata
+      integer :: rmesg(2)                                  ! master receive message header: rank, ndata
 
-      logical, allocatable :: filter(:)                    ! local land-patch mask
+      real(r8) :: area_obs                                 ! mapped patch area in one observation grid cell
+      type(block_data_real8_2d) :: area_wgrid              ! mapped patch area on obs world grid (this%y%grid)
+      type(block_data_real8_3d) :: hx_wgrid                ! ensemble H(x) mapped to obs world grid (this%y%grid)
 
-      type(block_data_real8_2d) :: theta_wgrid             ! incidence angle on obs world grid
-      type(pointer_real8_1d), allocatable :: theta_part(:) ! incidence angle on patch-grid parts
+      integer,  allocatable :: iloc(:)                     ! obs indices handled by one IO task
+      integer,  allocatable :: tmp_idx(:)                  ! obs indices received by master
+      real(r8), allocatable :: tmp_data(:,:)               ! H(x) values sent/received by MPI
+      logical,  allocatable :: filter(:)                   ! local patch mask used for mapping
+      integer :: iens                                      ! Ensemble member index
+      integer :: np                                        ! Patch index
+      integer :: ipart                                     ! Patch-grid intersection part index
+      integer :: ipol                                      ! Polarization index
+      real(r8) :: hx_tmp(2)                                ! Brightness temperatures for both polarizations
+      real(r8) :: sumarea(0:DEF_DA_ENS_NUM)                ! Valid part area for each member
+      type(block_data_real8_2d) :: theta_wgrid             ! Incidence angles on the observation grid
+      type(pointer_real8_1d), allocatable :: theta_part(:) ! Incidence angles on patch-grid parts
 
 !-----------------------------------------------------------------------------
+      ! Reuse observations within the time step; clear releases them after analysis.
+      IF (.not. allocated(this%y%y)) CALL this%y%read(idate, deltim)
+      IF (allocated(this%hx_obs)) deallocate(this%hx_obs)
+
       IF (allocated(this%hx_model)) deallocate(this%hx_model)
       allocate(this%hx_model(0:DEF_DA_ENS_NUM, numpatch))
       this%hx_model = spval
@@ -273,51 +288,7 @@ CONTAINS
          IF (allocated(theta_wgrid%blk)) deallocate(theta_wgrid%blk)
       ENDIF
 
-   END SUBROUTINE PM_calc_model
-
-!-----------------------------------------------------------------------------
-
-   SUBROUTINE PM_calc_obs (this, idate, deltim)
-
-!-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
-!------------------------ Dummy Arguments ------------------------------------
-      class(PM_type),      intent(inout) :: this
-      integer,             intent(in)    :: idate(3)
-      real(r8),            intent(in)    :: deltim
-
-!------------------------ Local Variables ------------------------------------
-      integer :: iobs                                      ! observation index in this%y
-      integer :: ip                                        ! IO task loop index on master
-      integer :: ib, jb                                    ! block indices of an observation grid cell
-      integer :: il, jl                                    ! local indices inside the block
-
-      integer :: ndata                                     ! valid obs count handled by one IO task
-      integer :: isrc                                      ! MPI source rank for received obs data
-      integer :: smesg(2)                                  ! IO-to-master message header: rank, ndata
-      integer :: rmesg(2)                                  ! master receive message header: rank, ndata
-
-      real(r8) :: area_obs                                 ! mapped patch area in one observation grid cell
-      type(block_data_real8_2d) :: area_wgrid              ! mapped patch area on obs world grid (this%y%grid)
-      type(block_data_real8_3d) :: hx_wgrid                ! ensemble H(x) mapped to obs world grid (this%y%grid)
-
-      integer,  allocatable :: iloc(:)                     ! obs indices handled by one IO task
-      integer,  allocatable :: tmp_idx(:)                  ! obs indices received by master
-      real(r8), allocatable :: tmp_data(:,:)               ! H(x) values sent/received by MPI
-      logical,  allocatable :: filter(:)                   ! local patch mask used for mapping
-      integer :: nvalid_patch                              ! debug count of patches with valid ensemble H(x)
-
-!-----------------------------------------------------------------------------
-      CALL this%clear()
-
-      ! Read current observations.
-      CALL this%y%read(idate, deltim)
-
-      ! Compute model-space H(x).
-      CALL this%calc_model()
       IF (.not. DEF_DA) RETURN
-      IF (this%y%nobs == 0) RETURN
 
       ! Keep the mapped numerator and area denominator on the same valid patches.
       allocate (filter(numpatch))
@@ -403,7 +374,7 @@ CONTAINS
       CALL mpi_bcast(this%hx_obs, this%y%nobs*DEF_DA_ENS_NUM, MPI_REAL8, p_address_master, p_comm_glb, p_err)
 #endif
 
-   END SUBROUTINE PM_calc_obs
+   END SUBROUTINE PM_calc_hx
 
 !-----------------------------------------------------------------------------
 
@@ -544,46 +515,27 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE PM_set_calc_obs(this, idate, deltim)
+   SUBROUTINE PM_set_calc_hx(this, idate, deltim)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
 
       class(PM_set_type),  intent(inout) :: this
-      integer,             intent(in)    :: idate(3)
-      real(r8),            intent(in)    :: deltim
+      integer,            intent(in)    :: idate(3)
+      real(r8),           intent(in)    :: deltim
 
       integer :: is
 
 !-----------------------------------------------------------------------------
-      CALL this%clear()
       IF (.not. allocated(this%sensors)) RETURN
 
       DO is = 1, this%nsensor
-         CALL this%sensors(is)%calc_obs(idate, deltim)
+         CALL this%sensors(is)%calc_hx(idate, deltim)
       ENDDO
 
       IF (DEF_DA) CALL this%concat()
 
-   END SUBROUTINE PM_set_calc_obs
-
-!-----------------------------------------------------------------------------
-
-   SUBROUTINE PM_set_calc_model(this)
-
-!-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
-      class(PM_set_type), intent(inout) :: this
-      integer :: is
-
-!-----------------------------------------------------------------------------
-      IF (.not. allocated(this%sensors)) RETURN
-      DO is = 1, this%nsensor
-         CALL this%sensors(is)%calc_model()
-      ENDDO
-
-   END SUBROUTINE PM_set_calc_model
+   END SUBROUTINE PM_set_calc_hx
 
 !-----------------------------------------------------------------------------
 END MODULE MOD_DA_Obs_PM

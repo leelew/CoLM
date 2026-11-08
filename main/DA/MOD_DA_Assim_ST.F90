@@ -100,7 +100,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
       ! Prepare observations and forecast H(x).
-      CALL st%calc_obs(idate, deltim)
+      CALL st%calc_hx(idate, deltim)
       CALL st%save(.false.)
 
       IF (.not. DEF_DA) THEN
@@ -146,11 +146,11 @@ CONTAINS
          ENDDO
       ENDIF
 
-      ! Save analysis diagnostics and recompute model-space H(x).
+      ! Recompute both H(x) representations and save analysis diagnostics.
       IF (p_is_worker .and. numpatch > 0) THEN
          t_soisno_a(:,:) = sum(t_soisno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2) / DEF_DA_ENS_NUM
       ENDIF
-      CALL st%calc_model()
+      CALL st%calc_hx(idate, deltim)
       CALL st%save(.true.)
       CALL st%clear()
 

@@ -102,13 +102,10 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
       ! Prepare observations and forecast H(x).
-      CALL sm%calc_obs(idate, deltim)
+      CALL sm%calc_hx(idate, deltim)
       CALL sm%save(.false.)
 
-      IF (.not. DEF_DA) THEN
-         CALL sm%clear()
-         RETURN
-      ENDIF
+      IF (.not. DEF_DA) RETURN
 
       IF (p_is_worker .and. numpatch > 0) THEN
          wliq_soisno_ol(:,:) = wliq_soisno_ens(:,0,:)
@@ -171,11 +168,11 @@ CONTAINS
          ENDDO
       ENDIF
 
-      ! Save analysis diagnostics and recompute model-space H(x).
+      ! Recompute model- and observation-space H(x), then save analysis diagnostics.
       IF (p_is_worker .and. numpatch > 0) THEN
          wliq_soisno_a(:,:) = sum(wliq_soisno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2) / DEF_DA_ENS_NUM
       ENDIF
-      CALL sm%calc_model()
+      CALL sm%calc_hx(idate, deltim)
       CALL sm%save(.true.)
       CALL sm%clear()
 

@@ -60,8 +60,7 @@ MODULE MOD_DA_Obs_TQ
    CONTAINS
 
       procedure :: init       => TQ_type_init                  ! Configure sources and assimilation parameters
-      procedure :: calc_obs   => TQ_type_calc_obs              ! Prepare observation-space y and H(x) from enabled sources
-      procedure :: calc_model => TQ_type_calc_model            ! Recompute source model-space H(x) after state updates
+      procedure :: calc_hx    => TQ_type_calc_hx               ! Compute model- and observation-space H(x) from enabled sources
       procedure :: save       => TQ_type_save                  ! Copy model-space H(x) into shared diagnostics
       procedure :: clear      => TQ_type_clear                 ! Clear time-step data while retaining configurations
       procedure :: prepare    => TQ_type_prepare               ! Select nearby observations and localize error variances
@@ -118,7 +117,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE TQ_type_calc_obs (this, idate, deltim)
+   SUBROUTINE TQ_type_calc_hx (this, idate, deltim)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -129,25 +128,9 @@ CONTAINS
       real(r8), intent(in)           :: deltim
 
 !-----------------------------------------------------------------------------
-      CALL this%clear()
-      IF (this%use_synop) CALL this%synop%calc_obs(idate, deltim)
+      IF (this%use_synop) CALL this%synop%calc_hx(idate, deltim)
 
-   END SUBROUTINE TQ_type_calc_obs
-
-!-----------------------------------------------------------------------------
-
-   SUBROUTINE TQ_type_calc_model (this)
-
-!-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
-!------------------------ Dummy Arguments ------------------------------------
-      class(TQ_type), intent(inout) :: this
-
-!-----------------------------------------------------------------------------
-      IF (this%use_synop) CALL this%synop%calc_model()
-
-   END SUBROUTINE TQ_type_calc_model
+   END SUBROUTINE TQ_type_calc_hx
 
 !-----------------------------------------------------------------------------
 
