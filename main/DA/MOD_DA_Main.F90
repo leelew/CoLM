@@ -5,17 +5,17 @@ MODULE MOD_DA_Main
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
 !   Coordinate ensemble forecasting, sequential data assimilation, and
-!   observation-equivalent diagnostics.
+!   Observation-equivalent diagnostics.
 !
 ! NOTES:
 !   Enabled analyses follow a fixed order, independent of the order of
-!   observation streams in the namelist:
+!   Observation streams in the namelist:
 !      2 m temperature -> 2 m relative humidity ->
-!      snow -> soil moisture -> soil & snow temperature.
+!      Snow -> soil moisture -> soil & snow temperature -> discharge.
 !
 !   After analysis, online mode applies the ensemble mean to the model
-!   for subsequent land-atmosphere coupling, while offline mode restores
-!   the unperturbed trajectory for evaluation.
+!   For subsequent land-atmosphere coupling, while offline mode restores
+!   The unperturbed trajectory for evaluation.
 !
 ! AUTHOR:
 !   Lu Li, 12/2024: Initial implemention
@@ -23,26 +23,26 @@ MODULE MOD_DA_Main
 !   Lu Li, Zhilong Fan, 11/2026: DA v1.0
 !-----------------------------------------------------------------------------
 ! VERSION:
-!   v1.0 (Lu Li, Zhilong Fan, Zhuo Wang): 
-!      Provides a unified workflow for observation processing, ensemble 
-!      forecasting, analysis updates, diagnostic output, and model feedback.
+!   v1.0 (Lu Li, Zhilong Fan, Zhuo Wang):
+!      Provides a unified workflow for observation processing, ensemble
+!      Forecasting, analysis updates, diagnostic output, and model feedback.
 !      Implemented analyses include screen-level temperature and humidity,
-!      snow, soil moisture, and soil temperature, with a common structure for
-!      extending assimilation to additional land-surface variables. 
+!      Snow, soil moisture, and soil temperature, with a common structure for
+!      Extending assimilation to additional land-surface variables.
 !
 !      1. Organizes observations into site, grid, and pseudo-observation types.
 !         Source-specific modules construct observation equivalents, while
-!         target-specific modules select and localize observations for analysis.
+!         Target-specific modules select and localize observations for analysis.
 !         Screen-level analysis products provide pseudo-observations for
-!         subsequent land data assimilation.
+!         Subsequent land data assimilation.
 !      2. Establishes an observation-operator library, including a passive
-!         microwave radiative-transfer operator for brightness temperatures.
+!         Microwave radiative-transfer operator for brightness temperatures.
 !      3. Uses the existing ensemble-generation scheme to represent uncertainty
-!         through perturbations to atmospheric forcing, model states, and parameters.
+!         Through perturbations to atmospheric forcing, model states, and parameters.
 !      4. Applies LETKF to update model states using the configured observations.
 !      5. Manages ensemble states, forcing, fluxes, restart data, and diagnostic
-!         history within the DA modules. Supports open-loop H(x) simulation
-!         and optional analysis feedback for land-atmosphere coupling.
+!         History within the DA modules. Supports open-loop H(x) simulation
+!         And optional analysis feedback for land-atmosphere coupling.
 !-----------------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_Spmd_task
@@ -105,15 +105,15 @@ CONTAINS
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
 
-      integer,  intent(in)    :: idate(3)
+      integer,  intent(in)    :: idate (3       )
       real(r8), intent(in)    :: deltim
       logical,  intent(in)    :: dolai
       logical,  intent(in)    :: doalb
       logical,  intent(in)    :: dosst
-      real(r8), intent(inout) :: oro(numpatch)
+      real(r8), intent(inout) :: oro   (numpatch)
       logical,  intent(in)    :: is_spinup
 
-      integer :: i
+      integer                 :: i
 
 !-----------------------------------------------------------------------------
       IF (.not. p_is_worker) RETURN
@@ -162,7 +162,7 @@ CONTAINS
       use_assim_sm   = .false.
       IF (use_assim_st) CALL end_DA_ST ()
       use_assim_st   = .false.
-      use_assim_disc = .false. 
+      use_assim_disc = .false.
 
    END SUBROUTINE end_DA
 
