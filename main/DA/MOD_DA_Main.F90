@@ -14,37 +14,35 @@ MODULE MOD_DA_Main
 !      snow -> soil moisture -> soil & snow temperature.
 !
 !   After analysis, online mode applies the ensemble mean to the model
-!   for subsequent land-atmosphere coupling. while offline mode restores
+!   for subsequent land-atmosphere coupling, while offline mode restores
 !   the unperturbed trajectory for evaluation.
 !
 ! AUTHOR:
 !   Lu Li, 12/2024: Initial implemention
 !   Zhilong Fan, Lu Li, 03/2025: Clean codes
 !   Lu Li, Zhilong Fan, 11/2026: DA v1.0
-!
+!-----------------------------------------------------------------------------
 ! VERSION:
-!   v1.0 (Lu Li, Zhilong Fan, Zhuo Wang):
+!   v1.0 (Lu Li, Zhilong Fan, Zhuo Wang): 
+!      Provides a unified workflow for observation processing, ensemble 
+!      forecasting, analysis updates, diagnostic output, and model feedback.
+!      Implemented analyses include screen-level temperature and humidity,
+!      snow, soil moisture, and soil temperature, with a common structure for
+!      extending assimilation to additional land-surface variables. 
 !
-!   Provides a unified workflow for observation processing, ensemble
-!   forecasting, analysis updates, diagnostic output, and model feedback.
-!   Implemented analyses include screen-level temperature and humidity,
-!   soil moisture, and soil temperature, with a common structure for
-!   extending assimilation to additional land-surface variables.
-!
-!   Organizes observations into site, grid, and pseudo-observation types.
-!   Source-specific modules construct observation equivalents, while
-!   target-specific modules select and localize observations for analysis.
-!
-!   Establishes an observation-operator library, including a passive
-!   microwave radiative-transfer operator for brightness temperatures.
-!
-!   Uses the existing ensemble-generation scheme and LETKF to update
-!   model states. Screen-level analysis products can also serve as
-!   pseudo-observations for subsequent soil moisture assimilation.
-!
-!   Manages ensemble states, forcing, fluxes, restart data, and diagnostic
-!   history within the DA modules. Supports open-loop H(x) simulation
-!   and optional analysis feedback for land-atmosphere coupling.
+!      1. Organizes observations into site, grid, and pseudo-observation types.
+!         Source-specific modules construct observation equivalents, while
+!         target-specific modules select and localize observations for analysis.
+!         Screen-level analysis products provide pseudo-observations for
+!         subsequent land data assimilation.
+!      2. Establishes an observation-operator library, including a passive
+!         microwave radiative-transfer operator for brightness temperatures.
+!      3. Uses the existing ensemble-generation scheme to represent uncertainty
+!         through perturbations to atmospheric forcing, model states, and parameters.
+!      4. Applies LETKF to update model states using the configured observations.
+!      5. Manages ensemble states, forcing, fluxes, restart data, and diagnostic
+!         history within the DA modules. Supports open-loop H(x) simulation
+!         and optional analysis feedback for land-atmosphere coupling.
 !-----------------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_Spmd_task
@@ -160,11 +158,11 @@ CONTAINS
       IF (use_assim_2mt .or. use_assim_2mq) CALL end_DA_TQ ()
       use_assim_2mt  = .false.
       use_assim_2mq  = .false.
-      use_assim_disc = .false.
       IF (use_assim_sm) CALL end_DA_SM ()
       use_assim_sm   = .false.
       IF (use_assim_st) CALL end_DA_ST ()
       use_assim_st   = .false.
+      use_assim_disc = .false. 
 
    END SUBROUTINE end_DA
 
