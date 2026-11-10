@@ -52,6 +52,7 @@ MODULE MOD_DA_Obs_PM
    USE MOD_DA_Obs_GridType
    USE MOD_DA_Operator_RTM
    USE MOD_DA_Vars_TimeVars
+   USE MOD_DA_Ens, only: porsl_ens
    IMPLICIT NONE
 
 !-----------------------------------------------------------------------------

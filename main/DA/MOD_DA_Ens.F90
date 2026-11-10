@@ -22,7 +22,7 @@ MODULE MOD_DA_Ens
    USE MOD_LandPatch
    USE MOD_SPMD_Task
    USE MOD_Vars_Global
-   USE MOD_Vars_TimeInvariants, only: porsl, psi0, bsw, hksati, &
+   USE MOD_Vars_TimeInvariants, only: porsl, hksati, &
       vf_sand, vf_clay, patchtype, z_soil_ptb
    USE MOD_Vars_1DForcing
    USE MOD_Vars_1DFluxes
@@ -32,29 +32,30 @@ MODULE MOD_DA_Ens
    IMPLICIT NONE
    SAVE
 
-   ! local parameters
-   ! forcing [parameters used here is consistent with SMAP L4 (Table 4 in [1])]
-   integer,  parameter :: nvar = 4                               ! number of pertutated forcing variables
-   real(r8), parameter :: tau_ar = 24.0                          ! correlation time scale in hours
+   ! parameters
+   real(r8) :: dt                                                          ! time step in hours
 
-   real(r8) :: dt                                                ! time step in hours
-   real(r8) :: phi                                               ! AR(1) autocorrelation coefficient consider time scale
-   real(r8) :: sigma_eps                                         ! standard deviation of noise in AR(1) process
-   real(r8), dimension(nvar) :: sigma = (/0.5, 0.3, 20.0, 1.0/)  ! standard deviation of perturbed forcing variables (prcp, sw, lw, t)
-   real(r8), dimension(nvar, nvar) :: C = reshape([ &
+   ! forcing [parameters used here is consistent with SMAP L4 (Table 4 in [1])]
+   integer,  parameter :: nvar_forc = 4                                    ! number of pertutated forcing variables
+   real(r8), parameter :: tau_forc = 24.0                                  ! correlation time scale in hours
+
+   real(r8) :: phi_forc                                                    ! AR(1) autocorrelation coefficient consider time scale
+   real(r8) :: sigma_eps_forc                                              ! standard deviation of noise in AR(1) process
+   real(r8), dimension(nvar_forc) :: sigma_forc = (/0.5, 0.3, 20.0, 1.0/)  ! standard deviation of perturbed forcing variables (prcp, sw, lw, t)
+   real(r8), dimension(nvar_forc, nvar_forc) :: C = reshape([ &
          1.0, -0.8,  0.5, 0.0, &
         -0.8,  1.0, -0.5, 0.4, &
          0.5, -0.5,  1.0, 0.4, &
-         0.0,  0.4,  0.4, 1.0], shape=[nvar, nvar])              ! cross-correlation matrix between perturbed forcing variables
-   real(r8), allocatable :: r_prev(:,:,:)                        ! previous perturbation (numpatch, nvar, DEF_DA_ENS_NUM)
-   real(r8), allocatable :: r_curr(:,:,:)                        ! current perturbation (numpatch, nvar, DEF_DA_ENS_NUM)
-   logical :: initialized = .false.                              ! flag to indicate if is initialized
+         0.0,  0.4,  0.4, 1.0], shape=[nvar_forc, nvar_forc])              ! cross-correlation matrix between perturbed forcing variables
+   real(r8), allocatable :: r_prev_forc(:,:,:)                             ! previous perturbation (numpatch, nvar_forc, DEF_DA_ENS_NUM)
+   real(r8), allocatable :: r_curr_forc(:,:,:)                             ! current perturbation (numpatch, nvar_forc, DEF_DA_ENS_NUM)
+   logical :: initialized = .false.                                        ! flag to indicate if is initialized
 
    ! soil moisture [10-layer scheme from the legacy MOD_DA_Ensemble]
-   integer,  parameter :: nvar_sm = nl_soil                     ! number of perturbed soil moisture layers
-   real(r8), parameter :: tau_sm = 3.0                           ! correlation time scale in hours
-   real(r8) :: phi_sm                                            ! AR(1) autocorrelation coefficient consider time scale
-   real(r8) :: sigma_eps_sm                                      ! standard deviation of noise in AR(1) process
+   integer,  parameter :: nvar_sm = nl_soil                                ! number of perturbed soil moisture layers
+   real(r8), parameter :: tau_sm = 3.0                                     ! correlation time scale in hours
+   real(r8) :: phi_sm                                                      ! AR(1) autocorrelation coefficient consider time scale
+   real(r8) :: sigma_eps_sm                                                ! standard deviation of noise in AR(1) process
    real(r8), dimension(nvar_sm) :: sigma_sm = (/ &
          0.105_r8, 0.166_r8, 0.102_r8, 6.61e-3_r8, 3.69e-3_r8, &
          1.22e-3_r8, 1.83e-3_r8, 2.61e-3_r8, 3.65e-3_r8, 4.55e-3_r8 /) ! kg/m2
@@ -69,9 +70,13 @@ MODULE MOD_DA_Ens
          0.3_r8, 0.4_r8, 0.5_r8, 0.6_r8, 0.7_r8, 0.8_r8, 0.9_r8, 1.0_r8, 0.9_r8, 0.8_r8, &
          0.2_r8, 0.3_r8, 0.4_r8, 0.5_r8, 0.6_r8, 0.7_r8, 0.8_r8, 0.9_r8, 1.0_r8, 0.9_r8, &
          0.1_r8, 0.2_r8, 0.3_r8, 0.4_r8, 0.5_r8, 0.6_r8, 0.7_r8, 0.8_r8, 0.9_r8, 1.0_r8], &
-         shape=[nvar_sm, nvar_sm])                              ! cross-layer correlation
-   real(r8), allocatable :: r_prev_sm(:,:,:)                     ! previous perturbation (numpatch, nvar_sm, DEF_DA_ENS_NUM)
-   real(r8), allocatable :: r_curr_sm(:,:,:)                     ! current perturbation (numpatch, nvar_sm, DEF_DA_ENS_NUM)
+         shape=[nvar_sm, nvar_sm])                                         ! cross-layer correlation
+   real(r8), allocatable :: r_prev_sm(:,:,:)                               ! previous perturbation (numpatch, nvar_sm, DEF_DA_ENS_NUM)
+   real(r8), allocatable :: r_curr_sm(:,:,:)                               ! current perturbation (numpatch, nvar_sm, DEF_DA_ENS_NUM)
+
+   ! perturbed soil hydraulic parameters
+   real(r8), allocatable :: porsl_ens (:,:,:)                              ! fraction of soil that is voids (nl_soil, 0:N, numpatch) [-]
+   real(r8), allocatable :: hksati_ens(:,:,:)                              ! saturated hydraulic conductivity (nl_soil, 0:N, numpatch) [mm/s]
 
 !-----------------------------------------------------------------------
 
@@ -89,23 +94,24 @@ CONTAINS
 !------------------------ Local Variables ------------------------------
       integer  ::  np, i, j
 
-      real(r8) :: cov_matrix(nvar, nvar)                         ! covariance matrix between perturbed forcing variables
-      real(r8) :: L(nvar, nvar)                                  ! Cholesky decomposition of correlation matrix
-      integer  :: info                                           ! info flag for Cholesky decomposition
-      real(r8) :: u1(DEF_DA_ENS_NUM/2), u2(DEF_DA_ENS_NUM/2)     ! uniform random variables
-      real(r8) :: z(nvar, DEF_DA_ENS_NUM)                        ! standard normal random variables
-      real(r8) :: mean_z(nvar)                                   ! mean of perturbation (nvar)
-      real(r8) :: std_z(nvar)                                    ! std of perturbation (nvar)
-      real(r8) :: zxL(nvar, DEF_DA_ENS_NUM)                      ! correlated random variables (nvar, DEF_DA_ENS_NUM)
+      real(r8) :: cov_matrix(nvar_forc, nvar_forc)                         ! covariance matrix between perturbed forcing variables
+      real(r8) :: L(nvar_forc, nvar_forc)                                  ! Cholesky decomposition of correlation matrix
+      integer  :: info                                                     ! info flag for Cholesky decomposition
+      real(r8) :: u1(DEF_DA_ENS_NUM/2), u2(DEF_DA_ENS_NUM/2)               ! uniform random variables
+      real(r8) :: z_forc(nvar_forc, DEF_DA_ENS_NUM)                        ! standard normal random variables
+      real(r8) :: mean_z_forc(nvar_forc)                                   ! mean of perturbation (nvar_forc)
+      real(r8) :: std_z_forc(nvar_forc)                                    ! std of perturbation (nvar_forc)
+      real(r8) :: mean_r_forc(nvar_forc)                                  ! Ensemble means of forcing perturbations after AR(1)
+      real(r8) :: zxL(nvar_forc, DEF_DA_ENS_NUM)                           ! correlated random variables (nvar, DEF_DA_ENS_NUM)
 
-      real(r8) :: cov_matrix_sm(nvar_sm, nvar_sm)                ! covariance matrix between soil moisture layers
-      real(r8) :: L_sm(nvar_sm, nvar_sm)                         ! Cholesky decomposition of soil moisture covariance
-      real(r8) :: z_sm(nvar_sm, DEF_DA_ENS_NUM)                  ! standard normal random variables (layer, member)
-      real(r8) :: mean_z_sm(nvar_sm)                             ! mean of perturbation (nvar_sm)
-      real(r8) :: std_z_sm(nvar_sm)                              ! std of perturbation (nvar_sm)
-      real(r8) :: zxL_sm(nvar_sm, DEF_DA_ENS_NUM)                ! correlated random variables (nvar_sm, DEF_DA_ENS_NUM)
-      real(r8) :: mean_r_sm(nvar_sm)                             ! mean of perturbation for soil moisture (nvar_sm)
-      real(r8) :: a_sm(nvar_sm, DEF_DA_ENS_NUM)                  ! disturbed soil moisture (layer, member)
+      real(r8) :: cov_matrix_sm(nvar_sm, nvar_sm)                          ! covariance matrix between soil moisture layers
+      real(r8) :: L_sm(nvar_sm, nvar_sm)                                   ! Cholesky decomposition of soil moisture covariance
+      real(r8) :: z_sm(nvar_sm, DEF_DA_ENS_NUM)                            ! standard normal random variables (layer, member)
+      real(r8) :: mean_z_sm(nvar_sm)                                       ! mean of perturbation (nvar_sm)
+      real(r8) :: std_z_sm(nvar_sm)                                        ! std of perturbation (nvar_sm)
+      real(r8) :: zxL_sm(nvar_sm, DEF_DA_ENS_NUM)                          ! correlated random variables (nvar_sm, DEF_DA_ENS_NUM)
+      real(r8) :: mean_r_sm(nvar_sm)                                       ! mean of perturbation for soil moisture (nvar_sm)
+      real(r8) :: a_sm(nvar_sm, DEF_DA_ENS_NUM)                            ! disturbed soil moisture (layer, member)
 
 !-----------------------------------------------------------------------
       IF (.not. p_is_worker) RETURN
@@ -113,37 +119,37 @@ CONTAINS
       ! initialize persistent variables
       IF (.not. initialized) THEN
          CALL random_seed()
-         allocate(r_prev   (numpatch, nvar,    DEF_DA_ENS_NUM))
-         allocate(r_curr   (numpatch, nvar,    DEF_DA_ENS_NUM))
-         allocate(r_prev_sm(numpatch, nvar_sm, DEF_DA_ENS_NUM))
-         allocate(r_curr_sm(numpatch, nvar_sm, DEF_DA_ENS_NUM))
-         r_prev    = 0.0_r8
-         r_curr    = 0.0_r8
-         r_prev_sm = 0.0_r8
-         r_curr_sm = 0.0_r8
+         allocate(r_prev_forc(numpatch, nvar_forc, DEF_DA_ENS_NUM))
+         allocate(r_curr_forc(numpatch, nvar_forc, DEF_DA_ENS_NUM))
+         allocate(r_prev_sm  (numpatch, nvar_sm,   DEF_DA_ENS_NUM))
+         allocate(r_curr_sm  (numpatch, nvar_sm,   DEF_DA_ENS_NUM))
+         r_prev_forc = 0.0_r8
+         r_curr_forc = 0.0_r8
+         r_prev_sm   = 0.0_r8
+         r_curr_sm   = 0.0_r8
          initialized = .true.
       ENDIF
 
       ! calculate AR(1) parameters
       dt = deltim/3600
-      phi = exp(-dt/tau_ar)
-      sigma_eps = sqrt(1.0 - phi**2)
+      phi_forc = exp(-dt/tau_forc)
+      sigma_eps_forc = sqrt(1.0 - phi_forc**2)
       phi_sm = exp(-dt/tau_sm)
       sigma_eps_sm = sqrt(1.0 - phi_sm**2)
 
       ! calculate covariance matrix by cross-correlation matrix and standard deviation
       cov_matrix = 0.0_r8
-      DO i = 1, nvar
-         DO j = 1, nvar
-            cov_matrix(i,j) = C(i,j) * sigma(i) * sigma(j)
+      DO i = 1, nvar_forc
+         DO j = 1, nvar_forc
+            cov_matrix(i,j) = C(i,j) * sigma_forc(i) * sigma_forc(j)
          ENDDO
       ENDDO
 
       ! perform Cholesky decomposition of covariance matrix
       L = cov_matrix
-      CALL dpotrf('L', nvar, L, nvar, info)
-      DO i = 1, nvar
-         DO j = i+1, nvar
+      CALL dpotrf('L', nvar_forc, L, nvar_forc, info)
+      DO i = 1, nvar_forc
+         DO j = i+1, nvar_forc
             L(i,j) = 0.0_r8
          ENDDO
       ENDDO
@@ -170,73 +176,75 @@ CONTAINS
          CALL random_number(u2)
          DO i = 1, DEF_DA_ENS_NUM/2
             u1(i) = max(u1(i), 1e-10)  ! ensure u1 is not zero
-            z(1,i*2-1) = sqrt(-2.0*log(u1(i))) * cos(2.0*pi*u2(i))
-            z(1,i*2)   = sqrt(-2.0*log(u1(i))) * sin(2.0*pi*u2(i))
+            z_forc(1,i*2-1) = sqrt(-2.0*log(u1(i))) * cos(2.0*pi*u2(i))
+            z_forc(1,i*2)   = sqrt(-2.0*log(u1(i))) * sin(2.0*pi*u2(i))
          ENDDO
          CALL random_number(u1)
          CALL random_number(u2)
          DO i = 1, DEF_DA_ENS_NUM/2
             u1(i) = max(u1(i), 1e-10)
-            z(2,i*2-1) = sqrt(-2.0*log(u1(i))) * cos(2.0*pi*u2(i))
-            z(2,i*2)   = sqrt(-2.0*log(u1(i))) * sin(2.0*pi*u2(i))
+            z_forc(2,i*2-1) = sqrt(-2.0*log(u1(i))) * cos(2.0*pi*u2(i))
+            z_forc(2,i*2)   = sqrt(-2.0*log(u1(i))) * sin(2.0*pi*u2(i))
          ENDDO
          CALL random_number(u1)
          CALL random_number(u2)
          DO i = 1, DEF_DA_ENS_NUM/2
             u1(i) = max(u1(i), 1e-10)
-            z(3,i*2-1) = sqrt(-2.0*log(u1(i))) * cos(2.0*pi*u2(i))
-            z(3,i*2)   = sqrt(-2.0*log(u1(i))) * sin(2.0*pi*u2(i))
+            z_forc(3,i*2-1) = sqrt(-2.0*log(u1(i))) * cos(2.0*pi*u2(i))
+            z_forc(3,i*2)   = sqrt(-2.0*log(u1(i))) * sin(2.0*pi*u2(i))
          ENDDO
          CALL random_number(u1)
          CALL random_number(u2)
          DO i = 1, DEF_DA_ENS_NUM/2
             u1(i) = max(u1(i), 1e-10)
-            z(4,i*2-1) = sqrt(-2.0*log(u1(i))) * cos(2.0*pi*u2(i))
-            z(4,i*2)   = sqrt(-2.0*log(u1(i))) * sin(2.0*pi*u2(i))
+            z_forc(4,i*2-1) = sqrt(-2.0*log(u1(i))) * cos(2.0*pi*u2(i))
+            z_forc(4,i*2)   = sqrt(-2.0*log(u1(i))) * sin(2.0*pi*u2(i))
          ENDDO
 
          ! normalize z to mean 0 and std 1
-         DO i = 1, nvar
-            mean_z(i) = sum(z(i, :))/DEF_DA_ENS_NUM
-            std_z(i) = sqrt(sum((z(i, :) - mean_z(i))**2)/(DEF_DA_ENS_NUM - 1))
+         DO i = 1, nvar_forc
+            mean_z_forc(i) = sum(z_forc(i, :))/DEF_DA_ENS_NUM
+            std_z_forc(i) = sqrt(sum((z_forc(i, :) - mean_z_forc(i))**2)/(DEF_DA_ENS_NUM - 1))
          ENDDO
-         DO i = 1, nvar
-            z(i,:) = (z(i,:)-mean_z(i))/std_z(i)
+         DO i = 1, nvar_forc
+            z_forc(i,:) = (z_forc(i,:)-mean_z_forc(i))/std_z_forc(i)
          ENDDO
 
-         ! multiply by Cholesky factor to introduce correlation (z*L)
-         CALL dgemm('N', 'N', nvar, DEF_DA_ENS_NUM, nvar, 1.0_r8, L, nvar, z, nvar, 0.0_r8, zxL, nvar)
+         ! Apply the Cholesky factor to introduce forcing cross-correlations.
+         CALL dgemm('N', 'N', nvar_forc, DEF_DA_ENS_NUM, nvar_forc, &
+                    1.0_r8, L, nvar_forc, z_forc, nvar_forc, &
+                    0.0_r8, zxL, nvar_forc)
 
          ! introduce correlation using AR(1) process
-         DO i = 1, nvar
+         DO i = 1, nvar_forc
             DO j = 1, DEF_DA_ENS_NUM
-               r_curr(np,i,j) = phi * r_prev(np,i,j) + sigma_eps * zxL(i,j)
+               r_curr_forc(np,i,j) = phi_forc * r_prev_forc(np,i,j) + sigma_eps_forc * zxL(i,j)
             ENDDO
          ENDDO
          ! no AR(1) process, directly use correlated random variables
-         ! r_curr(np,:,:) = zxL
+         ! r_curr_forc(np,:,:) = zxL
 
          ! normalize the disturbance ensemble samples to mean 0
-         mean_z = sum(r_curr(np,:,:), dim=2)/DEF_DA_ENS_NUM
-         DO i = 1, nvar
+         mean_r_forc = sum(r_curr_forc(np,:,:), dim=2)/DEF_DA_ENS_NUM
+         DO i = 1, nvar_forc
             DO j = 1, DEF_DA_ENS_NUM
-               r_curr(np,i,j) = r_curr(np,i,j) - mean_z(i)
+               r_curr_forc(np,i,j) = r_curr_forc(np,i,j) - mean_r_forc(i)
             ENDDO
          ENDDO
 
          ! save current perturbation as previous perturbation for next time step
-         r_prev(np,:,:) = r_curr(np,:,:)
+         r_prev_forc(np,:,:) = r_curr_forc(np,:,:)
 
          ! generate ensemble samples according different types
          DO j = 1, DEF_DA_ENS_NUM
-            forc_prc_ens  (j,np) = forc_prc  (np) * exp(r_curr(np,1,j) - 0.5 * sigma(1)**2)
-            forc_prl_ens  (j,np) = forc_prl  (np) * exp(r_curr(np,1,j) - 0.5 * sigma(1)**2)
-            forc_sols_ens (j,np) = forc_sols (np) * exp(r_curr(np,2,j) - 0.5 * sigma(2)**2)
-            forc_soll_ens (j,np) = forc_soll (np) * exp(r_curr(np,2,j) - 0.5 * sigma(2)**2)
-            forc_solsd_ens(j,np) = forc_solsd(np) * exp(r_curr(np,2,j) - 0.5 * sigma(2)**2)
-            forc_solld_ens(j,np) = forc_solld(np) * exp(r_curr(np,2,j) - 0.5 * sigma(2)**2)
-            forc_frl_ens  (j,np) = forc_frl  (np) + r_curr(np,3,j)
-            forc_t_ens    (j,np) = forc_t    (np) + r_curr(np,4,j)
+            forc_prc_ens  (j,np) = forc_prc  (np) * exp(r_curr_forc(np,1,j) - 0.5 * sigma_forc(1)**2)
+            forc_prl_ens  (j,np) = forc_prl  (np) * exp(r_curr_forc(np,1,j) - 0.5 * sigma_forc(1)**2)
+            forc_sols_ens (j,np) = forc_sols (np) * exp(r_curr_forc(np,2,j) - 0.5 * sigma_forc(2)**2)
+            forc_soll_ens (j,np) = forc_soll (np) * exp(r_curr_forc(np,2,j) - 0.5 * sigma_forc(2)**2)
+            forc_solsd_ens(j,np) = forc_solsd(np) * exp(r_curr_forc(np,2,j) - 0.5 * sigma_forc(2)**2)
+            forc_solld_ens(j,np) = forc_solld(np) * exp(r_curr_forc(np,2,j) - 0.5 * sigma_forc(2)**2)
+            forc_frl_ens  (j,np) = forc_frl  (np) + r_curr_forc(np,3,j)
+            forc_t_ens    (j,np) = forc_t    (np) + r_curr_forc(np,4,j)
          ENDDO
 
          IF (DEF_DA_ENS_SM) THEN
@@ -255,7 +263,6 @@ CONTAINS
             DO i = 1, nvar_sm
                mean_z_sm(i) = sum(z_sm(i,:))/DEF_DA_ENS_NUM
                std_z_sm(i) = sqrt(sum((z_sm(i,:) - mean_z_sm(i))**2)/(DEF_DA_ENS_NUM - 1))
-               std_z_sm(i) = max(std_z_sm(i), 1.0e-10_r8)
                z_sm(i,:) = (z_sm(i,:) - mean_z_sm(i))/std_z_sm(i)
             ENDDO
 
@@ -447,8 +454,6 @@ CONTAINS
       IF (p_is_worker) THEN
          ! Soil hydraulic parameters
          porsl        = porsl_ens       (  :,iens,:)
-         psi0         = psi0_ens        (  :,iens,:)
-         bsw          = bsw_ens         (  :,iens,:)
          hksati       = hksati_ens      (  :,iens,:)
 
          ! Restart states
@@ -719,19 +724,39 @@ CONTAINS
 !    Each member applies one global adjustment, shared by all patches and
 !    layers, which represents the overall mean bias of the soil parameter
 !    dataset.
+!
+!    Only porsl and hksati are perturbed. The standard deviations follow
+!    Ewerdwalbesloh et al. (2026), Eqs. (6) and (8), which are the Cosby et al.
+!    (1984) pedotransfer uncertainty regressions: sigma_hksati is the standard
+!    deviation of log10(hksati), sigma_porsl is the standard deviation of
+!    porsl itself. Both are damped by DEF_DA_ENS_SOIL_PTB_SCALE.
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
 
       integer  :: i, iens, ipatch, il
       real(r8) :: mean_z, std_z
-      real(r8) :: z_porsl, z_psi0, z_bsw, z_hksati
+      real(r8) :: z_porsl, z_hksati
       real(r8) :: sand_pct, clay_pct, silt_pct
-      real(r8) :: sigma_porsl, sigma_psi0, sigma_bsw, sigma_hksati
+      real(r8) :: sigma_porsl, sigma_hksati
 
-      IF (.not. allocated(porsl_ens) .or. .not. DEF_DA_ENS_SOIL_PTB) RETURN
+      IF (.not. DEF_DA .or. DEF_DA_ENS_NUM < 1 .or. &
+          .not. p_is_worker .or. numpatch <= 0) RETURN
+
+      ! porsl_ens is used by the observation operator and the SM analysis even
+      ! when the parameter perturbation is switched off, so allocate it here
+      ! for every DA run; member 0 always keeps the original parameter.
+      IF (.not. allocated(porsl_ens)) THEN
+         allocate (porsl_ens  (nl_soil,0:DEF_DA_ENS_NUM,numpatch))
+         allocate (hksati_ens (nl_soil,0:DEF_DA_ENS_NUM,numpatch))
+         porsl_ens  = spread(porsl,  2, DEF_DA_ENS_NUM + 1)
+         hksati_ens = spread(hksati, 2, DEF_DA_ENS_NUM + 1)
+      ENDIF
+
+      IF (.not. DEF_DA_ENS_SOIL_PTB) RETURN
 
       ! normalize each parameter across the members in use to mean 0 and std 1
-      DO i = 1, 4
+      ! z_soil_ptb row 1: porsl, row 2: hksati
+      DO i = 1, 2
          mean_z = sum(z_soil_ptb(i,1:DEF_DA_ENS_NUM))/DEF_DA_ENS_NUM
          std_z  = sqrt(sum((z_soil_ptb(i,1:DEF_DA_ENS_NUM) - mean_z)**2)/(DEF_DA_ENS_NUM - 1))
          std_z  = max(std_z, 1.0e-10_r8)
@@ -741,48 +766,24 @@ CONTAINS
       ! expand each member's global adjustment over all patches and layers
       DO iens = 1, DEF_DA_ENS_NUM
          z_porsl  = z_soil_ptb(1, iens)
-         z_psi0   = z_soil_ptb(2, iens)
-         z_bsw    = z_soil_ptb(3, iens)
-         z_hksati = z_soil_ptb(4, iens)
+         z_hksati = z_soil_ptb(2, iens)
 
          DO ipatch = 1, numpatch
             IF (patchtype(ipatch) > 2) CYCLE
             DO il = 1, nl_soil
-               IF (vf_sand(il,ipatch) == spval .or. vf_clay(il,ipatch) == spval) CYCLE
-
                sand_pct = vf_sand(il,ipatch) * 100.0_r8
                clay_pct = vf_clay(il,ipatch) * 100.0_r8
                silt_pct = 100.0_r8 - sand_pct - clay_pct
 
-               sigma_psi0   = DEF_DA_ENS_SOIL_PTB_SCALE * 10.0_r8**(0.72_r8 - 0.0026_r8*silt_pct + 0.0012_r8*clay_pct)
                sigma_porsl  = DEF_DA_ENS_SOIL_PTB_SCALE * (7.73_r8 - 0.073_r8*clay_pct)/100.0_r8
-               sigma_bsw    = DEF_DA_ENS_SOIL_PTB_SCALE * (0.05_r8*clay_pct + 1.34_r8)
-               sigma_hksati = DEF_DA_ENS_SOIL_PTB_SCALE * 10.0_r8**(0.459_r8 + 0.00321_r8*silt_pct)
+               sigma_hksati = DEF_DA_ENS_SOIL_PTB_SCALE * (0.459_r8 + 0.00321_r8*silt_pct)
 
                ! porosity: additive in raw space
-               IF (porsl_ens(il,0,ipatch) /= spval) THEN
-                  porsl_ens(il,iens,ipatch) = max(0.01_r8, min(0.99_r8, &
-                     porsl_ens(il,0,ipatch) + sigma_porsl*z_porsl))
-               ENDIF
+               porsl_ens(il,iens,ipatch) = max(0.01_r8, min(0.99_r8, porsl_ens(il,0,ipatch) + sigma_porsl * z_porsl))
 
-               ! saturated matric potential: log-space perturbation of the magnitude
-               IF (psi0_ens(il,0,ipatch) /= spval) THEN
-                  psi0_ens(il,iens,ipatch) = -exp(log(abs(psi0_ens(il,0,ipatch))) &
-                     + sigma_psi0*z_psi0)
-               ENDIF
-
-               ! Clapp-Hornberger b: additive in raw space
-               IF (bsw_ens(il,0,ipatch) /= spval) THEN
-                  bsw_ens(il,iens,ipatch) = max(1.0_r8, min(30.0_r8, &
-                     bsw_ens(il,0,ipatch) + sigma_bsw*z_bsw))
-               ENDIF
-
-               ! saturated hydraulic conductivity: log-space perturbation
-               IF (hksati_ens(il,0,ipatch) /= spval .and. hksati_ens(il,0,ipatch) > 0.0_r8) THEN
-                  hksati_ens(il,iens,ipatch) = exp(log(hksati_ens(il,0,ipatch)) &
-                     + sigma_hksati*z_hksati)
-                  hksati_ens(il,iens,ipatch) = max(hksati_ens(il,iens,ipatch), 1.0e-10_r8)
-               ENDIF
+               ! saturated hydraulic conductivity: perturbation of log10
+               hksati_ens(il,iens,ipatch) = 10.0_r8**(log10(hksati_ens(il,0,ipatch)) + sigma_hksati * z_hksati)
+               hksati_ens(il,iens,ipatch) = max(hksati_ens(il,iens,ipatch), 1.0e-10_r8)
             ENDDO
          ENDDO
       ENDDO
@@ -799,10 +800,12 @@ CONTAINS
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
 
-      IF (allocated(r_prev))      deallocate(r_prev)
-      IF (allocated(r_curr))      deallocate(r_curr)
-      IF (allocated(r_prev_sm))   deallocate(r_prev_sm)
-      IF (allocated(r_curr_sm))   deallocate(r_curr_sm)
+      IF (allocated(r_prev_forc))   deallocate(r_prev_forc)
+      IF (allocated(r_curr_forc))   deallocate(r_curr_forc)
+      IF (allocated(r_prev_sm  ))   deallocate(r_prev_sm  )
+      IF (allocated(r_curr_sm  ))   deallocate(r_curr_sm  )
+      IF (allocated(porsl_ens  ))   deallocate(porsl_ens  )
+      IF (allocated(hksati_ens ))   deallocate(hksati_ens )
       initialized = .false.
 
    END SUBROUTINE end_DA_Ens

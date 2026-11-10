@@ -25,7 +25,6 @@ MODULE MOD_DA_Vars_TimeVars
    USE MOD_Vars_Global
    USE MOD_SPMD_Task
    USE MOD_LandPatch
-   USE MOD_Vars_TimeInvariants, only: porsl, psi0, bsw, hksati
    USE MOD_NetCDFVector
 #ifdef GridRiverLakeFlow
    USE MOD_NetCDFSerial
@@ -89,14 +88,6 @@ MODULE MOD_DA_Vars_TimeVars
    real(r8), allocatable :: t_lake_ens       (  :,:,:)  ! lake layer temperature                                   [K]
    real(r8), allocatable :: lake_icefrac_ens (  :,:,:)  ! lake mass fraction of lake layer that is frozen          [-]
    real(r8), allocatable :: savedtke1_ens    (    :,:)  ! top level eddy conductivity                              [W/(m K)]
-
-!=============================================================================
-! ensemble soil hydraulic parameters
-!=============================================================================
-   real(r8), allocatable :: porsl_ens        (  :,:,:)  ! fraction of soil that is voids                           [-]
-   real(r8), allocatable :: psi0_ens         (  :,:,:)  ! minimum soil suction                                     [mm]
-   real(r8), allocatable :: bsw_ens          (  :,:,:)  ! clapp and hornberger "b" parameter                       [-]
-   real(r8), allocatable :: hksati_ens       (  :,:,:)  ! hydraulic conductivity at saturation                     [mm h2o/s]
 
 !=============================================================================
 ! ensemble land-atmosphere coupling state variables
@@ -215,13 +206,6 @@ CONTAINS
             allocate (lake_icefrac_ens (           nl_lake,0:DEF_DA_ENS_NUM,numpatch)); lake_icefrac_ens (  :,:,:) = spval
             allocate (savedtke1_ens    (                   0:DEF_DA_ENS_NUM,numpatch)); savedtke1_ens    (    :,:) = spval
 
-            IF (DEF_DA) THEN
-               allocate (porsl_ens     (           nl_soil,0:DEF_DA_ENS_NUM,numpatch)); porsl_ens  = spread(porsl,  2, DEF_DA_ENS_NUM + 1)
-               allocate (psi0_ens      (           nl_soil,0:DEF_DA_ENS_NUM,numpatch)); psi0_ens   = spread(psi0,   2, DEF_DA_ENS_NUM + 1)
-               allocate (bsw_ens       (           nl_soil,0:DEF_DA_ENS_NUM,numpatch)); bsw_ens    = spread(bsw,    2, DEF_DA_ENS_NUM + 1)
-               allocate (hksati_ens    (           nl_soil,0:DEF_DA_ENS_NUM,numpatch)); hksati_ens = spread(hksati, 2, DEF_DA_ENS_NUM + 1)
-            ENDIF
-
             allocate (trad_ens         (                   0:DEF_DA_ENS_NUM,numpatch)); trad_ens         (    :,:) = spval
             allocate (tref_ens         (                   0:DEF_DA_ENS_NUM,numpatch)); tref_ens         (    :,:) = spval
             allocate (qref_ens         (                   0:DEF_DA_ENS_NUM,numpatch)); qref_ens         (    :,:) = spval
@@ -331,11 +315,6 @@ CONTAINS
             deallocate (t_lake_ens                       )
             deallocate (lake_icefrac_ens                 )
             deallocate (savedtke1_ens                    )
-
-            IF (allocated(porsl_ens )) deallocate (porsl_ens )
-            IF (allocated(psi0_ens  )) deallocate (psi0_ens  )
-            IF (allocated(bsw_ens   )) deallocate (bsw_ens   )
-            IF (allocated(hksati_ens)) deallocate (hksati_ens)
 
             deallocate (trad_ens                         )
             deallocate (tref_ens                         )

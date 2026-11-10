@@ -31,6 +31,7 @@ MODULE MOD_DA_Assim_SM
    USE MOD_DA_Obs_SM
    USE MOD_DA_EnKF
    USE MOD_DA_Vars_TimeVars
+   USE MOD_DA_Ens, only: porsl_ens
    IMPLICIT NONE
 
    type(SM_type) :: sm
