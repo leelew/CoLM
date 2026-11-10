@@ -105,12 +105,12 @@ CONTAINS
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
 
-      integer,  intent(in)    :: idate (3       )
+      integer,  intent(in)    :: idate(3)
       real(r8), intent(in)    :: deltim
       logical,  intent(in)    :: dolai
       logical,  intent(in)    :: doalb
       logical,  intent(in)    :: dosst
-      real(r8), intent(inout) :: oro   (numpatch)
+      real(r8), intent(inout) :: oro(numpatch)
       logical,  intent(in)    :: is_spinup
 
       integer                 :: i

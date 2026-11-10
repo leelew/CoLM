@@ -92,18 +92,18 @@ CONTAINS
       integer              :: np, i, j, info
       real(r8)             :: u1(DEF_DA_ENS_NUM/2), u2(DEF_DA_ENS_NUM/2)  ! Uniform random variables
 
-      real(r8)             :: cov_matrix  (nvar_forc,nvar_forc     )      ! Covariance matrix between perturbed forcing variables
-      real(r8)             :: L           (nvar_forc,nvar_forc     )      ! Cholesky factor of the forcing covariance matrix
-      real(r8)             :: z_forc      (nvar_forc,DEF_DA_ENS_NUM)      ! Standard normal random variables for forcing
-      real(r8)             :: mean_z_forc (nvar_forc               )      ! Ensemble means of raw forcing normal samples
-      real(r8)             :: std_z_forc  (nvar_forc               )      ! Sample standard deviations of raw forcing normal samples
-      real(r8)             :: mean_r_forc (nvar_forc               )      ! Ensemble means of forcing perturbations after AR(1)
-      real(r8)             :: zxL         (nvar_forc,DEF_DA_ENS_NUM)      ! Correlated forcing innovations
+      real(r8)             :: cov_matrix(nvar_forc,nvar_forc)             ! Covariance matrix between perturbed forcing variables
+      real(r8)             :: L(nvar_forc,nvar_forc)                      ! Cholesky factor of the forcing covariance matrix
+      real(r8)             :: z_forc(nvar_forc,DEF_DA_ENS_NUM)            ! Standard normal random variables for forcing
+      real(r8)             :: mean_z_forc(nvar_forc)                      ! Ensemble means of raw forcing normal samples
+      real(r8)             :: std_z_forc(nvar_forc)                       ! Sample standard deviations of raw forcing normal samples
+      real(r8)             :: mean_r_forc(nvar_forc)                      ! Ensemble means of forcing perturbations after AR(1)
+      real(r8)             :: zxL(nvar_forc,DEF_DA_ENS_NUM)               ! Correlated forcing innovations
 
-      real(r8)             :: z_sm        (DEF_DA_ENS_NUM          )      ! Standard normal random variables for soil moisture
+      real(r8)             :: z_sm(DEF_DA_ENS_NUM)                        ! Standard normal random variables for soil moisture
       real(r8)             :: mean_z_sm                                   ! Ensemble means of soil moisture
       real(r8)             :: std_z_sm                                    ! Sample standard deviations of soil moisture
-      real(r8)             :: mean_r_sm   (nvar_sm                 )      ! Ensemble means of soil moisture perturbations after AR(1)
+      real(r8)             :: mean_r_sm(nvar_sm)                          ! Ensemble means of soil moisture perturbations after AR(1)
 
 !-----------------------------------------------------------------------
       ! Initialize persistent variables

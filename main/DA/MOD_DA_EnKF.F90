@@ -36,32 +36,32 @@ CONTAINS
 !------------------------------ Dummy Arguments ------------------------------
       integer,  intent(in)  :: num_ens                        ! Ensemble size
       integer,  intent(in)  :: num_obs                        ! Number of observations
-      real(r8), intent(in)  :: hx    (num_obs,num_ens)        ! Ensemble H(x) matrix
-      real(r8), intent(in)  :: y     (num_obs        )        ! Observation vector
-      real(r8), intent(in)  :: R     (num_obs        )        ! Observation error standard deviation
+      real(r8), intent(in)  :: hx(num_obs,num_ens)            ! Ensemble H(x) matrix
+      real(r8), intent(in)  :: y(num_obs)                     ! Observation vector
+      real(r8), intent(in)  :: R(num_obs)                     ! Observation error standard deviation
       real(r8), intent(in)  :: infl                           ! Inflation factor
-      real(r8), intent(out) :: trans (num_ens,num_ens)        ! Transform matrix (k x k)
+      real(r8), intent(out) :: trans(num_ens,num_ens)         ! Transform matrix (k x k)
 
 !------------------------------ Local Variables ------------------------------
-      real(r8)              :: hx_mean     (num_obs        )  ! Mean of ensemble H(x) (l)
-      real(r8)              :: dhx         (num_obs,num_ens)  ! H(x) departures from the ensemble mean (l x k)
-      real(r8)              :: dhx_t       (num_ens,num_obs)  ! Transpose of dhx (k x l)
-      real(r8)              :: C           (num_ens,num_obs)  ! C = (dhx)^T * (R)^-1 (k x l)
-      real(r8)              :: M1          (num_ens,num_ens)  ! C * dhx (k x k)
-      real(r8)              :: pa_inv      (num_ens,num_ens)  ! Inverse of background error covariance matrix (k x k)
-      real(r8)              :: eigval      (num_ens        )  ! Eigenvalues of pa_inv (k)
-      real(r8)              :: eigvec      (num_ens,num_ens)  ! Eigenvectors of pa_inv (k x k)
-      real(r8)              :: M2          (num_ens,num_ens)  ! M2 = eigvec * eigval^-1 (k x k)
-      real(r8)              :: pa          (num_ens,num_ens)  ! Background error covariance matrix (k x k)
-      real(r8)              :: M3          (num_ens,num_obs)  ! M3 = pa * C (k x l)
-      real(r8)              :: delta       (num_obs        )  ! Increment of observation (l)
-      real(r8)              :: w_avg       (num_ens        )  ! LETKF weights for the analysis ensemble mean (k)
-      real(r8)              :: M4          (num_ens,num_ens)  ! M4 = eigvec * sqrt((k-1)/eigval) (k x k)
-      real(r8)              :: trans_pert  (num_ens,num_ens)  ! Perturbation transform matrix (k x k)
-      real(r8)              :: I0          (num_ens,num_ens)  ! Identity matrix (k x k)
-      real(r8)              :: one_div_ens (num_ens        )  ! 1/num_ens
+      real(r8)              :: hx_mean(num_obs)               ! Mean of ensemble H(x) (l)
+      real(r8)              :: dhx(num_obs,num_ens)           ! H(x) departures from the ensemble mean (l x k)
+      real(r8)              :: dhx_t(num_ens,num_obs)         ! Transpose of dhx (k x l)
+      real(r8)              :: C(num_ens,num_obs)             ! C = (dhx)^T * (R)^-1 (k x l)
+      real(r8)              :: M1(num_ens,num_ens)            ! C * dhx (k x k)
+      real(r8)              :: pa_inv(num_ens,num_ens)        ! Inverse of background error covariance matrix (k x k)
+      real(r8)              :: eigval(num_ens)                ! Eigenvalues of pa_inv (k)
+      real(r8)              :: eigvec(num_ens,num_ens)        ! Eigenvectors of pa_inv (k x k)
+      real(r8)              :: M2(num_ens,num_ens)            ! M2 = eigvec * eigval^-1 (k x k)
+      real(r8)              :: pa(num_ens,num_ens)            ! Background error covariance matrix (k x k)
+      real(r8)              :: M3(num_ens,num_obs)            ! M3 = pa * C (k x l)
+      real(r8)              :: delta(num_obs)                 ! Increment of observation (l)
+      real(r8)              :: w_avg(num_ens)                 ! LETKF weights for the analysis ensemble mean (k)
+      real(r8)              :: M4(num_ens,num_ens)            ! M4 = eigvec * sqrt((k-1)/eigval) (k x k)
+      real(r8)              :: trans_pert(num_ens,num_ens)    ! Perturbation transform matrix (k x k)
+      real(r8)              :: I0(num_ens,num_ens)            ! Identity matrix (k x k)
+      real(r8)              :: one_div_ens(num_ens)           ! 1/num_ens
       integer               :: i, j, err
-      real(r8)              :: work        (4*num_ens      )
+      real(r8)              :: work(4*num_ens)
 
 !-----------------------------------------------------------------------------
 
