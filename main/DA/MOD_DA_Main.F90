@@ -82,8 +82,6 @@ CONTAINS
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
 
-!-----------------------------------------------------------------------------
-
       use_assim_2mt  = any(DEF_DA_OBS_TARGET == '2MT')
       use_assim_2mq  = any(DEF_DA_OBS_TARGET == '2MQ')
 #ifdef GridRiverLakeFlow
@@ -152,8 +150,6 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
-
-!-----------------------------------------------------------------------------
 
       IF (use_assim_2mt .or. use_assim_2mq) CALL end_DA_TQ ()
       use_assim_2mt  = .false.
