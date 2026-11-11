@@ -14,14 +14,14 @@ MODULE MOD_DA_Main
 !      Snow -> soil moisture -> soil & snow temperature -> discharge.
 !
 !   After analysis, online mode applies the ensemble mean to the model
-!   For subsequent land-atmosphere coupling, while offline mode restores
-!   The unperturbed trajectory for evaluation.
+!   for subsequent land-atmosphere coupling, while offline mode restores
+!   the unperturbed trajectory for evaluation.
 !
 ! AUTHOR:
 !   Lu Li, 12/2024: Initial implemention
 !   Zhilong Fan, Lu Li, 03/2025: Clean codes
 !   Lu Li, Zhilong Fan, 11/2026: DA v1.0
-!-----------------------------------------------------------------------------
+!
 ! VERSION:
 !   v1.0 (Lu Li, Zhilong Fan, Zhuo Wang):
 !      Provides a unified workflow for observation processing, ensemble

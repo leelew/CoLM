@@ -64,7 +64,6 @@ CONTAINS
       real(r8)              :: work(4*num_ens)
 
 !-----------------------------------------------------------------------------
-
       ! Calculate observation space perturbation
       hx_mean = sum(hx, dim=2) / size(hx, dim=2)
       DO j = 1, num_ens
