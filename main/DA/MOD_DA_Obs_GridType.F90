@@ -7,59 +7,61 @@ MODULE MOD_DA_Obs_GridType
 !   Grid observation derived type for data assimilation.
 !
 !   A grid_obs_type represents one gridded observation stream: a satellite
-!   or gridded product that comes with its own spatial grid. It stores the
-!   observation grid, the grid-to-patch spatial mapping, and
-!   timestep-dependent observation vectors.
+!   Or gridded product that comes with its own spatial grid. It stores the
+!   Observation grid, the grid-to-patch spatial mapping, and
+!   Timestep-dependent observation vectors.
 !
-!   Source-specific modules, such as PM, AM, GNSS, and MR, build on this
-!   type instead of duplicating storage and search logic.
+!   Source-specific modules for passive microwave (PM), GNSS reflectometry (GNSS-R), 
+!   And moderate-resolution optical/thermal remote sensing (MR) build on this type 
+!   To share storage and search logic. Observation variables include brightness 
+!   Temperature (TB), retrieved soil moisture (SM), delay-Doppler maps (DDM),
+!   Land surface temperature (LST), and fractional snow-covered area (fSCA).
+!
+! WORKFLOW:
+!   1. Init: Read the global reference grid and build the area-weighted
+!      mapping between observation cells and model patches once.
+!   2. Read: Read and broadcast the orbit/swath observation vectors, select
+!      records within the current time step and model domain, and retain
+!      their values, metadata, and reference-grid indices on each process.
+!   3. Clear: Release the current observation vectors while retaining the
+!      reference grid and spatial mapping for subsequent time steps.
 !
 ! FILE CONVENTIONS:
-!      Files are located under <DEF_DA_OBS_DIR>/<sensor>/.
-!      grid.nc                       grid centers: 'latitude', 'longitude'
-!      <var_name>_YYYY_MM_DD_HH.nc    per-timestep observations with
-!                                      'latitude', 'longitude', 'time',
-!                                      <var_name>, 'r', 'theta', 'ii', 'jj'
+!   Files are located under <DEF_DA_OBS_DIR>/<sensor>/.
 !
-!   ii and jj are the 1-based latitude and longitude indices in grid.nc.
+!   grid.nc defines a complete global reference grid using cell-center
+!   Coordinates 'latitude' and 'longitude'. This static grid is used to
+!   Build the spatial mapping between model patches and observation cells.
+!   Its cell size should approximate the satellite observation footprint.
+!
+!   <var_name>_YYYY_MM_DD_HH.nc stores observations for each time period as
+!   Vectors following the satellite orbit or swath, rather than as a full
+!   Global field. Each record contains 'latitude', 'longitude', 'time',
+!   <var_name>, 'r', 'theta', 'ii', and 'jj'. The 1-based latitude index ii
+!   And longitude index jj locate the record in grid.nc, linking each
+!   Observation to the corresponding cell and its mapped model patches.
 !   time is UTC seconds since the beginning of the observation day.
 !   r is the observation error standard deviation; theta is in radians.
 !
 ! SUPPORTED:
-! +--------+----------+----------------------+-------------------------------+
-! | Source | Variable | Assimilated state    | Example datasets              |
-! +--------+----------+----------------------+-------------------------------+
-! | PM     | TB_H/TB_V| Soil moisture, soil  | SMAP L1C, FY3D MWRI,          |
-! |        |          | temperature, snow    | AMSR-E.                       |
-! |        |          | variables            |                               |
-! +--------+----------+----------------------+-------------------------------+
-! | PM     | SM       | Soil moisture        | SMAP L2 SM, SMOS L2 SM,       |
-! |        |          |                      | AMSR2 SM                      |
-! +--------+----------+----------------------+-------------------------------+
-! | AM     | BS       | Soil moisture, soil  | ATMS/MWHS/MWTS TB             |
-! |        |          | temperature, snow    |                               |
-! |        |          | variables            |                               |
-! +--------+----------+----------------------+-------------------------------+
-! | AM     | SM       | Soil moisture        | ASCAT, Sentinel-1             |
-! +--------+----------+----------------------+-------------------------------+
-! | GNSS   | DDM      | Soil moisture        | FY3E, CYGNSS                  |
-! +--------+----------+----------------------+-------------------------------+
-! | MR     | LST      | Land surface         | MODIS LST, VIIRS LST, FY3F    |
-! |        |          | temperature, soil    |                               |
-! |        |          | temperature          |                               |
-! +--------+----------+----------------------+-------------------------------+
-! | MR     | fSCA     | Snow variables       | MODIS, VIIRS, FY3F            |
-! +--------+----------+----------------------+-------------------------------+
-!   PM   = passive microwave remote sensing
-!   AM   = active microwave remote sensing
-!   GNSS = GNSS-R observation source
-!   MR   = moderate-resolution optical/thermal remote sensing
-!   TB   = brightness temperature
-!   BS   = backscatter coefficient
-!   SM   = retrieved soil moisture
-!   DDM  = delay-Doppler map
-!   LST  = land surface temperature
-!   fSCA = fractional snow-covered area
+!   +--------+----------+----------------------+----------------------------+
+!   | Source | Variable | Assimilated state    | Example datasets           |
+!   +--------+----------+----------------------+----------------------------+
+!   | PM     | TB_H/TB_V| Soil moisture, soil  | SMAP L1C, FY3D MWRI,       |
+!   |        |          | temperature, snow    | AMSR-E.                    |
+!   |        |          | variables            |                            |
+!   +--------+----------+----------------------+----------------------------+
+!   | PM     | SM       | Soil moisture        | SMAP L2 SM, SMOS L2 SM,    |
+!   |        |          |                      | AMSR2 SM                   |
+!   +--------+----------+----------------------+----------------------------+
+!   | GNSS   | DDM      | Soil moisture        | FY3E, CYGNSS               |
+!   +--------+----------+----------------------+----------------------------+
+!   | MR     | LST      | Land surface         | MODIS LST, VIIRS LST, FY3F |
+!   |        |          | temperature, soil    |                            |
+!   |        |          | temperature          |                            |
+!   +--------+----------+----------------------+----------------------------+
+!   | MR     | fSCA     | Snow variables       | MODIS, VIIRS, FY3F         |
+!   +--------+----------+----------------------+----------------------------+
 !
 ! HISTORY:
 !   Lu Li, 05/2026: Initial version
@@ -80,33 +82,28 @@ MODULE MOD_DA_Obs_GridType
 !-----------------------------------------------------------------------------
    type :: grid_obs_type
 
-      ! initialize once
-      character(len=16) :: source_name = ''  ! e.g., "PM", "GNOS", "MR", "MR"
-      character(len=32) :: sensor_name = ''  ! e.g., "SMAP_L1C_D",
-      character(len=16) :: var_name    = ''  ! e.g., "TB_H", "SM", "LST", "fSCA"
+      character(len=16)          :: source_name = ''         ! E.g., "PM"
+      character(len=32)          :: sensor_name = ''         ! E.g., "SMAP_L1C_D"
+      character(len=16)          :: var_name    = ''         ! E.g., "TB_H"
 
-      ! grid map (initialize once)
-      type(grid_type)   :: grid           ! grid info for obs
-      type(spatial_mapping_type) :: mg2p  ! mapping from obs grid to patch
+      type(grid_type)            :: grid                     ! Grid info for obs
+      type(spatial_mapping_type) :: mg2p                     ! Mapping from obs grid to patch
 
-      ! counting variables for this timestep
-      integer           :: nobs  ! total avaliable obs
-
-      ! per-observation info (length = nobs)
-      real(r8), allocatable :: lat(:)    ! latitude of each obs point
-      real(r8), allocatable :: lon(:)    ! longitude of each obs point
-      real(r8), allocatable :: time(:)   ! UTC time of each obs point (seconds since begin of current day)
-      real(r8), allocatable :: y(:)      ! observed value
-      real(r8), allocatable :: r(:)      ! observation error standard deviation
-      real(r8), allocatable :: theta(:)  ! incidence angle for each obs point [rad]
-      integer,  allocatable :: ii(:)     ! the number of lat grids of this cell
-      integer,  allocatable :: jj(:)     ! the number of lon grids of this cell
+      integer                    :: nobs                     ! Total avaliable obs
+      real(r8), allocatable      :: lat(:)                   ! Latitude of each obs point
+      real(r8), allocatable      :: lon(:)                   ! Longitude of each obs point
+      real(r8), allocatable      :: time(:)                  ! UTC time of each obs point (seconds since begin of current day)
+      real(r8), allocatable      :: y(:)                     ! Observed value
+      real(r8), allocatable      :: r(:)                     ! Observation error standard deviation
+      real(r8), allocatable      :: theta(:)                 ! Incidence angle for each obs point [rad]
+      integer,  allocatable      :: ii(:)                    ! Latitude index of each observation in the global reference grid
+      integer,  allocatable      :: jj(:)                    ! Longitude index of each observation in the global reference grid
 
    CONTAINS
 
-      procedure, PUBLIC :: init  => grid_obs_init   ! initialize the obs type (grid info, mapping, etc.)
-      procedure, PUBLIC :: read  => grid_obs_read   ! read obs data for this time step (from file)
-      procedure, PUBLIC :: clear => grid_obs_clear  ! clear obs data for this time step (keep init info)
+      procedure, PUBLIC          :: init  => grid_obs_init   ! Initialize the obs type (grid info, mapping, etc.)
+      procedure, PUBLIC          :: read  => grid_obs_read   ! Read obs data for this time step (from file)
+      procedure, PUBLIC          :: clear => grid_obs_clear  ! Clear obs data for this time step (keep init info)
 
    END type grid_obs_type
 
@@ -127,7 +124,7 @@ CONTAINS
       character(len=*),      intent(in)    :: sensor_name
       character(len=*),      intent(in)    :: var_name
 
-      character(len=256) :: grid_file_name
+      character(len=256)                   :: grid_file_name
 
       this%source_name = source_name
       this%sensor_name = sensor_name
@@ -149,14 +146,14 @@ CONTAINS
 
       class(grid_obs_type),   intent(inout) :: this
 
-      IF (allocated(this%lat))    deallocate(this%lat  )
-      IF (allocated(this%lon))    deallocate(this%lon  )
-      IF (allocated(this%time))   deallocate(this%time )
-      IF (allocated(this%y))      deallocate(this%y    )
-      IF (allocated(this%r))      deallocate(this%r    )
+      IF (allocated(this%lat  ))  deallocate(this%lat  )
+      IF (allocated(this%lon  ))  deallocate(this%lon  )
+      IF (allocated(this%time ))  deallocate(this%time )
+      IF (allocated(this%y    ))  deallocate(this%y    )
+      IF (allocated(this%r    ))  deallocate(this%r    )
       IF (allocated(this%theta))  deallocate(this%theta)
-      IF (allocated(this%ii))     deallocate(this%ii   )
-      IF (allocated(this%jj))     deallocate(this%jj   )
+      IF (allocated(this%ii   ))  deallocate(this%ii   )
+      IF (allocated(this%jj   ))  deallocate(this%jj   )
 
       this%nobs = 0
 
@@ -169,29 +166,29 @@ CONTAINS
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
 
-!------------------------ Dummy Arguments ------------------------------------
+!------------------------------ Dummy Arguments ------------------------------
       class(grid_obs_type), intent(inout) :: this
       integer,              intent(in)    :: idate(3)
       real(r8),             intent(in)    :: deltim
 
-!------------------------ Local Variables ------------------------------------
-      logical :: exists_file               ! whether the expected obs file exists
-      integer :: sdate(3)                  ! timestep start time adjusted to the beginning of step
-      integer :: month, mday, hour         ! calendar month, day of month, and UTC hour
-      character(len=4)   :: yearstr        ! YYYY string for file name
-      character(len=2)   :: monthstr       ! MM string for file name
-      character(len=2)   :: daystr         ! DD string for file name
-      character(len=2)   :: hourstr        ! HH string for file name
-      character(len=256) :: obs_file_name  ! full path of current timestep obs file
-      real(r8), allocatable :: lat(:)      ! raw obs latitudes read from file [deg]
-      real(r8), allocatable :: lon(:)      ! raw obs longitudes read from file [deg]
-      real(r8), allocatable :: time(:)     ! raw obs times read from file [s since current UTC day]
-      real(r8), allocatable :: y(:)        ! raw obs values for var
-      real(r8), allocatable :: r(:)        ! raw obs error standard deviation for var
-      real(r8), allocatable :: theta(:)    ! raw incidence angles read from file [rad]
-      integer,  allocatable :: ii(:)       ! raw obs ii index read from file
-      integer,  allocatable :: jj(:)       ! raw obs jj index read from file
-      logical,  allocatable :: valid(:)    ! full-length mask for obs inside time window and domain
+!------------------------------ Local Variables ------------------------------
+      logical                             :: exists_file        ! Whether the expected obs file exists
+      integer                             :: sdate(3)           ! Timestep start time adjusted to the beginning of step
+      integer                             :: month, mday, hour  ! Calendar month, day of month, and UTC hour
+      character(len=4)                    :: yearstr            ! YYYY string for file name
+      character(len=2)                    :: monthstr           ! MM string for file name
+      character(len=2)                    :: daystr             ! DD string for file name
+      character(len=2)                    :: hourstr            ! HH string for file name
+      character(len=256)                  :: obs_file_name      ! Full path of current timestep obs file
+      real(r8), allocatable               :: lat(:)             ! Raw obs latitudes
+      real(r8), allocatable               :: lon(:)             ! Raw obs longitudes 
+      real(r8), allocatable               :: time(:)            ! Raw obs times [s since current UTC day]
+      real(r8), allocatable               :: y(:)               ! Raw obs values 
+      real(r8), allocatable               :: r(:)               ! Raw obs error standard deviation 
+      real(r8), allocatable               :: theta(:)           ! Raw incidence angles [rad]
+      integer,  allocatable               :: ii(:)              ! Raw obs ii index 
+      integer,  allocatable               :: jj(:)              ! Raw obs jj index 
+      logical,  allocatable               :: valid(:)           ! Full-length mask for obs inside time window and domain
 
 !-----------------------------------------------------------------------------
       CALL this%clear()
@@ -202,53 +199,53 @@ CONTAINS
       CALL adj2begin(sdate)
       CALL julian2monthday(sdate(1), sdate(2), month, mday)
       hour = int(sdate(3)/3600)
-      write (yearstr, '(I4.4)') sdate(1)
+      write (yearstr,  '(I4.4)') sdate(1)
       write (monthstr, '(I2.2)') month
-      write (daystr, '(I2.2)') mday
-      write (hourstr, '(I2.2)') hour
+      write (daystr,   '(I2.2)') mday
+      write (hourstr,  '(I2.2)') hour
 
-      ! whether exists obs for this timestep at domain
+      ! Whether exists obs for this timestep at domain
       obs_file_name = trim(DEF_DA_OBS_DIR)//'/'//trim(this%sensor_name)//'/'//trim(this%var_name)//'_'// &
          trim(yearstr)//'_'//trim(monthstr)//'_'//trim(daystr)//'_'//trim(hourstr)//'.nc'
       inquire (file=trim(obs_file_name), exist=exists_file)
 
       IF (exists_file) THEN
-         CALL ncio_read_bcast_serial(obs_file_name, 'latitude', lat)
-         CALL ncio_read_bcast_serial(obs_file_name, 'longitude', lon)
-         CALL ncio_read_bcast_serial(obs_file_name, 'time', time)
-         CALL ncio_read_bcast_serial(obs_file_name, trim(this%var_name), y)
-         CALL ncio_read_bcast_serial(obs_file_name, 'r', r)
-         CALL ncio_read_bcast_serial(obs_file_name, 'theta', theta)
-         CALL ncio_read_bcast_serial(obs_file_name, 'ii', ii)
-         CALL ncio_read_bcast_serial(obs_file_name, 'jj', jj)
+         CALL ncio_read_bcast_serial (obs_file_name, 'latitude',          lat  )
+         CALL ncio_read_bcast_serial (obs_file_name, 'longitude',         lon  )
+         CALL ncio_read_bcast_serial (obs_file_name, 'time',              time )
+         CALL ncio_read_bcast_serial (obs_file_name, trim(this%var_name), y    )
+         CALL ncio_read_bcast_serial (obs_file_name, 'r',                 r    )
+         CALL ncio_read_bcast_serial (obs_file_name, 'theta',             theta)
+         CALL ncio_read_bcast_serial (obs_file_name, 'ii',                ii   )
+         CALL ncio_read_bcast_serial (obs_file_name, 'jj',                jj   )
 
          allocate (valid(size(time)))
-         valid = time >= sdate(3)          .and. &
-            time <= sdate(3) + deltim .and. &
-            lat  >= DEF_domain%edges  .and. &
-            lat  <= DEF_domain%edgen  .and. &
-            lon  >= DEF_domain%edgew  .and. &
+         valid = time >= sdate(3)          .and.  &
+            time <= sdate(3) + deltim      .and.  &
+            lat  >= DEF_domain%edges       .and.  &
+            lat  <= DEF_domain%edgen       .and.  &
+            lon  >= DEF_domain%edgew       .and.  &
             lon  <= DEF_domain%edgee
          this%nobs = count(valid)
 
          IF (this%nobs > 0) THEN
-            allocate (this%lat(this%nobs))
-            allocate (this%lon(this%nobs))
-            allocate (this%time(this%nobs))
-            allocate (this%y(this%nobs))
-            allocate (this%r(this%nobs))
-            allocate (this%theta(this%nobs))
-            allocate (this%ii(this%nobs))
-            allocate (this%jj(this%nobs))
+            allocate (this%lat   (this%nobs))
+            allocate (this%lon   (this%nobs))
+            allocate (this%time  (this%nobs))
+            allocate (this%y     (this%nobs))
+            allocate (this%r     (this%nobs))
+            allocate (this%theta (this%nobs))
+            allocate (this%ii    (this%nobs))
+            allocate (this%jj    (this%nobs))
 
-            this%lat    = pack(lat  , valid)
-            this%lon    = pack(lon  , valid)
-            this%time   = pack(time , valid)
-            this%y      = pack(y    , valid)
-            this%r      = pack(r    , valid)
+            this%lat    = pack(lat,   valid)
+            this%lon    = pack(lon,   valid)
+            this%time   = pack(time,  valid)
+            this%y      = pack(y,     valid)
+            this%r      = pack(r,     valid)
             this%theta  = pack(theta, valid)
-            this%ii     = pack(ii   , valid)
-            this%jj     = pack(jj   , valid)
+            this%ii     = pack(ii,    valid)
+            this%jj     = pack(jj,    valid)
          ENDIF
 
          IF (allocated(valid)) deallocate(valid)
@@ -264,8 +261,7 @@ CONTAINS
 
       IF (p_is_master) THEN
          IF (exists_file) THEN
-            WRITE (*,'(A,I0,2A)') '[DA] Selected ', this%nobs, &
-               ' observations from ', trim(obs_file_name)
+            WRITE (*,'(A,I0,2A)') '[DA] Selected ', this%nobs, 'observations from ', trim(obs_file_name)
          ELSE
             WRITE (*,'(2A)') '[DA] Observation file not found: ', trim(obs_file_name)
          ENDIF
