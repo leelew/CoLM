@@ -6,6 +6,11 @@ MODULE MOD_DA_Vars_Hist
 ! DESCRIPTION:
 !   History output of DA-related quantities.
 !
+!   Write history diagnostics of model states and observation equivalents
+!   computed through observation operators. Observation equivalents are
+!   output only where observations are available, ensuring consistent
+!   spatial coverage for comparison with observations.
+!
 ! AUTHOR:
 !   Zhilong Fan, 09/2026
 !   Lu Li, Zhilong Fan, 11/2026: DA v1.0
@@ -126,11 +131,11 @@ CONTAINS
          CALL write_history_variable_2d ( DEF_hist_vars%DA_hx_f,                                          &
             a_hx_f(s,:), file_hist, 'f_hx_f'//trim(stream_suffix), itime_in_file,                         &
             sumarea_obs, filter_obs,                                                                      &
-            'Prior H(x) of '//trim(stream_label), '')
+            'Prior ensemble-mean H(x) of '//trim(stream_label), '')
          CALL write_history_variable_2d ( DEF_hist_vars%DA_hx_a,                                          &
             a_hx_a(s,:), file_hist, 'f_hx_a'//trim(stream_suffix), itime_in_file,                         &
             sumarea_obs, filter_obs,                                                                      &
-            'Analysis H(x) of '//trim(stream_label), '')
+            'Analysis ensemble-mean H(x) of '//trim(stream_label), '')
          CALL write_history_variable_3d ( DEF_hist_vars%DA_hx_f_ens,                                      &
             a_hx_f_ens(s,:,:), file_hist, 'f_hx_f_ens'//trim(stream_suffix), itime_in_file,               &
             'ens', 1, DEF_DA_ENS_NUM, sumarea_obs, filter_obs,                                            &
