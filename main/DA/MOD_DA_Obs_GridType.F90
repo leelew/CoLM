@@ -40,8 +40,6 @@ MODULE MOD_DA_Obs_GridType
 !   <var_name>, 'r', 'theta', 'ii', and 'jj'. The 1-based latitude index ii
 !   And longitude index jj locate the record in grid.nc, linking each
 !   Observation to the corresponding cell and its mapped model patches.
-!   time is UTC seconds since the beginning of the observation day.
-!   r is the observation error standard deviation; theta is in radians.
 !
 ! SUPPORTED:
 !   +--------+----------+----------------------+----------------------------+
@@ -154,7 +152,6 @@ CONTAINS
       IF (allocated(this%theta))  deallocate(this%theta)
       IF (allocated(this%ii   ))  deallocate(this%ii   )
       IF (allocated(this%jj   ))  deallocate(this%jj   )
-
       this%nobs = 0
 
    END SUBROUTINE grid_obs_clear
@@ -172,7 +169,6 @@ CONTAINS
       real(r8),             intent(in)    :: deltim
 
 !------------------------------ Local Variables ------------------------------
-      logical                             :: exists_file        ! Whether the expected obs file exists
       integer                             :: sdate(3)           ! Timestep start time adjusted to the beginning of step
       integer                             :: month, mday, hour  ! Calendar month, day of month, and UTC hour
       character(len=4)                    :: yearstr            ! YYYY string for file name
@@ -180,6 +176,7 @@ CONTAINS
       character(len=2)                    :: daystr             ! DD string for file name
       character(len=2)                    :: hourstr            ! HH string for file name
       character(len=256)                  :: obs_file_name      ! Full path of current timestep obs file
+      logical                             :: exists_file        ! Whether the expected obs file exists
       real(r8), allocatable               :: lat(:)             ! Raw obs latitudes
       real(r8), allocatable               :: lon(:)             ! Raw obs longitudes 
       real(r8), allocatable               :: time(:)            ! Raw obs times [s since current UTC day]
