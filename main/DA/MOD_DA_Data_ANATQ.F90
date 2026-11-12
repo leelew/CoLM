@@ -1,7 +1,7 @@
 #include <define.h>
 
 #ifdef DataAssimilation
-MODULE MOD_DA_Obs_ANATQ
+MODULE MOD_DA_Data_ANATQ
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
 !   2 m temperature and relative humidity analysis means as pseudo-observations
@@ -19,7 +19,7 @@ MODULE MOD_DA_Obs_ANATQ
    USE MOD_SPMD_Task
    USE MOD_Vars_Global
    USE MOD_Vars_TimeInvariants
-   USE MOD_DA_Obs_PseudoType
+   USE MOD_DA_Data_PseudoType
    USE MOD_DA_Assim_TQ
    IMPLICIT NONE
 
@@ -37,7 +37,7 @@ MODULE MOD_DA_Obs_ANATQ
    CONTAINS
 
       procedure :: init     => ANATQ_init    ! Initialize an empty observation collection
-      procedure :: calc_hx => ANATQ_calc_hx  ! Construct y and matching observation-space H(x)
+      procedure :: forward => ANATQ_forward  ! Construct y and matching observation-space H(x)
       procedure :: clear    => ANATQ_clear   ! Clear observations and H(x) for this variable
 
    END type ANATQ_type
@@ -60,7 +60,7 @@ MODULE MOD_DA_Obs_ANATQ
    CONTAINS
 
       procedure :: init     => ANATQ_set_init    ! Initialize the temperature and humidity collections
-      procedure :: calc_hx => ANATQ_set_calc_hx  ! Prepare both variables and combine their records
+      procedure :: forward => ANATQ_set_forward  ! Prepare both variables and combine their records
       procedure :: concat   => ANATQ_set_concat  ! Combine temperature records followed by humidity
       procedure :: clear    => ANATQ_set_clear   ! Clear both variables and their combined arrays
 
@@ -81,13 +81,12 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
       CALL this%clear()
-      CALL this%y%init()
 
    END SUBROUTINE ANATQ_init
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE ANATQ_calc_hx (this, var_name)
+   SUBROUTINE ANATQ_forward (this, var_name)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -193,7 +192,7 @@ CONTAINS
          p_address_master, p_comm_glb, p_err)
       deallocate(hx_obs, hx_recv)
 
-   END SUBROUTINE ANATQ_calc_hx
+   END SUBROUTINE ANATQ_forward
 
 !-----------------------------------------------------------------------------
 
@@ -228,7 +227,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE ANATQ_set_calc_hx (this)
+   SUBROUTINE ANATQ_set_forward (this)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
@@ -237,11 +236,11 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
       CALL this%clear()
-      CALL this%tref%calc_hx('2MT')
-      CALL this%rhref%calc_hx('2MRH')
+      CALL this%tref%forward('2MT')
+      CALL this%rhref%forward('2MRH')
       CALL this%concat()
 
-   END SUBROUTINE ANATQ_set_calc_hx
+   END SUBROUTINE ANATQ_set_forward
 
 !-----------------------------------------------------------------------------
 
@@ -300,5 +299,5 @@ CONTAINS
    END SUBROUTINE ANATQ_set_clear
 
 !-----------------------------------------------------------------------------
-END MODULE MOD_DA_Obs_ANATQ
+END MODULE MOD_DA_Data_ANATQ
 #endif

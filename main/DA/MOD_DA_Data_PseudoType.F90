@@ -1,7 +1,7 @@
 #include <define.h>
 
 #ifdef DataAssimilation
-MODULE MOD_DA_Obs_PseudoType
+MODULE MOD_DA_Data_PseudoType
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
 !   Handle one patch-based pseudo-observation variable derived from model
@@ -153,5 +153,5 @@ CONTAINS
    END SUBROUTINE pseudo_obs_clear
 
 !-----------------------------------------------------------------------------
-END MODULE MOD_DA_Obs_PseudoType
+END MODULE MOD_DA_Data_PseudoType
 #endif

@@ -1,16 +1,16 @@
 #include <define.h>
 
 #ifdef DataAssimilation
-MODULE MOD_DA_Obs_SM
+MODULE MOD_DA_Data_ST
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
-!   Observation aggregation module for soil-moisture data assimilation.
+!   Observation aggregation module for soil-temperature data assimilation.
 !
-!   This module provides SM_type, a soil-moisture-specific observation
-!   container used by MOD_DA_Assim_SM. It sits above source-specific
-!   observation modules such as PM, GNSS, ANATQ.
+!   This module provides ST_type, a soil-temperature-specific observation
+!   container used by MOD_DA_Assim_ST. It sits above source-specific
+!   observation modules, currently PM.
 !
-!   SM_type owns the soil-moisture observation workflow:
+!   ST_type owns the soil-temperature observation workflow:
 !      1. receive a unified list of observation configs from the assimilation
 !         driver;
 !      2. split configs by source and initialize the corresponding source
@@ -20,22 +20,17 @@ MODULE MOD_DA_Obs_SM
 !      4. concatenate all enabled source/sensor observations into one vector;
 !      5. prepare localized patch-level y, R, and H(x) arrays for LETKF.
 !
-!   ANATQ selects changed T and q records independently, gathers them on
-!   master, and broadcasts to all workers. Its combined vectors follow the
-!   same concatenation and localization path as the other sources.
-!
 !   Source-level parameters, such as PM sensor, variable, and frequency,
 !   are passed to the corresponding source module config type.
-!   Soil-moisture assimilation parameters, such as observation search radius
-!   and localization radius, are kept in SM_type.
+!   Soil-temperature assimilation parameters, such as observation search
+!   radius and localization radius, are kept in ST_type.
 !
 ! HISTORY:
 !   Lu Li, 05/2026: First implementation
-!   Lu Li, Zhilong Fan, 10/2026: First operational version
+!   Lu Li, Zhilong Fan, 11/2026: DA v1.0
 !-----------------------------------------------------------------------------
    USE MOD_Precision
-   USE MOD_DA_Obs_PM
-   USE MOD_DA_Obs_ANATQ
+   USE MOD_DA_Data_PM
    USE MOD_DA_Vars_TimeVars
    USE MOD_Namelist
    USE MOD_Pixelset
@@ -44,57 +39,55 @@ MODULE MOD_DA_Obs_SM
    IMPLICIT NONE
 
 !-----------------------------------------------------------------------------
-! Configuration for one observation stream used in soil moisture assimilation.
+! Configuration for one observation stream used in soil temperature assimilation.
 !-----------------------------------------------------------------------------
-   type :: SM_config_type
+   type :: ST_config_type
 
-      character(len=16) :: source_name  ! Observation source, e.g., 'PM' or 'ANATQ'
+      character(len=16) :: source_name  ! Observation source, currently 'PM'
       character(len=32) :: sensor_name  ! Sensor or dataset identifier used by the source module
-      character(len=16) :: var_name     ! Observation variable, e.g., 'TB_H', 'TB_V' or 'SM' for PM
-      real(r8) :: fghz                  ! Microwave frequency [GHz], used by the PM brightness temperature operator
+      character(len=16) :: var_name     ! Observation variable passed to the source operator
+      real(r8) :: fghz                  ! Microwave frequency for the PM brightness temperature operator [GHz]
       integer  :: istream               ! Stream index in the shared hx_ol, hx_f* and hx_a* diagnostic arrays
 
-   END type SM_config_type
+   END type ST_config_type
 
 !-----------------------------------------------------------------------------
-! Observation collection for soil moisture assimilation.
+! Observation collection for soil temperature assimilation.
 ! Source modules prepare observations and ensemble H(x); this type combines
 ! their records and selects nearby observations for each target patch.
 !-----------------------------------------------------------------------------
-   type :: SM_type
+   type :: ST_type
 
-      type(SM_config_type), allocatable :: cfgs(:)  ! Configuration for each observation stream
+      type(ST_config_type), allocatable :: cfgs(:)  ! Configuration for each observation stream
 
-      logical :: use_pm = .false.     ! Include passive microwave observations
-      logical :: use_anatq = .false.  ! Include 2 m temperature and RH analysis pseudo-observations
+      logical :: use_pm = .false.  ! Include passive microwave observations
 
       ! Observation selection and LETKF parameters.
-      real(r8) :: dres  ! Maximum latitude and longitude separation from the target patch [degrees]
+      real(r8) :: dres  ! Observation search half-width in latitude and longitude [degrees]
       real(r8) :: locr  ! Gaussian localization length scale for distance-based R inflation [km]
       real(r8) :: infl  ! Ensemble background covariance inflation factor
 
       ! Source-specific observation containers.
-      type(PM_set_type) :: pm        ! Passive microwave observations and ensemble H(x)
-      type(ANATQ_set_type) :: anatq  ! 2 m temperature and RH pseudo-observations and ensemble H(x)
+      type(PM_set_type) :: pm  ! Passive microwave observations and ensemble H(x)
 
       ! Combined records on all ranks; units of y, hx_obs and r depend on the variable.
       integer :: nobs = 0                   ! Total number of records from all enabled sources
       real(r8), allocatable :: lat(:)       ! Observation latitudes [nobs], degrees north
       real(r8), allocatable :: lon(:)       ! Observation longitudes [nobs], degrees east
-      real(r8), allocatable :: y(:)         ! Observed values or analysis ensemble means [nobs]
+      real(r8), allocatable :: y(:)         ! Observed values [nobs]
       real(r8), allocatable :: hx_obs(:,:)  ! Current observation equivalents [nobs, DEF_DA_ENS_NUM]
       real(r8), allocatable :: r(:)         ! Observation error standard deviations [nobs]
 
    CONTAINS
 
-      procedure :: init       => SM_type_init     ! Configure enabled sources and assimilation parameters
-      procedure :: calc_hx    => SM_type_calc_hx  ! Compute model- and observation-space H(x) from enabled sources
-      procedure :: save       => SM_type_save     ! Copy PM patch H(x) into forecast or analysis diagnostics
-      procedure :: clear      => SM_type_clear    ! Deallocate combined records and clear source observations
-      procedure :: concat     => SM_type_concat   ! Combine enabled sources in matching y, hx_obs and r order
-      procedure :: prepare    => SM_type_prepare  ! Select nearby valid records and localize their error variances
+      procedure :: init       => ST_type_init     ! Configure enabled sources and assimilation parameters
+      procedure :: forward    => ST_type_forward  ! Compute model- and observation-space H(x) from enabled sources
+      procedure :: save       => ST_type_save     ! Copy PM patch H(x) into forecast or analysis diagnostics
+      procedure :: clear      => ST_type_clear    ! Deallocate combined records and clear source observations
+      procedure :: concat     => ST_type_concat   ! Combine enabled sources in matching y, hx_obs and r order
+      procedure :: prepare    => ST_type_prepare  ! Select nearby valid records and localize their error variances
 
-   END type SM_type
+   END type ST_type
 
 !-----------------------------------------------------------------------------
 
@@ -102,15 +95,15 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE SM_type_init(this, pixelset, configs)
+   SUBROUTINE ST_type_init(this, pixelset, configs)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
 
 !------------------------ Dummy Arguments ------------------------------------
-      class(SM_type),       intent(inout) :: this
+      class(ST_type),       intent(inout) :: this
       type(pixelset_type),  intent(in)    :: pixelset
-      type(SM_config_type), intent(in)    :: configs(:)
+      type(ST_config_type), intent(in)    :: configs(:)
 
 !------------------------ Local Variables ------------------------------------
       integer :: i, ipm, npm
@@ -119,15 +112,15 @@ CONTAINS
 !-----------------------------------------------------------------------------
       CALL this%clear()
       this%use_pm = .false.
-      this%use_anatq = .false.
 
       IF (allocated(this%cfgs)) deallocate(this%cfgs)
+      IF (size(configs) == 0) RETURN
 
       allocate(this%cfgs(size(configs)))
       this%cfgs = configs
-      this%dres = DEF_DA_ASSIM_SM_DRES
-      this%locr = DEF_DA_ASSIM_SM_LOCR
-      this%infl = DEF_DA_ASSIM_SM_INFL
+      this%dres = DEF_DA_ASSIM_ST_DRES
+      this%locr = DEF_DA_ASSIM_ST_LOCR
+      this%infl = DEF_DA_ASSIM_ST_INFL
 
       ! the number of each source type
       npm = 0
@@ -156,48 +149,39 @@ CONTAINS
          deallocate(pm_configs)
       ENDIF
 
-      this%use_anatq = DEF_DA .and. any(configs%source_name == 'ANATQ')
-      IF (this%use_anatq) THEN
-         IF (.not. (any(DEF_DA_OBS_SOURCE == 'site' .and. DEF_DA_OBS_TARGET == '2MT') .and. &
-            any(DEF_DA_OBS_SOURCE == 'site' .and. DEF_DA_OBS_TARGET == '2MQ'))) &
-            ERROR STOP 'ANATQ requires SYNOP 2MT and 2MQ screen level analyses'
-         CALL this%anatq%init()
-      ENDIF
-
-   END SUBROUTINE SM_type_init
+   END SUBROUTINE ST_type_init
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE SM_type_clear(this)
+   SUBROUTINE ST_type_clear(this)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
 
 !------------------------ Dummy Arguments ------------------------------------
-      class(SM_type), intent(inout) :: this
+      class(ST_type), intent(inout) :: this
 
 !-----------------------------------------------------------------------------
       this%nobs = 0
-      IF (allocated(this%lat))       deallocate(this%lat)
-      IF (allocated(this%lon))       deallocate(this%lon)
-      IF (allocated(this%y  ))       deallocate(this%y  )
-      IF (allocated(this%hx_obs ))   deallocate(this%hx_obs )
-      IF (allocated(this%r  ))       deallocate(this%r  )
+      IF (allocated(this%lat   )) deallocate(this%lat   )
+      IF (allocated(this%lon   )) deallocate(this%lon   )
+      IF (allocated(this%y     )) deallocate(this%y     )
+      IF (allocated(this%hx_obs)) deallocate(this%hx_obs)
+      IF (allocated(this%r     )) deallocate(this%r     )
 
       CALL this%pm%clear()
-      CALL this%anatq%clear()
 
-   END SUBROUTINE SM_type_clear
+   END SUBROUTINE ST_type_clear
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE SM_type_concat(this)
+   SUBROUTINE ST_type_concat(this)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
 
 !------------------------ Dummy Arguments ------------------------------------
-      class(SM_type), intent(inout) :: this
+      class(ST_type), intent(inout) :: this
 
 !------------------------ Local Variables ------------------------------------
       integer :: n
@@ -205,14 +189,13 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
       this%nobs = 0
-      IF (allocated(this%lat)) deallocate(this%lat)
-      IF (allocated(this%lon)) deallocate(this%lon)
-      IF (allocated(this%y))   deallocate(this%y)
-      IF (allocated(this%hx_obs))  deallocate(this%hx_obs)
-      IF (allocated(this%r))   deallocate(this%r)
+      IF (allocated(this%lat   )) deallocate(this%lat   )
+      IF (allocated(this%lon   )) deallocate(this%lon   )
+      IF (allocated(this%y     )) deallocate(this%y     )
+      IF (allocated(this%hx_obs)) deallocate(this%hx_obs)
+      IF (allocated(this%r     )) deallocate(this%r     )
 
       IF (this%use_pm) this%nobs = this%nobs + this%pm%nobs
-      IF (this%use_anatq) this%nobs = this%nobs + this%anatq%nobs
       IF (this%nobs == 0) RETURN
 
       allocate(this%lat(this%nobs))
@@ -235,48 +218,36 @@ CONTAINS
          ENDIF
       ENDIF
 
-      IF (this%use_anatq) THEN
-         n = this%anatq%nobs
-         IF (n > 0) THEN
-            this%lat(offset+1:offset+n) = this%anatq%lat
-            this%lon(offset+1:offset+n) = this%anatq%lon
-            this%y(offset+1:offset+n) = this%anatq%y
-            this%hx_obs(offset+1:offset+n,:) = this%anatq%hx_obs
-            this%r(offset+1:offset+n) = this%anatq%r
-            offset = offset + n
-         ENDIF
-      ENDIF
-
-   END SUBROUTINE SM_type_concat
+   END SUBROUTINE ST_type_concat
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE SM_type_calc_hx(this, idate, deltim)
-
-!-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
-      class(SM_type),     intent(inout) :: this
-      integer,            intent(in)    :: idate(3)
-      real(r8),           intent(in)    :: deltim
-
-!-----------------------------------------------------------------------------
-      IF (this%use_pm) CALL this%pm%calc_hx(idate, deltim)
-      IF (this%use_anatq .and. .not. allocated(this%anatq%y)) CALL this%anatq%calc_hx()
-
-      IF (DEF_DA) CALL this%concat()
-
-   END SUBROUTINE SM_type_calc_hx
-
-!-----------------------------------------------------------------------------
-
-   SUBROUTINE SM_type_save (this, is_analysis)
+   SUBROUTINE ST_type_forward(this, idate, deltim)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
 
 !------------------------ Dummy Arguments ------------------------------------
-      class(SM_type), intent(in) :: this
+      class(ST_type), intent(inout) :: this
+      integer,        intent(in)    :: idate(3)
+      real(r8),       intent(in)    :: deltim
+
+!-----------------------------------------------------------------------------
+      IF (this%use_pm) CALL this%pm%forward(idate, deltim)
+
+      IF (DEF_DA) CALL this%concat()
+
+   END SUBROUTINE ST_type_forward
+
+!-----------------------------------------------------------------------------
+
+   SUBROUTINE ST_type_save (this, is_analysis)
+
+!-----------------------------------------------------------------------------
+      IMPLICIT NONE
+
+!------------------------ Dummy Arguments ------------------------------------
+      class(ST_type), intent(in) :: this
       logical,        intent(in) :: is_analysis
 
 !------------------------ Local Variables ------------------------------------
@@ -292,7 +263,6 @@ CONTAINS
       IF (numpatch <= 0) RETURN
       IF (.not. allocated(hx_f_ens)) RETURN
 
-      ! ANATQ is not a meaningful H(x) diagnostic
       DO istream = 1, size(this%cfgs)
          is = this%cfgs(istream)%istream
          IF (is_analysis) THEN
@@ -332,21 +302,20 @@ CONTAINS
                      sum(this%pm%sensors(ipm)%hx_model(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
                ENDDO
             ENDIF
-
          ENDIF
       ENDDO
 
-   END SUBROUTINE SM_type_save
+   END SUBROUTINE ST_type_save
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE SM_type_prepare (this, np, nobs_p, y_p, hx_p, r_p)
+   SUBROUTINE ST_type_prepare (this, np, nobs_p, y_p, hx_p, r_p)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
 
 !------------------------ Dummy Arguments ------------------------------------
-      class(SM_type),         intent(in)  :: this
+      class(ST_type),         intent(in)  :: this
       integer,                intent(in)  :: np
       integer,                intent(out) :: nobs_p
       real(r8), allocatable,  intent(out) :: y_p(:)
@@ -394,8 +363,8 @@ CONTAINS
       dist = 2.0_r8*6378.1_r8*asin(sqrt(max(0.0_r8,min(1.0_r8,hav))))
       r_p = r_p**2 / max(exp(-(dist**2)/(2.0_r8*this%locr**2)), 1.0e-6_r8)
 
-   END SUBROUTINE SM_type_prepare
+   END SUBROUTINE ST_type_prepare
 
 !-----------------------------------------------------------------------------
-END MODULE MOD_DA_Obs_SM
+END MODULE MOD_DA_Data_ST
 #endif

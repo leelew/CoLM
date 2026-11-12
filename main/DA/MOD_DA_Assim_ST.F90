@@ -4,7 +4,7 @@
 MODULE MOD_DA_Assim_ST
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
-!   Soil-temperature assimilation driver using observations prepared by Obs_ST.
+!   Soil-temperature assimilation driver using observations prepared by Data_ST.
 !
 ! WORKFLOW:
 !   1. Initialize observation streams from the namelist.
@@ -27,7 +27,7 @@ MODULE MOD_DA_Assim_ST
    USE MOD_LandPatch
    USE MOD_Namelist
    USE MOD_SPMD_Task
-   USE MOD_DA_Obs_ST
+   USE MOD_DA_Data_ST
    USE MOD_DA_EnKF
    USE MOD_DA_Vars_TimeVars
    IMPLICIT NONE
@@ -100,7 +100,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
       ! Prepare observations and forecast H(x).
-      CALL st%calc_hx(idate, deltim)
+      CALL st%forward(idate, deltim)
       CALL st%save(.false.)
 
       IF (.not. DEF_DA) THEN
@@ -150,7 +150,7 @@ CONTAINS
       IF (p_is_worker .and. numpatch > 0) THEN
          t_soisno_a(:,:) = sum(t_soisno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2) / DEF_DA_ENS_NUM
       ENDIF
-      CALL st%calc_hx(idate, deltim)
+      CALL st%forward(idate, deltim)
       CALL st%save(.true.)
       CALL st%clear()
 

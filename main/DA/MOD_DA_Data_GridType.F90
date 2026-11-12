@@ -1,7 +1,7 @@
 #include <define.h>
 
 #ifdef DataAssimilation
-MODULE MOD_DA_Obs_GridType
+MODULE MOD_DA_Data_GridType
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
 !   Grid observation derived type for data assimilation.
@@ -267,5 +267,5 @@ CONTAINS
    END SUBROUTINE grid_obs_read
 
 !-----------------------------------------------------------------------------
-END MODULE MOD_DA_Obs_GridType
+END MODULE MOD_DA_Data_GridType
 #endif

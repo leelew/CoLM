@@ -1,7 +1,7 @@
 #include <define.h>
 
 #ifdef DataAssimilation
-MODULE MOD_DA_Obs_SiteType
+MODULE MOD_DA_Data_SiteType
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
 !   Site observation derived type for data assimilation.
@@ -326,5 +326,5 @@ CONTAINS
    END SUBROUTINE site_obs_read
 
 !-----------------------------------------------------------------------------
-END MODULE MOD_DA_Obs_SiteType
+END MODULE MOD_DA_Data_SiteType
 #endif

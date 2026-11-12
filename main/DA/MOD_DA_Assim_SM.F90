@@ -4,7 +4,7 @@
 MODULE MOD_DA_Assim_SM
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
-!   Soil-moisture assimilation driver using observations prepared by Obs_SM,
+!   Soil-moisture assimilation driver using observations prepared by Data_SM,
 !   including passive-microwave data and ANATQ pseudo-observations.
 !
 ! WORKFLOW:
@@ -28,7 +28,7 @@ MODULE MOD_DA_Assim_SM
    USE MOD_Namelist
    USE MOD_SPMD_Task
    USE MOD_Const_Physical
-   USE MOD_DA_Obs_SM
+   USE MOD_DA_Data_SM
    USE MOD_DA_EnKF
    USE MOD_DA_Vars_TimeVars
    IMPLICIT NONE
@@ -102,7 +102,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
       ! Prepare observations and forecast H(x).
-      CALL sm%calc_hx(idate, deltim)
+      CALL sm%forward(idate, deltim)
       CALL sm%save(.false.)
 
       IF (.not. DEF_DA) RETURN
@@ -172,7 +172,7 @@ CONTAINS
       IF (p_is_worker .and. numpatch > 0) THEN
          wliq_soisno_a(:,:) = sum(wliq_soisno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2) / DEF_DA_ENS_NUM
       ENDIF
-      CALL sm%calc_hx(idate, deltim)
+      CALL sm%forward(idate, deltim)
       CALL sm%save(.true.)
       CALL sm%clear()
 

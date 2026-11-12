@@ -1,13 +1,13 @@
 #include <define.h>
 
 #ifdef DataAssimilation
-MODULE MOD_DA_Obs_TQ
+MODULE MOD_DA_Data_TQ
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
 !   Observation collection for 2 m temperature and humidity assimilation.
 !
-!   This module manages SYNOP observations for one 2 m analysis target.
-!   SYNOP stores the combined observations and H(x); this module selects
+!   This module manages site observations for one 2 m analysis target.
+!   INSITU_set_type stores the combined observations and H(x); this module selects
 !   nearby records and localizes their observation error variances without
 !   copying the source arrays.
 !
@@ -25,7 +25,7 @@ MODULE MOD_DA_Obs_TQ
    USE MOD_SPMD_Task
    USE MOD_Vars_Global
    USE MOD_Vars_TimeInvariants
-   USE MOD_DA_Obs_SYNOP
+   USE MOD_DA_Data_INSITU
    USE MOD_DA_Vars_TimeVars
    IMPLICIT NONE
 
@@ -34,10 +34,10 @@ MODULE MOD_DA_Obs_TQ
 !-----------------------------------------------------------------------------
    type :: TQ_config_type
 
-      character(len=16) :: source_name  ! Observation source class, e.g., 'site'
-      character(len=32) :: sensor_name  ! Station network or dataset identifier
-      character(len=16) :: var_name     ! Observation variable: '2MT' or '2MQ'
-      integer :: istream                ! Stream index in the shared H(x) diagnostics
+      character(len=16)                 :: source_name                    ! Observation source class, e.g., 'site'
+      character(len=32)                 :: sensor_name                    ! Station network or dataset identifier
+      character(len=16)                 :: var_name                       ! Observation variable: '2MT' or '2MQ'
+      integer                           :: istream                        ! Stream index in the shared H(x) diagnostics
 
    END type TQ_config_type
 
@@ -46,24 +46,24 @@ MODULE MOD_DA_Obs_TQ
 !-----------------------------------------------------------------------------
    type :: TQ_type
 
-      type(TQ_config_type), allocatable :: cfgs(:)  ! Observation stream configurations
-      logical :: use_synop = .false.                ! Include SYNOP station observations
+      type(TQ_config_type), allocatable :: cfgs(:)                        ! Observation stream configurations
+      logical                           :: use_insitu = .false.           ! Include site observations
 
       ! Observation selection and LETKF parameters.
-      real(r8) :: dres  ! Observation search half-width [degrees]
-      real(r8) :: locr  ! Gaussian localization length scale [km]
-      real(r8) :: infl  ! Ensemble covariance inflation factor [-]
+      real(r8)                          :: dres                           ! Observation search half-width [degrees]
+      real(r8)                          :: locr                           ! Gaussian localization length scale [km]
+      real(r8)                          :: infl                           ! Ensemble covariance inflation factor [-]
 
       ! Source-specific observation containers.
-      type(SYNOP_set_type) :: synop  ! Station observations and ensemble H(x)
+      type(INSITU_set_type)             :: insitu                         ! Station observations and ensemble H(x)
 
    CONTAINS
 
-      procedure :: init       => TQ_type_init     ! Configure sources and assimilation parameters
-      procedure :: calc_hx    => TQ_type_calc_hx  ! Compute model- and observation-space H(x) from enabled sources
-      procedure :: save       => TQ_type_save     ! Copy model-space H(x) into shared diagnostics
-      procedure :: clear      => TQ_type_clear    ! Clear time-step data while retaining configurations
-      procedure :: prepare    => TQ_type_prepare  ! Select nearby observations and localize error variances
+      procedure                         :: init       => TQ_type_init     ! Configure sources and assimilation parameters
+      procedure                         :: forward    => TQ_type_forward  ! Compute model- and observation-space H(x) from enabled sources
+      procedure                         :: save       => TQ_type_save     ! Copy model-space H(x) into shared diagnostics
+      procedure                         :: clear      => TQ_type_clear    ! Clear time-step data while retaining configurations
+      procedure                         :: prepare    => TQ_type_prepare  ! Select nearby observations and localize error variances
 
    END type TQ_type
 
@@ -79,19 +79,19 @@ CONTAINS
       IMPLICIT NONE
 
 !------------------------ Dummy Arguments ------------------------------------
-      class(TQ_type), intent(inout)    :: this
-      type(pixelset_type), intent(in)   :: pixelset
-      type(TQ_config_type), intent(in) :: configs(:)
+      class(TQ_type), intent(inout)         :: this
+      type(pixelset_type), intent(in)       :: pixelset
+      type(TQ_config_type), intent(in)      :: configs(:)
 
 !------------------------ Local Variables ------------------------------------
-      integer :: i
-      integer :: isynop
-      integer :: nsynop
-      type(SYNOP_config_type), allocatable :: synop_configs(:)
+      integer                               :: i
+      integer                               :: iinsitu
+      integer                               :: ninsitu
+      type(INSITU_config_type), allocatable :: insitu_configs(:)
 
 !-----------------------------------------------------------------------------
       CALL this%clear()
-      this%use_synop = .false.
+      this%use_insitu = .false.
       IF (allocated(this%cfgs)) deallocate(this%cfgs)
       allocate(this%cfgs(size(configs)))
       this%cfgs = configs
@@ -100,37 +100,37 @@ CONTAINS
       this%infl = DEF_DA_ASSIM_TQ_INFL
 
       ! Configure the station source for site streams.
-      nsynop = count(configs%source_name == 'site')
-      allocate(synop_configs(nsynop))
-      isynop = 0
+      ninsitu = count(configs%source_name == 'site')
+      allocate(insitu_configs(ninsitu))
+      iinsitu = 0
       DO i = 1, size(configs)
          IF (trim(configs(i)%source_name) /= 'site') CYCLE
-         isynop = isynop + 1
-         synop_configs(isynop)%source_name = configs(i)%source_name
-         synop_configs(isynop)%sensor_name = configs(i)%sensor_name
-         synop_configs(isynop)%var_name = configs(i)%var_name
+         iinsitu = iinsitu + 1
+         insitu_configs(iinsitu)%source_name = configs(i)%source_name
+         insitu_configs(iinsitu)%sensor_name = configs(i)%sensor_name
+         insitu_configs(iinsitu)%var_name = configs(i)%var_name
       ENDDO
-      CALL this%synop%init(pixelset, synop_configs)
-      this%use_synop = nsynop > 0
+      CALL this%insitu%init(pixelset, insitu_configs)
+      this%use_insitu = ninsitu > 0
 
    END SUBROUTINE TQ_type_init
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE TQ_type_calc_hx (this, idate, deltim)
+   SUBROUTINE TQ_type_forward (this, idate, deltim)
 
 !-----------------------------------------------------------------------------
       IMPLICIT NONE
 
 !------------------------ Dummy Arguments ------------------------------------
       class(TQ_type), intent(inout) :: this
-      integer, intent(in)            :: idate(3)
-      real(r8), intent(in)           :: deltim
+      integer, intent(in)           :: idate(3)
+      real(r8), intent(in)          :: deltim
 
 !-----------------------------------------------------------------------------
-      IF (this%use_synop) CALL this%synop%calc_hx(idate, deltim)
+      IF (this%use_insitu) CALL this%insitu%forward(idate, deltim)
 
-   END SUBROUTINE TQ_type_calc_hx
+   END SUBROUTINE TQ_type_forward
 
 !-----------------------------------------------------------------------------
 
@@ -143,7 +143,7 @@ CONTAINS
       class(TQ_type), intent(inout) :: this
 
 !-----------------------------------------------------------------------------
-      CALL this%synop%clear()
+      CALL this%insitu%clear()
 
    END SUBROUTINE TQ_type_clear
 
@@ -159,23 +159,23 @@ CONTAINS
       logical, intent(in)        :: is_analysis
 
 !------------------------ Local Variables ------------------------------------
-      integer :: i
-      integer :: is
-      integer :: isynop
-      integer :: np
-      logical :: valid_hx
+      integer                    :: i
+      integer                    :: is
+      integer                    :: iinsitu
+      integer                    :: np
+      logical                    :: valid_hx
 
 !-----------------------------------------------------------------------------
       IF (.not. p_is_worker) RETURN
-      IF (nsource <= 0 .or. numpatch <= 0) RETURN
+      IF (nstream <= 0 .or. numpatch <= 0) RETURN
       IF (.not. allocated(hx_f_ens)) RETURN
-      IF (.not. this%use_synop) RETURN
-      IF (.not. allocated(this%synop%sensors)) RETURN
+      IF (.not. this%use_insitu) RETURN
+      IF (.not. allocated(this%insitu%sensors)) RETURN
 
-      isynop = 0
+      iinsitu = 0
       DO i = 1, size(this%cfgs)
          IF (trim(this%cfgs(i)%source_name) /= 'site') CYCLE
-         isynop = isynop + 1
+         iinsitu = iinsitu + 1
          is = this%cfgs(i)%istream
          IF (is_analysis) THEN
             hx_a_ens(is,:,:) = spval
@@ -185,23 +185,23 @@ CONTAINS
             hx_f_ens(is,:,:) = spval
             hx_f(is,:) = spval
          ENDIF
-         IF (.not. allocated(this%synop%sensors(isynop)%hx_model)) CYCLE
+         IF (.not. allocated(this%insitu%sensors(iinsitu)%hx_model)) CYCLE
 
          DO np = 1, numpatch
             IF (.not. DEF_DA) THEN
-               hx_ol(is,np) = this%synop%sensors(isynop)%hx_model(0,np)
+               hx_ol(is,np) = this%insitu%sensors(iinsitu)%hx_model(0,np)
                CYCLE
             ENDIF
-            valid_hx = all(this%synop%sensors(isynop)%hx_model(1:DEF_DA_ENS_NUM,np) /= spval)
+            valid_hx = all(this%insitu%sensors(iinsitu)%hx_model(1:DEF_DA_ENS_NUM,np) /= spval)
             IF (is_analysis) THEN
-               hx_a_ens(is,1:DEF_DA_ENS_NUM,np) = this%synop%sensors(isynop)%hx_model(1:DEF_DA_ENS_NUM,np)
+               hx_a_ens(is,1:DEF_DA_ENS_NUM,np) = this%insitu%sensors(iinsitu)%hx_model(1:DEF_DA_ENS_NUM,np)
                IF (valid_hx) hx_a(is,np) = &
-                  sum(this%synop%sensors(isynop)%hx_model(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
+                  sum(this%insitu%sensors(iinsitu)%hx_model(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
             ELSE
-               hx_ol(is,np) = this%synop%sensors(isynop)%hx_model(0,np)
-               hx_f_ens(is,1:DEF_DA_ENS_NUM,np) = this%synop%sensors(isynop)%hx_model(1:DEF_DA_ENS_NUM,np)
+               hx_ol(is,np) = this%insitu%sensors(iinsitu)%hx_model(0,np)
+               hx_f_ens(is,1:DEF_DA_ENS_NUM,np) = this%insitu%sensors(iinsitu)%hx_model(1:DEF_DA_ENS_NUM,np)
                IF (valid_hx) hx_f(is,np) = &
-                  sum(this%synop%sensors(isynop)%hx_model(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
+                  sum(this%insitu%sensors(iinsitu)%hx_model(1:DEF_DA_ENS_NUM,np)) / DEF_DA_ENS_NUM
             ENDIF
          ENDDO
       ENDDO
@@ -224,10 +224,10 @@ CONTAINS
       real(r8), allocatable,  intent(out) :: r_p(:)
 
 !------------------------ Local Variables ------------------------------------
-      integer :: iens, iobs
-      real(r8) :: lat_p, lon_p, dlat, dlon
-      logical,  allocatable :: valid(:)
-      real(r8), allocatable :: lat(:), lon(:), dist(:), hav(:)
+      integer                             :: iens, iobs
+      real(r8)                            :: lat_p, lon_p, dlat, dlon
+      logical,  allocatable               :: valid(:)
+      real(r8), allocatable               :: lat(:), lon(:), dist(:), hav(:)
 
 !-----------------------------------------------------------------------------
       nobs_p = 0
@@ -235,27 +235,27 @@ CONTAINS
       lon_p = patchlonr(np)*180.0_r8/pi
 
       ! All source records are globally available before this local search.
-      allocate(valid(this%synop%nobs))
+      allocate(valid(this%insitu%nobs))
       valid = .false.
-      DO iobs = 1, this%synop%nobs
-         dlat = abs(this%synop%lat(iobs) - lat_p)
-         dlon = modulo(abs(this%synop%lon(iobs) - lon_p), 360.0_r8)
+      DO iobs = 1, this%insitu%nobs
+         dlat = abs(this%insitu%lat(iobs) - lat_p)
+         dlon = modulo(abs(this%insitu%lon(iobs) - lon_p), 360.0_r8)
          IF (dlon > 180.0_r8) dlon = 360.0_r8 - dlon
          valid(iobs) = dlat < this%dres .and. dlon < this%dres .and. &
-            this%synop%y(iobs) /= spval .and. all(this%synop%hx_obs(iobs,:) /= spval)
+            this%insitu%y(iobs) /= spval .and. all(this%insitu%hx_obs(iobs,:) /= spval)
       ENDDO
       nobs_p = count(valid)
       IF (nobs_p == 0) RETURN
 
       allocate(y_p(nobs_p), hx_p(nobs_p,DEF_DA_ENS_NUM), r_p(nobs_p))
       allocate(lat(nobs_p), lon(nobs_p), dist(nobs_p), hav(nobs_p))
-      y_p = pack(this%synop%y, valid)
+      y_p = pack(this%insitu%y, valid)
       DO iens = 1, DEF_DA_ENS_NUM
-         hx_p(:,iens) = pack(this%synop%hx_obs(:,iens), valid)
+         hx_p(:,iens) = pack(this%insitu%hx_obs(:,iens), valid)
       ENDDO
-      r_p = pack(this%synop%r, valid)
-      lat = pack(this%synop%lat, valid)
-      lon = pack(this%synop%lon, valid)
+      r_p = pack(this%insitu%r, valid)
+      lat = pack(this%insitu%lat, valid)
+      lon = pack(this%insitu%lon, valid)
 
       ! Convert the error standard deviation to variance, then inflate R.
       hav = sin((lat*pi/180.0_r8 - patchlatr(np))/2.0_r8)**2 + &
@@ -267,5 +267,5 @@ CONTAINS
    END SUBROUTINE TQ_type_prepare
 
 !-----------------------------------------------------------------------------
-END MODULE MOD_DA_Obs_TQ
+END MODULE MOD_DA_Data_TQ
 #endif

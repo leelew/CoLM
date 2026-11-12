@@ -4,8 +4,8 @@
 MODULE MOD_DA_Assim_TQ
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
-!   Screen-level temperature and humidity assimilation driver using SYNOP
-!   observations prepared by Obs_TQ.
+!   Screen-level temperature and humidity assimilation driver using site
+!   observations prepared by Data_TQ.
 !
 ! WORKFLOW:
 !   1. Initialize temperature and humidity observation streams from the namelist.
@@ -30,7 +30,7 @@ MODULE MOD_DA_Assim_TQ
    USE MOD_SPMD_Task
    USE MOD_Vars_Global
    USE MOD_Vars_1DForcing
-   USE MOD_DA_Obs_TQ
+   USE MOD_DA_Data_TQ
    USE MOD_DA_EnKF
    USE MOD_DA_Vars_TimeVars
    IMPLICIT NONE
@@ -38,7 +38,7 @@ MODULE MOD_DA_Assim_TQ
    type(TQ_type) :: tq_tref
    type(TQ_type) :: tq_qref
 
-   ! Products of the current SYNOP assimilation cycle for ANATQ.
+   ! Products of the current screen-level assimilation cycle for ANATQ.
    ! Analysis arrays are allocated only after both analysis steps finish.
    real(r8), allocatable :: tref_ens_f  (:,:)
    real(r8), allocatable :: tref_ens_a  (:,:)
@@ -144,11 +144,11 @@ CONTAINS
 
       ! Prepare both observation operators before updating either state.
       IF (allocated(tq_tref%cfgs)) THEN
-         CALL tq_tref%calc_hx(idate, deltim)
+         CALL tq_tref%forward(idate, deltim)
          CALL tq_tref%save(.false.)
       ENDIF
       IF (allocated(tq_qref%cfgs)) THEN
-         CALL tq_qref%calc_hx(idate, deltim)
+         CALL tq_qref%forward(idate, deltim)
          CALL tq_qref%save(.false.)
       ENDIF
 
@@ -267,11 +267,11 @@ CONTAINS
          rhref_ens_a(:,:) = rhref_ens
       ENDIF
       IF (allocated(tq_tref%cfgs)) THEN
-         CALL tq_tref%calc_hx(idate, deltim)
+         CALL tq_tref%forward(idate, deltim)
          CALL tq_tref%save(.true.)
       ENDIF
       IF (allocated(tq_qref%cfgs)) THEN
-         CALL tq_qref%calc_hx(idate, deltim)
+         CALL tq_qref%forward(idate, deltim)
          CALL tq_qref%save(.true.)
       ENDIF
       IF (allocated(tq_tref%cfgs)) CALL tq_tref%clear()
@@ -290,14 +290,14 @@ CONTAINS
       IF (allocated(tq_tref%cfgs)) THEN
          CALL tq_tref%clear()
          deallocate(tq_tref%cfgs)
-         IF (allocated(tq_tref%synop%cfgs)) deallocate(tq_tref%synop%cfgs)
-         IF (allocated(tq_tref%synop%sensors)) deallocate(tq_tref%synop%sensors)
+         IF (allocated(tq_tref%insitu%cfgs)) deallocate(tq_tref%insitu%cfgs)
+         IF (allocated(tq_tref%insitu%sensors)) deallocate(tq_tref%insitu%sensors)
       ENDIF
       IF (allocated(tq_qref%cfgs)) THEN
          CALL tq_qref%clear()
          deallocate(tq_qref%cfgs)
-         IF (allocated(tq_qref%synop%cfgs)) deallocate(tq_qref%synop%cfgs)
-         IF (allocated(tq_qref%synop%sensors)) deallocate(tq_qref%synop%sensors)
+         IF (allocated(tq_qref%insitu%cfgs)) deallocate(tq_qref%insitu%cfgs)
+         IF (allocated(tq_qref%insitu%sensors)) deallocate(tq_qref%insitu%sensors)
       ENDIF
 
       IF (allocated(tref_ens_f )) deallocate (tref_ens_f )
