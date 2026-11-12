@@ -44,8 +44,6 @@ CONTAINS
    SUBROUTINE save_DA_hist (file_hist, itime_in_file, idate)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
       character(len=*),         intent(in) :: file_hist
       integer,                  intent(in) :: itime_in_file
       integer,                  intent(in) :: idate(3)
@@ -59,7 +57,6 @@ CONTAINS
       character(len=256)                   :: file_hist_ucat
       integer                              :: itime_in_file_ucat
       integer                              :: i, s
-
 !-----------------------------------------------------------------------------
       IF (HistForm == 'Gridded' .and. p_is_io) CALL allocate_block_data (ghist, sumarea_model)
       IF (HistForm == 'Gridded' .and. p_is_io) CALL allocate_block_data (ghist, sumarea_obs  )

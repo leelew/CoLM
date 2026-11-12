@@ -147,8 +147,6 @@ CONTAINS
    SUBROUTINE allocate_DA_TimeVars()
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
       nstream = count(len_trim(DEF_DA_OBS_TARGET) > 0)
 
       IF (p_is_worker) THEN
@@ -251,8 +249,6 @@ CONTAINS
    SUBROUTINE deallocate_DA_TimeVars()
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
       IF (allocated(z_sno_ens       )) deallocate (z_sno_ens       )
       IF (allocated(dz_sno_ens      )) deallocate (dz_sno_ens      )
       IF (allocated(t_soisno_ens    )) deallocate (t_soisno_ens    )
@@ -345,8 +341,6 @@ CONTAINS
    SUBROUTINE WRITE_DA_TimeVars (idate, lc_year, site, dir_restart)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
       integer,          intent(in) :: idate (3)       
       integer,          intent(in) :: lc_year        
       character(len=*), intent(in) :: site            
@@ -356,7 +350,6 @@ CONTAINS
       character(len=14)            :: cdate           
       character(len=256)           :: cyear           
       character(len=256)           :: file_gridriver 
-
 !-----------------------------------------------------------------------------
       write(cyear,'(i4.4)') lc_year
       write(cdate,'(i4.4,"-",i3.3,"-",i5.5)') idate(1), idate(2), idate(3)
@@ -451,8 +444,6 @@ CONTAINS
    SUBROUTINE READ_DA_TimeVars (idate, lc_year, site, dir_restart)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
       integer,          intent(in) :: idate (3)
       integer,          intent(in) :: lc_year
       character(len=*), intent(in) :: site
@@ -463,7 +454,6 @@ CONTAINS
       character(len=14)            :: cyear
       character(len=256)           :: file_gridriver  
       logical                      :: fexists         
-
 !-----------------------------------------------------------------------------
       write (cyear, '(i4.4)') lc_year
       write (cdate, '(i4.4,"-",i3.3,"-",i5.5)') idate(1), idate(2), idate(3)
@@ -563,8 +553,6 @@ CONTAINS
    SUBROUTINE check_DA_TimeVars ()
 
 !-----------------------------------------------------------------------
-      IMPLICIT NONE
-
       CALL check_vector_data ('z_sno       [m]    ', z_sno_ens       )
       CALL check_vector_data ('dz_sno      [m]    ', dz_sno_ens      )
       CALL check_vector_data ('t_soisno    [K]    ', t_soisno_ens    )

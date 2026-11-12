@@ -114,8 +114,6 @@ CONTAINS
    SUBROUTINE grid_obs_init (this, pixelset, source_name, sensor_name, var_name)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
       class(grid_obs_type),  intent(inout) :: this
       type(pixelset_type),   intent(in)    :: pixelset
       character(len=*),      intent(in)    :: source_name
@@ -123,7 +121,7 @@ CONTAINS
       character(len=*),      intent(in)    :: var_name
 
       character(len=256)                   :: grid_file_name
-
+!-----------------------------------------------------------------------------
       this%source_name = source_name
       this%sensor_name = sensor_name
       this%var_name = var_name
@@ -140,10 +138,8 @@ CONTAINS
    SUBROUTINE grid_obs_clear (this)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
       class(grid_obs_type),   intent(inout) :: this
-
+!-----------------------------------------------------------------------------
       IF (allocated(this%lat  ))  deallocate(this%lat  )
       IF (allocated(this%lon  ))  deallocate(this%lon  )
       IF (allocated(this%time ))  deallocate(this%time )
@@ -161,14 +157,10 @@ CONTAINS
    SUBROUTINE grid_obs_read (this, idate, deltim)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
-!------------------------------ Dummy Arguments ------------------------------
       class(grid_obs_type), intent(inout) :: this
       integer,              intent(in)    :: idate(3)
       real(r8),             intent(in)    :: deltim
 
-!------------------------------ Local Variables ------------------------------
       integer                             :: sdate(3)           ! Timestep start time adjusted to the beginning of step
       integer                             :: month, mday, hour  ! Calendar month, day of month, and UTC hour
       character(len=4)                    :: yearstr            ! YYYY string for file name
@@ -186,7 +178,6 @@ CONTAINS
       integer,  allocatable               :: ii(:)              ! Raw obs ii index 
       integer,  allocatable               :: jj(:)              ! Raw obs jj index 
       logical,  allocatable               :: valid(:)           ! Full-length mask for obs inside time window and domain
-
 !-----------------------------------------------------------------------------
       CALL this%clear()
 

@@ -31,9 +31,6 @@ CONTAINS
 ! DESCRIPTION:
 !   Local transform ensemble Kalman filter
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
-!------------------------------ Dummy Arguments ------------------------------
       integer,  intent(in)  :: num_ens                        ! Ensemble size
       integer,  intent(in)  :: num_obs                        ! Number of observations
       real(r8), intent(in)  :: hx(num_obs,num_ens)            ! Ensemble H(x) matrix
@@ -42,7 +39,6 @@ CONTAINS
       real(r8), intent(in)  :: infl                           ! Inflation factor
       real(r8), intent(out) :: trans(num_ens,num_ens)         ! Transform matrix (k x k)
 
-!------------------------------ Local Variables ------------------------------
       real(r8)              :: hx_mean(num_obs)               ! Mean of ensemble H(x) (l)
       real(r8)              :: dhx(num_obs,num_ens)           ! H(x) departures from the ensemble mean (l x k)
       real(r8)              :: dhx_t(num_ens,num_obs)         ! Transpose of dhx (k x l)
@@ -62,7 +58,6 @@ CONTAINS
       real(r8)              :: one_div_ens(num_ens)           ! 1/num_ens
       integer               :: i, j, err
       real(r8)              :: work(4*num_ens)
-
 !-----------------------------------------------------------------------------
       ! Calculate observation space perturbation
       hx_mean = sum(hx, dim=2) / size(hx, dim=2)

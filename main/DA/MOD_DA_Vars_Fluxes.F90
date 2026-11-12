@@ -84,8 +84,6 @@ CONTAINS
    SUBROUTINE allocate_DA_Fluxes()
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
       IF (p_is_worker) THEN
          IF (numpatch > 0) THEN
             allocate (taux_ens         (          0:DEF_DA_ENS_NUM,numpatch)); taux_ens         (:,:  ) = spval
@@ -147,8 +145,6 @@ CONTAINS
    SUBROUTINE deallocate_DA_Fluxes()
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
       IF (p_is_worker) THEN
          IF (numpatch > 0) THEN
             deallocate (taux_ens        )

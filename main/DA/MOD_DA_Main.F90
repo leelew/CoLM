@@ -80,8 +80,6 @@ CONTAINS
    SUBROUTINE init_DA ()
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
       use_assim_2mt  = any(DEF_DA_OBS_TARGET == '2MT')
       use_assim_2mq  = any(DEF_DA_OBS_TARGET == '2MQ')
 #ifdef GridRiverLakeFlow
@@ -101,8 +99,6 @@ CONTAINS
    SUBROUTINE run_DA (idate, deltim, dolai, doalb, dosst, oro, is_spinup)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
       integer,  intent(in)    :: idate(3)
       real(r8), intent(in)    :: deltim
       logical,  intent(in)    :: dolai
@@ -112,7 +108,6 @@ CONTAINS
       logical,  intent(in)    :: is_spinup
 
       integer                 :: i
-
 !-----------------------------------------------------------------------------
       IF (.not. p_is_worker) RETURN
 
@@ -149,8 +144,6 @@ CONTAINS
    SUBROUTINE end_DA ()
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
       IF (use_assim_2mt .or. use_assim_2mq) CALL end_DA_TQ ()
       use_assim_2mt  = .false.
       use_assim_2mq  = .false.

@@ -55,71 +55,64 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE pseudo_obs_read (this, mask, y, r)
+   SUBROUTINE pseudo_obs_read(this, mask, y, r)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
+      class(pseudo_obs_type), intent(inout) :: this     ! Pseudo-observation collection
+      logical, allocatable, intent(in)      :: mask(:)  ! Selected local patches; allocated only on workers
+      real(r8), allocatable, intent(in)     :: y(:)     ! Analysis means on local patches; allocated only on workers
+      real(r8), intent(in)                  :: r        ! Observation error standard deviation
 
-!------------------------------ Dummy Arguments ------------------------------
-      class(pseudo_obs_type), intent(inout) :: this             ! Pseudo-observations collections
-      logical, intent(in)                   :: mask(:)          ! Selected local patches 
-      real(r8), intent(in)                  :: y(:)             ! Analysis means at patch observation locations
-      real(r8), intent(in)                  :: r                ! Observation error standard deviation
-
-!------------------------------ Local Variables ------------------------------
-      integer                               :: np               ! Local patch index
-      integer                               :: nlocal           ! Number of selected patches on this rank
-      integer                               :: iobs             ! Selected-patch index in send buffers
-      integer                               :: iproc            ! Rank index in p_comm_glb
-      real(r8), allocatable                 :: obs(:,:)         ! Send buffer: lat, lon, y, r 
-      real(r8), allocatable                 :: obs_global(:,:)  ! Gathered lat, lon, y, r on master 
-      integer, allocatable                  :: counts(:)        ! Selected-patch count per rank 
-      integer, allocatable                  :: displs(:)        ! Receive offset per rank, in patch units 
-
+      integer               :: np               ! Local patch index
+      integer               :: nlocal           ! Number of selected patches on one worker
+      integer               :: iobs             ! Record index in the worker send buffer
+      integer               :: iworker          ! Worker index in the global worker list
+      integer               :: offset           ! Number of records already received on master
+      real(r8), allocatable :: obs(:,:)         ! Selected latitude, longitude, y and r on each worker
+      real(r8), allocatable :: obs_global(:,:)  ! Observation records gathered on master
 !-----------------------------------------------------------------------------
       CALL this%clear()
 
-      ! Pack selected patches in local patch order.
-      IF (p_is_worker) THEN 
-         nlocal = count(mask)
-      ELSE
-         nlocal = 0
-      allocate(obs(4,nlocal))
-
-      IF (p_is_worker) THEN
-         iobs = 0
-         DO np = 1, numpatch
-            IF (.not. mask(np)) CYCLE
-            iobs = iobs + 1
-            obs(1,iobs) = patchlatr(np)*180.0_r8/pi
-            obs(2,iobs) = (modulo(patchlonr(np)+pi,2.0_r8*pi)-pi)*180.0_r8/pi
-            obs(3,iobs) = y(np)
-            obs(4,iobs) = r
-         ENDDO
-      ENDIF
-
-#ifdef USEMPI
-      ! Gather selected-patch counts on master, then broadcast the total count.
-      allocate(counts(0:p_np_glb-1), displs(0:p_np_glb-1))
-      counts = 0
-      displs = 0
-      CALL mpi_gather(nlocal, 1, MPI_INTEGER, counts, 1, MPI_INTEGER, p_address_master, p_comm_glb, p_err)
-      IF (p_is_master) this%nobs = sum(counts)
-      CALL mpi_bcast(this%nobs, 1, MPI_INTEGER, p_address_master, p_comm_glb, p_err)
+      ! Count selected patches on workers and obtain the global record count.
+      nlocal = 0
+      IF (p_is_worker) nlocal = count(mask)
+      CALL mpi_allreduce(nlocal, this%nobs, 1, MPI_INTEGER, MPI_SUM, p_comm_glb, p_err)
       IF (this%nobs == 0) RETURN
 
-      ! Compute receive offsets in patch units and allocate receive buffers.
-      IF (p_is_master) THEN
-         DO iproc = 1, p_np_glb-1
-            displs(iproc) = displs(iproc-1) + counts(iproc-1)
-         ENDDO
-         allocate(obs_global(4,this%nobs))
-      ELSE
-         allocate(obs_global(4,1))
+      ! Workers send selected records in local patch order.
+      IF (p_is_worker) THEN
+         CALL mpi_send(nlocal, 1, MPI_INTEGER, p_address_master, mpi_tag_size, p_comm_glb, p_err)
+         IF (nlocal > 0) THEN
+            allocate(obs(4,nlocal))
+            iobs = 0
+            DO np = 1, numpatch
+               IF (.not. mask(np)) CYCLE
+               iobs = iobs + 1
+               obs(1,iobs) = patchlatr(np)*180.0_r8/pi
+               obs(2,iobs) = (modulo(patchlonr(np)+pi,2.0_r8*pi)-pi)*180.0_r8/pi
+               obs(3,iobs) = y(np)
+               obs(4,iobs) = r
+            ENDDO
+            CALL mpi_send(obs, 4*nlocal, MPI_REAL8, p_address_master, mpi_tag_data, p_comm_glb, p_err)
+         ENDIF
       ENDIF
-      CALL mpi_gatherv(obs, 4*nlocal, MPI_REAL8, obs_global, 4*counts, 4*displs, MPI_REAL8, p_address_master, p_comm_glb, p_err)
 
-      ! Store the gathered data in object members on master and broadcast to workers
+      ! Master concatenates records in worker order, matching ANATQ H(x).
+      IF (p_is_master) THEN
+         allocate(obs_global(4,this%nobs))
+         offset = 0
+         DO iworker = 0, p_np_worker-1
+            CALL mpi_recv(nlocal, 1, MPI_INTEGER, p_address_worker(iworker), &
+               mpi_tag_size, p_comm_glb, p_stat, p_err)
+            IF (nlocal > 0) THEN
+               CALL mpi_recv(obs_global(:,offset+1:offset+nlocal), 4*nlocal, MPI_REAL8, &
+                  p_address_worker(iworker), mpi_tag_data, p_comm_glb, p_stat, p_err)
+               offset = offset + nlocal
+            ENDIF
+         ENDDO
+      ENDIF
+
+      ! Broadcast complete observation vectors to all processes.
       allocate(this%lat(this%nobs), this%lon(this%nobs), this%y(this%nobs), this%r(this%nobs))
       IF (p_is_master) THEN
          this%lat = obs_global(1,:)
@@ -129,9 +122,8 @@ CONTAINS
       ENDIF
       CALL mpi_bcast(this%lat, this%nobs, MPI_REAL8, p_address_master, p_comm_glb, p_err)
       CALL mpi_bcast(this%lon, this%nobs, MPI_REAL8, p_address_master, p_comm_glb, p_err)
-      CALL mpi_bcast(this%y,   this%nobs, MPI_REAL8, p_address_master, p_comm_glb, p_err)
-      CALL mpi_bcast(this%r,   this%nobs, MPI_REAL8, p_address_master, p_comm_glb, p_err)
-#endif
+      CALL mpi_bcast(this%y, this%nobs, MPI_REAL8, p_address_master, p_comm_glb, p_err)
+      CALL mpi_bcast(this%r, this%nobs, MPI_REAL8, p_address_master, p_comm_glb, p_err)
 
    END SUBROUTINE pseudo_obs_read
 
@@ -140,10 +132,8 @@ CONTAINS
    SUBROUTINE pseudo_obs_clear (this)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
       class(pseudo_obs_type), intent(inout) :: this
-
+!-----------------------------------------------------------------------------
       this%nobs = 0
       IF (allocated(this%lat)) deallocate(this%lat)
       IF (allocated(this%lon)) deallocate(this%lon)
@@ -155,3 +145,4 @@ CONTAINS
 !-----------------------------------------------------------------------------
 END MODULE MOD_DA_Data_PseudoType
 #endif
+

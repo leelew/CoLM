@@ -63,8 +63,6 @@ CONTAINS
    SUBROUTINE allocate_DA_AccVars ()
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
       IF (p_is_worker) THEN
          IF (numpatch > 0) THEN
             allocate (nac_obs           (nstream,                          numpatch))
@@ -98,8 +96,6 @@ CONTAINS
    SUBROUTINE deallocate_DA_AccVars ()
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
       IF (allocated(nac_obs          )) deallocate (nac_obs          )
       IF (allocated(a_hx_ol          )) deallocate (a_hx_ol          )
       IF (allocated(a_hx_f_ens       )) deallocate (a_hx_f_ens       )
@@ -127,8 +123,6 @@ CONTAINS
    SUBROUTINE flush_DA_AccVars ()
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
       IF (allocated(nac_obs          )) nac_obs           = 0.0_r8
       IF (allocated(a_hx_ol          )) a_hx_ol           = spval
       IF (allocated(a_hx_f_ens       )) a_hx_f_ens        = spval
@@ -156,8 +150,6 @@ CONTAINS
    SUBROUTINE accumulate_DA_AccVars ()
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
       WHERE (hx_ol /= spval) nac_obs = nac_obs + 1.0_r8
       CALL acc_DA_hist (hx_ol,                   a_hx_ol          )
       CALL acc_DA_hist (hx_f_ens,                a_hx_f_ens       )
@@ -187,12 +179,11 @@ CONTAINS
    SUBROUTINE acc_DA_hist_2d (var, s)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
       real(r8), intent(in)    :: var (  :,:)
       real(r8), intent(inout) :: s   (  :,:)
-      integer :: i1, i2
 
+      integer :: i1, i2
+!-----------------------------------------------------------------------------
       DO i2 = lbound(var,2), ubound(var,2)
          DO i1 = lbound(var,1), ubound(var,1)
             IF (var(i1,i2) /= spval) THEN
@@ -212,12 +203,11 @@ CONTAINS
    SUBROUTINE acc_DA_hist_3d (var, s)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
       real(r8), intent(in)    :: var (:,:,:)
       real(r8), intent(inout) :: s   (:,:,:)
-      integer :: i1, i2, i3
 
+      integer :: i1, i2, i3
+!-----------------------------------------------------------------------------
       DO i3 = lbound(var,3), ubound(var,3)
          DO i2 = lbound(var,2), ubound(var,2)
             DO i1 = lbound(var,1), ubound(var,1)

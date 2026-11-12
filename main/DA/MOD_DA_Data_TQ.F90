@@ -4,16 +4,27 @@
 MODULE MOD_DA_Data_TQ
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
-!   Observation collection for 2 m temperature and humidity assimilation.
+!   Observation handling for 2 m temperature and humidity data assimilation.
 !
-!   This module manages site observations for one 2 m analysis target.
-!   INSITU_set_type stores the combined observations and H(x); this module selects
-!   nearby records and localizes their observation error variances without
-!   copying the source arrays.
+! WORKFLOW:
+!   1. Init: Configure INSITU observation streams and initialize the source
+!      Module. Store observation search and localization parameters.
+!   2. Forward: Call INSITU to read observations and compute matching H(x).
+!      For assimilation, INSITU combines records from all configured streams.
+!   3. Prepare: Select nearby valid observations for each target patch and
+!      Convert error standard deviations to localized variances for LETKF.
+!   4. Save: Copy INSITU model-space H(x) into the shared diagnostic arrays.
+!   5. Clear: Release current observations and H(x), retaining source
+!      Configurations and site-to-patch mappings for subsequent forward calls.
 !
-!   The assimilation driver uses separate collections for temperature and
-!   humidity and controls their analysis order. Source modules compute H(x);
-!   this collection saves their model-space H(x) in the shared diagnostics.
+! SUPPORTED:
+!   INSITU:
+!      Station observations of 2 m temperature (2MT) and relative humidity
+!      (2MRH), such as SYNOP records.
+!
+! NOTES:
+!   Separate TQ_type instances serve temperature and humidity analysis
+!   Targets. MOD_DA_Assim_TQ controls their analysis order and state updates.
 !
 ! HISTORY:
 !   Lu Li, 11/2026: DA v1.0
@@ -28,18 +39,6 @@ MODULE MOD_DA_Data_TQ
    USE MOD_DA_Data_INSITU
    USE MOD_DA_Vars_TimeVars
    IMPLICIT NONE
-
-!-----------------------------------------------------------------------------
-! Configuration for one stream used in 2 m temperature or humidity assimilation
-!-----------------------------------------------------------------------------
-   type :: TQ_config_type
-
-      character(len=16)                 :: source_name                    ! Observation source class, e.g., 'site'
-      character(len=32)                 :: sensor_name                    ! Station network or dataset identifier
-      character(len=16)                 :: var_name                       ! Observation variable: '2MT' or '2MQ'
-      integer                           :: istream                        ! Stream index in the shared H(x) diagnostics
-
-   END type TQ_config_type
 
 !-----------------------------------------------------------------------------
 ! Observation collection for one 2 m analysis target
@@ -67,6 +66,15 @@ MODULE MOD_DA_Data_TQ
 
    END type TQ_type
 
+   type :: TQ_config_type
+
+      character(len=16)                 :: source_name                   
+      character(len=32)                 :: sensor_name                    
+      character(len=16)                 :: var_name                  
+      integer                           :: istream                        
+
+   END type TQ_config_type
+
 !-----------------------------------------------------------------------------
 
 CONTAINS
@@ -76,23 +84,18 @@ CONTAINS
    SUBROUTINE TQ_type_init (this, pixelset, configs)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
-!------------------------ Dummy Arguments ------------------------------------
       class(TQ_type), intent(inout)         :: this
       type(pixelset_type), intent(in)       :: pixelset
       type(TQ_config_type), intent(in)      :: configs(:)
 
-!------------------------ Local Variables ------------------------------------
       integer                               :: i
       integer                               :: iinsitu
       integer                               :: ninsitu
       type(INSITU_config_type), allocatable :: insitu_configs(:)
-
 !-----------------------------------------------------------------------------
       CALL this%clear()
       this%use_insitu = .false.
-      IF (allocated(this%cfgs)) deallocate(this%cfgs)
+
       allocate(this%cfgs(size(configs)))
       this%cfgs = configs
       this%dres = DEF_DA_ASSIM_TQ_DRES
@@ -120,13 +123,9 @@ CONTAINS
    SUBROUTINE TQ_type_forward (this, idate, deltim)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
-!------------------------ Dummy Arguments ------------------------------------
       class(TQ_type), intent(inout) :: this
       integer, intent(in)           :: idate(3)
       real(r8), intent(in)          :: deltim
-
 !-----------------------------------------------------------------------------
       IF (this%use_insitu) CALL this%insitu%forward(idate, deltim)
 
@@ -137,11 +136,7 @@ CONTAINS
    SUBROUTINE TQ_type_clear (this)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
-!------------------------ Dummy Arguments ------------------------------------
       class(TQ_type), intent(inout) :: this
-
 !-----------------------------------------------------------------------------
       CALL this%insitu%clear()
 
@@ -152,26 +147,15 @@ CONTAINS
    SUBROUTINE TQ_type_save (this, is_analysis)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
-!------------------------ Dummy Arguments ------------------------------------
       class(TQ_type), intent(in) :: this
       logical, intent(in)        :: is_analysis
 
-!------------------------ Local Variables ------------------------------------
       integer                    :: i
       integer                    :: is
       integer                    :: iinsitu
       integer                    :: np
       logical                    :: valid_hx
-
 !-----------------------------------------------------------------------------
-      IF (.not. p_is_worker) RETURN
-      IF (nstream <= 0 .or. numpatch <= 0) RETURN
-      IF (.not. allocated(hx_f_ens)) RETURN
-      IF (.not. this%use_insitu) RETURN
-      IF (.not. allocated(this%insitu%sensors)) RETURN
-
       iinsitu = 0
       DO i = 1, size(this%cfgs)
          IF (trim(this%cfgs(i)%source_name) /= 'site') CYCLE
@@ -185,7 +169,6 @@ CONTAINS
             hx_f_ens(is,:,:) = spval
             hx_f(is,:) = spval
          ENDIF
-         IF (.not. allocated(this%insitu%sensors(iinsitu)%hx_model)) CYCLE
 
          DO np = 1, numpatch
             IF (.not. DEF_DA) THEN
@@ -213,9 +196,6 @@ CONTAINS
    SUBROUTINE TQ_type_prepare (this, np, nobs_p, y_p, hx_p, r_p)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
-!------------------------ Dummy Arguments ------------------------------------
       class(TQ_type),         intent(in)  :: this
       integer,                intent(in)  :: np
       integer,                intent(out) :: nobs_p
@@ -223,12 +203,10 @@ CONTAINS
       real(r8), allocatable,  intent(out) :: hx_p(:,:)
       real(r8), allocatable,  intent(out) :: r_p(:)
 
-!------------------------ Local Variables ------------------------------------
       integer                             :: iens, iobs
       real(r8)                            :: lat_p, lon_p, dlat, dlon
       logical,  allocatable               :: valid(:)
       real(r8), allocatable               :: lat(:), lon(:), dist(:), hav(:)
-
 !-----------------------------------------------------------------------------
       nobs_p = 0
       lat_p = patchlatr(np)*180.0_r8/pi

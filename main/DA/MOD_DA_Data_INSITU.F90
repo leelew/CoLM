@@ -27,7 +27,7 @@ MODULE MOD_DA_Data_INSITU
 ! SUPPORTED:
 !   2MT:
 !      2 m air temperature [K]. H(x) is the model 2 m air temperature.
-!   2MQ:
+!   2MRH:
 !      2 m relative humidity [0-1]. H(x) is derived from model specific
 !      humidity, temperature, and surface pressure.
 !
@@ -108,8 +108,6 @@ CONTAINS
    SUBROUTINE INSITU_init(this, pixelset, source_name, sensor_name, var_name)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
       class(INSITU_type), intent(inout) :: this
       type(pixelset_type), intent(in)   :: pixelset
       character(len=*), intent(in)      :: source_name
@@ -125,14 +123,10 @@ CONTAINS
    SUBROUTINE INSITU_forward(this, idate, deltim)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
-!------------------------------ Dummy Arguments ------------------------------
       class(INSITU_type), intent(inout) :: this
       integer, intent(in)               :: idate(3)
       real(r8), intent(in)              :: deltim
 
-!------------------------------ Local Variables ------------------------------
       integer                           :: iobs      ! Observation index
       integer                           :: isite     ! Site-table index
       integer                           :: np        ! Local patch index
@@ -141,7 +135,6 @@ CONTAINS
       real(r8)                          :: es        ! Saturation vapor pressure [hPa]
       real(r8)                          :: e         ! Water vapor pressure [hPa]
       integer, allocatable              :: owner(:)  ! Number of workers contributing to each observation
-
 !-----------------------------------------------------------------------------
       CALL this%clear()
 
@@ -165,7 +158,7 @@ CONTAINS
 !-----------------------------------------------------------------------------
 ! 2 m relative humidity observations [0-1].
 !-----------------------------------------------------------------------------
-            CASE ('2MQ')
+            CASE ('2MRH')
                ! Convert specific humidity to relative humidity [0-1].
                DO np = 1, numpatch
                   DO iens = 0, DEF_DA_ENS_NUM
@@ -236,10 +229,8 @@ CONTAINS
    SUBROUTINE INSITU_clear(this)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
       class(INSITU_type), intent(inout) :: this
-
+!-----------------------------------------------------------------------------
       CALL this%y%clear()
       IF (allocated(this%hx_model)) deallocate(this%hx_model)
       IF (allocated(this%hx_obs  )) deallocate(this%hx_obs  )
@@ -251,13 +242,12 @@ CONTAINS
    SUBROUTINE INSITU_set_init(this, pixelset, configs)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
       class(INSITU_set_type),    intent(inout) :: this
       type(pixelset_type),      intent(in)     :: pixelset
       type(INSITU_config_type),  intent(in)    :: configs(:)
-      integer                                  :: i
 
+      integer                                  :: i
+!-----------------------------------------------------------------------------
       CALL this%clear()
       IF (allocated(this%cfgs   )) deallocate(this%cfgs   )
       IF (allocated(this%sensors)) deallocate(this%sensors)
@@ -283,11 +273,10 @@ CONTAINS
    SUBROUTINE INSITU_set_clear(this)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
       class(INSITU_set_type), intent(inout) :: this
-      integer                               :: i
 
+      integer                               :: i
+!-----------------------------------------------------------------------------
       this%nobs = 0
       IF (allocated(this%lat   )) deallocate(this%lat   )
       IF (allocated(this%lon   )) deallocate(this%lon   )
@@ -308,14 +297,12 @@ CONTAINS
    SUBROUTINE INSITU_set_forward(this, idate, deltim)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
       class(INSITU_set_type), intent(inout) :: this
       integer, intent(in)                   :: idate(3)
       real(r8), intent(in)                  :: deltim
-      integer                               :: is
 
-      IF (.not. allocated(this%sensors)) RETURN
+      integer                               :: is
+!-----------------------------------------------------------------------------
       DO is = 1, this%nsensor
          CALL this%sensors(is)%forward(idate, deltim)
       ENDDO
@@ -328,11 +315,10 @@ CONTAINS
    SUBROUTINE INSITU_set_concat(this)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
       class(INSITU_set_type), intent(inout) :: this
-      integer                               :: is, n, offset
 
+      integer                               :: is, n, offset
+!-----------------------------------------------------------------------------
       this%nobs = 0
       IF (allocated(this%lat   )) deallocate(this%lat   )
       IF (allocated(this%lon   )) deallocate(this%lon   )
@@ -349,13 +335,13 @@ CONTAINS
       ENDDO
       IF (this%nobs == 0) return
 
+      ! Combine observations and H(x) in stream order.
       allocate(this%lat(this%nobs))
       allocate(this%lon(this%nobs))
       allocate(this%y(this%nobs))
       allocate(this%r(this%nobs))
       allocate(this%hx_obs(this%nobs, DEF_DA_ENS_NUM))
 
-      ! Combine observations and H(x) in stream order.
       offset = 0
       DO is = 1, this%nsensor
          IF (.not. allocated(this%sensors(is)%hx_obs)) CYCLE

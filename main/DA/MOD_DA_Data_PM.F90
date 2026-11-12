@@ -120,15 +120,13 @@ CONTAINS
    SUBROUTINE PM_init(this, pixelset, source_name, sensor_name, var_name, fghz)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
       class(PM_type),      intent(inout) :: this
       type(pixelset_type), intent(in)    :: pixelset
       character(len=*),    intent(in)    :: source_name
       character(len=*),    intent(in)    :: sensor_name
       character(len=*),    intent(in)    :: var_name
       real(r8),            intent(in)    :: fghz
-
+!-----------------------------------------------------------------------------
       CALL this%y%init(pixelset, source_name, sensor_name, var_name)
       this%fghz = fghz
 
@@ -139,14 +137,10 @@ CONTAINS
    SUBROUTINE PM_forward(this, idate, deltim)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
-!------------------------------ Dummy Arguments ------------------------------
       class(PM_type),     intent(inout)   :: this
       integer,            intent(in)      :: idate(3)
       real(r8),           intent(in)      :: deltim
 
-!------------------------------ Local Variables ------------------------------
       type(block_data_real8_2d)           :: theta_wgrid                ! Incidence angles on the observation grid
       type(pointer_real8_1d), allocatable :: theta_part(:)              ! Incidence angles on patch-grid parts
       logical,  allocatable               :: filter(:)                  ! Local patch mask used for mapping
@@ -161,7 +155,6 @@ CONTAINS
       integer                             :: iobs, iens, np, ipart, ipol
       integer                             :: ib, jb, il, jl
       integer                             :: ip, ndata, isrc, smesg(2), rmesg(2)
-
 !-----------------------------------------------------------------------------
       CALL this%clear()
 
@@ -333,10 +326,8 @@ CONTAINS
    SUBROUTINE PM_clear(this)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
       class(PM_type), intent(inout) :: this
-
+!-----------------------------------------------------------------------------
       CALL this%y%clear()
       IF (allocated(this%hx_model)) deallocate(this%hx_model)
       IF (allocated(this%hx_obs  )) deallocate(this%hx_obs  )
@@ -348,13 +339,12 @@ CONTAINS
    SUBROUTINE PM_set_init(this, pixelset, configs)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
       class(PM_set_type),   intent(inout) :: this
       type(pixelset_type),  intent(in)    :: pixelset
       type(PM_config_type), intent(in)    :: configs(:)
-      integer                             :: i
 
+      integer                             :: i
+!-----------------------------------------------------------------------------
       CALL this%clear()
       IF (allocated(this%sensors)) THEN
          DO i = 1, size(this%sensors)
@@ -384,11 +374,10 @@ CONTAINS
    SUBROUTINE PM_set_clear(this)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
       class(PM_set_type), intent(inout) :: this
-      integer                           :: is
 
+      integer                           :: is
+!-----------------------------------------------------------------------------
       this%nobs = 0
       IF (allocated(this%lat   )) deallocate(this%lat   )
       IF (allocated(this%lon   )) deallocate(this%lon   )
@@ -409,11 +398,10 @@ CONTAINS
    SUBROUTINE PM_set_concat(this)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
       class(PM_set_type), intent(inout) :: this
-      integer                           :: is, n, offset
 
+      integer                           :: is, n, offset
+!-----------------------------------------------------------------------------
       this%nobs = 0
       IF (allocated(this%lat   )) deallocate(this%lat   )
       IF (allocated(this%lon   )) deallocate(this%lon   )
@@ -460,13 +448,12 @@ CONTAINS
    SUBROUTINE PM_set_forward(this, idate, deltim)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
       class(PM_set_type),  intent(inout) :: this
       integer,            intent(in)     :: idate(3)
       real(r8),           intent(in)     :: deltim
-      integer                            :: is
 
+      integer                            :: is
+!-----------------------------------------------------------------------------
       IF (.not. allocated(this%sensors)) RETURN
 
       DO is = 1, this%nsensor

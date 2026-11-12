@@ -10,7 +10,7 @@ MODULE MOD_DA_Data_SiteType
 !   It stores the station table, the site-to-patch spatial mapping, and
 !   Per-timestep observation vectors.
 !
-!   Source-specific modules for SYNOP and other station networks build on
+!   Source-specific modules for SYNOP, ISMN, SNOTEL, etc build on
 !   this type to share storage and search logic. Observation variables
 !   include screen-level temperature and humidity, soil moisture, soil
 !   temperature, and snow depth.
@@ -70,29 +70,29 @@ MODULE MOD_DA_Data_SiteType
 !-----------------------------------------------------------------------------
    type :: site_obs_type
 
-      character(len=16)     :: source_name = ''          ! "site"
-      character(len=32)     :: sensor_name = ''          ! E.g., "SYNOP", "SNOTEL"
-      character(len=16)     :: var_name    = ''          ! NetCDF variable name, e.g., "tref", "qref"
+      character(len=16)     :: source_name = ''                  ! "site"
+      character(len=32)     :: sensor_name = ''                  ! E.g., "SYNOP", "SNOTEL"
+      character(len=16)     :: var_name    = ''                  ! NetCDF variable name, e.g., "tref", "qref"
 
-      integer               :: nsite                     ! Number of sites in sites.nc
-      real(r8), allocatable :: site_lat(:)               ! Site latitude 
-      real(r8), allocatable :: site_lon(:)               ! Site longitude 
-      integer,  allocatable :: site_iworker(:)           ! Global rank of worker owning the site
-      integer,  allocatable :: site_iworker_ipatch(:)    ! Local patch index on the owning worker
+      integer               :: nsite                             ! Number of sites in sites.nc
+      real(r8), allocatable :: site_lat(:)                       ! Site latitude 
+      real(r8), allocatable :: site_lon(:)                       ! Site longitude 
+      integer,  allocatable :: site_iworker(:)                   ! Global rank of worker owning the site
+      integer,  allocatable :: site_iworker_ipatch(:)            ! Local patch index on the owning worker
 
-      integer               :: nobs                      ! Number of selected observations
-      integer,  allocatable :: isite(:)                  ! Row index in sites.nc for each observation
-      real(r8), allocatable :: lat(:)                    ! Latitude of each observation 
-      real(r8), allocatable :: lon(:)                    ! Longitude of each observation 
-      real(r8), allocatable :: time(:)                   ! UTC time of each observation [s since begin of current day]
-      real(r8), allocatable :: y(:)                      ! Observed value
-      real(r8), allocatable :: r(:)                      ! Observation error standard deviation
+      integer               :: nobs                              ! Number of selected observations
+      integer,  allocatable :: isite(:)                          ! Row index in sites.nc for each observation
+      real(r8), allocatable :: lat(:)                            ! Latitude of each observation 
+      real(r8), allocatable :: lon(:)                            ! Longitude of each observation 
+      real(r8), allocatable :: time(:)                           ! UTC time of each observation [s since begin of current day]
+      real(r8), allocatable :: y(:)                              ! Observed value
+      real(r8), allocatable :: r(:)                              ! Observation error standard deviation
 
    CONTAINS
 
-      procedure, PUBLIC     :: init   => site_obs_init   ! Read sites and build site-to-patch map
-      procedure, PUBLIC     :: read   => site_obs_read   ! Read observations for this time step
-      procedure, PUBLIC     :: clear  => site_obs_clear  ! Clear per-timestep data (keep site table)
+      procedure, PUBLIC     :: init   => site_obs_init           ! Read sites and build site-to-patch map
+      procedure, PUBLIC     :: read   => site_obs_read           ! Read observations for this time step
+      procedure, PUBLIC     :: clear  => site_obs_clear          ! Clear per-timestep data (keep site table)
 
    END type site_obs_type
 
@@ -105,16 +105,12 @@ CONTAINS
    SUBROUTINE site_obs_init (this, pixelset, source_name, sensor_name, var_name)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
-!------------------------------ Dummy Arguments ------------------------------
       class(site_obs_type), intent(inout) :: this                ! Site observation collection
       type(pixelset_type),  intent(in)    :: pixelset            ! Local pixel sets used for site-to-patch mapping
       character(len=*),     intent(in)    :: source_name         ! Observation source name
       character(len=*),     intent(in)    :: sensor_name         ! Sensor or station network name
       character(len=*),     intent(in)    :: var_name            ! Observation variable name
 
-!------------------------------ Local Variables ------------------------------
       character(len=256)                  :: site_file_name      ! Path to sites.nc
       integer                             :: i                   ! Site index
       integer                             :: np                  ! Local patch index
@@ -126,7 +122,6 @@ CONTAINS
       integer                             :: ilon                ! Longitude index in the shared pixel grid
       integer, allocatable                :: site_pixel_ilat(:)  ! Site pixel latitude indices; -1 if not found
       integer, allocatable                :: site_pixel_ilon(:)  ! Site pixel longitude indices; -1 if not found
-
 !-----------------------------------------------------------------------------
       ! Initialize the observation stream.
       this%source_name = source_name
@@ -209,10 +204,8 @@ CONTAINS
    SUBROUTINE site_obs_clear (this)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
       class(site_obs_type), intent(inout) :: this
-
+!-----------------------------------------------------------------------------
       IF (allocated(this%isite)) deallocate (this%isite)
       IF (allocated(this%lat  )) deallocate (this%lat  )
       IF (allocated(this%lon  )) deallocate (this%lon  )
@@ -228,31 +221,26 @@ CONTAINS
    SUBROUTINE site_obs_read (this, idate, deltim)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
-!------------------------------ Dummy Arguments ------------------------------
       class(site_obs_type), intent(inout) :: this
       integer,              intent(in)    :: idate(3)
       real(r8),             intent(in)    :: deltim
 
-!------------------------------ Local Variables ------------------------------
       integer                             :: i                 
-      integer                             :: sdate(3)           ! Timestep start time adjusted to the beginning of step
-      integer                             :: month, mday, hour  ! Calendar month, day of month, and UTC hour
-      character(len=4)                    :: yearstr            ! YYYY string for file name
-      character(len=2)                    :: monthstr           ! MM string for file name
-      character(len=2)                    :: daystr             ! DD string for file name
-      character(len=2)                    :: hourstr            ! HH string for file name
-      character(len=256)                  :: obs_file_name      ! Full path of current timestep obs file
-      logical                             :: exists_file        ! Whether the expected obs file exists
-      real(r8), allocatable               :: lat(:)             ! Raw obs latitudes
-      real(r8), allocatable               :: lon(:)             ! Raw obs longitudes
-      real(r8), allocatable               :: time(:)            ! Raw obs times [s since current UTC day]
-      real(r8), allocatable               :: y(:)               ! Raw obs values
-      real(r8), allocatable               :: r(:)               ! Raw obs error standard deviation
-      integer,  allocatable               :: isite(:)           ! Raw obs site index in sites.nc
-      logical,  allocatable               :: valid(:)           ! Mask for obs inside time window and domain with mapped sites
-
+      integer                             :: sdate(3)            ! Timestep start time adjusted to the beginning of step
+      integer                             :: month, mday, hour   ! Calendar month, day of month, and UTC hour
+      character(len=4)                    :: yearstr             ! YYYY string for file name
+      character(len=2)                    :: monthstr            ! MM string for file name
+      character(len=2)                    :: daystr              ! DD string for file name
+      character(len=2)                    :: hourstr             ! HH string for file name
+      character(len=256)                  :: obs_file_name       ! Full path of current timestep obs file
+      logical                             :: exists_file         ! Whether the expected obs file exists
+      real(r8), allocatable               :: lat(:)              ! Raw obs latitudes
+      real(r8), allocatable               :: lon(:)              ! Raw obs longitudes
+      real(r8), allocatable               :: time(:)             ! Raw obs times [s since current UTC day]
+      real(r8), allocatable               :: y(:)                ! Raw obs values
+      real(r8), allocatable               :: r(:)                ! Raw obs error standard deviation
+      integer,  allocatable               :: isite(:)            ! Raw obs site index in sites.nc
+      logical,  allocatable               :: valid(:)            ! Mask for obs inside time window and domain with mapped sites
 !-----------------------------------------------------------------------------
       CALL this%clear()
 
