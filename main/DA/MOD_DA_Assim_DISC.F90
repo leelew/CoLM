@@ -13,10 +13,7 @@ MODULE MOD_DA_Assim_DISC
 !   4. Retain the updated DA river state and restore the ordinary river state.
 !
 ! NOTES:
-!   No discharge observations are assimilated. The additional routing uses
-!   forecast runoff; land-state analysis does not recompute runoff here.
-!   The suffix _a denotes the separate DA routing trajectory, rather than
-!   a direct discharge-observation analysis. Vars modules manage its storage.
+!   No discharge observations are assimilated.
 !
 ! HISTORY:
 !   Lu Li, 05/2026: Initial implementation
@@ -42,78 +39,52 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE run_DA_DISC (idate, deltim)
+   SUBROUTINE run_DA_DISC(idate, deltim)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
-      integer, intent(in) :: idate(3)
+      integer,  intent(in) :: idate(3)
       real(r8), intent(in) :: deltim
-
 !-----------------------------------------------------------------------------
-      IF (.not. DEF_DA) RETURN
-
       IF (p_is_worker) THEN
-         ! Back up the ordinary river state and history accumulators.
-         IF (allocated(wdsrf_ucat_ol)) THEN
-            wdsrf_ucat_ol = wdsrf_ucat
-            veloc_riv_ol = veloc_riv
-         ENDIF
-         IF (DEF_Reservoir_Method > 0) THEN
-            IF (allocated(volresv_ol)) volresv_ol = volresv
-         ENDIF
+         ! Back up ordinary catchment states and load the retained DA states.
          IF (numucat > 0) THEN
+            wdsrf_ucat_ol   = wdsrf_ucat
+            veloc_riv_ol    = veloc_riv
             a_discharge_ol  = a_discharge
             acctime_ucat_ol = acctime_ucat
-         ENDIF
 
-         ! Ensemble-mean forecast runoff for river routing
-         IF (numpatch > 0) &
-            rnof = sum(rnof_ens(1:DEF_DA_ENS_NUM,:), dim=1) / DEF_DA_ENS_NUM
-
-         ! Load the DA river state retained from the previous time step.
-         IF (allocated(wdsrf_ucat_a)) THEN
             WHERE (wdsrf_ucat_a /= spval) wdsrf_ucat = wdsrf_ucat_a
             WHERE (veloc_riv_a  /= spval) veloc_riv  = veloc_riv_a
          ENDIF
-         IF (DEF_Reservoir_Method > 0) THEN
-            IF (allocated(volresv_a)) THEN
-               WHERE (volresv_a /= spval) volresv = volresv_a
-            ENDIF
+         IF (DEF_Reservoir_Method > 0 .and. numresv > 0) THEN
+            volresv_ol = volresv
+            WHERE (volresv_a /= spval) volresv = volresv_a
          ENDIF
+
+         ! Drive routing with ensemble-mean forecast runoff.
+         IF (numpatch > 0) rnof = sum(rnof_ens(1:DEF_DA_ENS_NUM,:), dim=1) / DEF_DA_ENS_NUM
       ENDIF
 
-      CALL grid_riverlake_flow (idate(1), deltim)
+      CALL grid_riverlake_flow(idate(1), deltim)
 
       IF (p_is_worker) THEN
-         ! Accumulate only the discharge and time contributed by this routing call.
          IF (numucat > 0) THEN
+            ! Accumulate discharge and routing time from this integration.
             a_discharge_a  = a_discharge_a  + (a_discharge  - a_discharge_ol )
             acctime_ucat_a = acctime_ucat_a + (acctime_ucat - acctime_ucat_ol)
-         ENDIF
 
-         ! Retain the updated DA river state for the next time step.
-         IF (allocated(wdsrf_ucat_a)) THEN
+            ! Retain DA states and restore ordinary states and accumulators.
             wdsrf_ucat_a = wdsrf_ucat
             veloc_riv_a  = veloc_riv
-         ENDIF
-         IF (DEF_Reservoir_Method > 0) THEN
-            IF (allocated(volresv_a)) volresv_a = volresv
-         ENDIF
-      ENDIF
 
-      ! Restore the ordinary river state and discharge accumulators.
-      IF (p_is_worker) THEN
-         IF (allocated(wdsrf_ucat_ol)) THEN
-            wdsrf_ucat = wdsrf_ucat_ol
-            veloc_riv = veloc_riv_ol
-         ENDIF
-         IF (DEF_Reservoir_Method > 0) THEN
-            IF (allocated(volresv_ol)) volresv = volresv_ol
-         ENDIF
-         IF (numucat > 0) THEN
+            wdsrf_ucat   = wdsrf_ucat_ol
+            veloc_riv    = veloc_riv_ol
             a_discharge  = a_discharge_ol
             acctime_ucat = acctime_ucat_ol
+         ENDIF
+         IF (DEF_Reservoir_Method > 0 .and. numresv > 0) THEN
+            volresv_a = volresv
+            volresv   = volresv_ol
          ENDIF
       ENDIF
 

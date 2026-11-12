@@ -4,18 +4,17 @@
 MODULE MOD_DA_Assim_ST
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
-!   Soil-temperature assimilation driver using observations prepared by Data_ST.
+!   Soil temperature data assimilation using observations.
 !
 ! WORKFLOW:
-!   1. Initialize observation streams from the namelist.
-!   2. Prepare observations and forecast H(x); save forecast diagnostics.
-!   3. Apply a localized LETKF update and temperature constraints per patch.
-!   4. Save analysis diagnostics, recompute H(x), and clear time-step data.
-!
-! NOTES:
-!   The LETKF update is applied to the top two soil layers, with temperature
-!   increments limited to +/-20 K. Source modules provide the H(x) operators.
-!   Model feedback is handled by the DA ensemble postprocessing step.
+!   1. Init: Select soil temperature observation streams from the namelist and
+!      Initialize Data_ST with their configurations.
+!   2. Run: Prepare observations and forecast H(x), then save diagnostics.
+!      For assimilation, select nearby observations for each soil patch and
+!      Apply LETKF to update temperature in the upper two soil layers.
+!      Limit temperature increments to +/-20 K. Recompute H(x) and save
+!      Analysis diagnostics.
+!   3. End: Release observation data and stream configurations.
 !
 ! HISTORY:
 !   Lu Li, 05/2026: First implementation
@@ -40,21 +39,13 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE init_DA_ST ()
+   SUBROUTINE init_DA_ST()
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
-      integer :: is, i, nsensor
+      integer                           :: is, i, nsensor
       type(ST_config_type), allocatable :: configs(:)
-
 !-----------------------------------------------------------------------------
-      nsensor = 0
-      DO i = 1, size(DEF_DA_OBS_TARGET)
-         IF (trim(DEF_DA_OBS_TARGET(i)) == 'ST') THEN
-            nsensor = nsensor + 1
-         ENDIF
-      ENDDO
+      nsensor = count(DEF_DA_OBS_TARGET == 'ST')
       IF (nsensor == 0) RETURN
 
       allocate(configs(nsensor))
@@ -78,45 +69,35 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE run_DA_ST (idate, deltim)
+   SUBROUTINE run_DA_ST(idate, deltim)
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
+      integer,  intent(in)  :: idate(3)
+      real(r8), intent(in)  :: deltim
 
-!------------------------ Dummy Arguments ------------------------------------
-      integer,  intent(in) :: idate(3)
-      real(r8), intent(in) :: deltim
-
-!------------------------ Local Variables ------------------------------------
-      integer :: np
-      integer :: iens
-      integer :: nobs_p                      ! Number of valid observations selected for the target patch
-      real(r8), allocatable :: y_p(:)        ! Selected observation values [nobs_p]
-      real(r8), allocatable :: hx_p(:,:)     ! Forecast observation equivalents [nobs_p, ens]
-      real(r8), allocatable :: r_p(:)        ! Localized observation error variances [nobs_p]
-      real(r8), allocatable :: trans(:,:)    ! LETKF ensemble transform [ens, ens]
-      real(r8), allocatable :: state_f(:,:)  ! Forecast soil temperature [soil, ens], K
-      real(r8), allocatable :: state_a(:,:)  ! Transformed soil temperature [soil, ens], K
-
+      integer               :: np, iens         ! Loop indices
+      integer               :: nobs_p           ! Number of observations selected for the target patch
+      real(r8), allocatable :: y_p(:)           ! Selected observation values
+      real(r8), allocatable :: hx_p(:,:)        ! Forecast ensemble H(x) at selected observation locations
+      real(r8), allocatable :: r_p(:)           ! Localized observation error variances
+      real(r8), allocatable :: trans(:,:)       ! LETKF ensemble transform matrix
+      real(r8), allocatable :: state_f(:,:)     ! Forecast soil temperature [K]
+      real(r8), allocatable :: state_a(:,:)     ! Transformed soil temperature [K]
 !-----------------------------------------------------------------------------
       ! Prepare observations and forecast H(x).
       CALL st%forward(idate, deltim)
       CALL st%save(.false.)
 
-      IF (.not. DEF_DA) THEN
-         CALL st%clear()
-         RETURN
-      ENDIF
+      IF (.not. DEF_DA) RETURN
 
-      IF (p_is_worker .and. numpatch > 0) THEN
-         t_soisno_ol(:,:) = t_soisno_ens(:,0,:)
-         t_soisno_f (:,:) = sum(t_soisno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2) / DEF_DA_ENS_NUM
-      ENDIF
-
-      ! Apply the localized LETKF update to each eligible patch.
+      ! Apply the localized LETKF update to each soil patch.
       IF (p_is_worker) THEN
          DO np = 1, numpatch
-            IF (patchtype(np) >= 3) CYCLE
+            ! Save open-loop and forecast states before analysis.
+            t_soisno_ol(:,np) = t_soisno_ens(:,0,np)
+            t_soisno_f (:,np) = sum(t_soisno_ens(:,1:DEF_DA_ENS_NUM,np), dim=2) / DEF_DA_ENS_NUM
+
+            IF (patchtype(np) >= 1) CYCLE
 
             ! Select observations and localize their error variances.
             CALL st%prepare(np, nobs_p, y_p, hx_p, r_p)
@@ -132,10 +113,10 @@ CONTAINS
                state_f(:,iens) = t_soisno_ens(1:,iens,np)
             ENDDO
             CALL dgemm('N', 'N', nl_soil, DEF_DA_ENS_NUM, DEF_DA_ENS_NUM, &
-               1.0_r8, state_f, nl_soil, trans, DEF_DA_ENS_NUM, &
+               1.0_r8, state_f, nl_soil, trans, DEF_DA_ENS_NUM,           &
                0.0_r8, state_a, nl_soil)
 
-            ! limit the temperature increment to keep the analysis physical
+            ! Limit temperature increments in the upper two layers to +/-20 K.
             DO iens = 1, DEF_DA_ENS_NUM
                t_soisno_ens(1:2,iens,np) = t_soisno_ens(1:2,iens,np) + &
                   max(-20.0_r8, min(20.0_r8, state_a(1:2,iens) - t_soisno_ens(1:2,iens,np)))
@@ -146,7 +127,7 @@ CONTAINS
          ENDDO
       ENDIF
 
-      ! Recompute both H(x) representations and save analysis diagnostics.
+      ! Recompute model- and observation-space H(x), then save analysis diagnostics.
       IF (p_is_worker .and. numpatch > 0) THEN
          t_soisno_a(:,:) = sum(t_soisno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2) / DEF_DA_ENS_NUM
       ENDIF
@@ -161,13 +142,10 @@ CONTAINS
    SUBROUTINE end_DA_ST()
 
 !-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
-!-----------------------------------------------------------------------------
       CALL st%clear()
-      IF (allocated(st%cfgs)) deallocate(st%cfgs)
+      IF (allocated(st%cfgs      )) deallocate(st%cfgs      )
       IF (allocated(st%pm%sensors)) deallocate(st%pm%sensors)
-      IF (allocated(st%pm%cfgs)) deallocate(st%pm%cfgs)
+      IF (allocated(st%pm%cfgs   )) deallocate(st%pm%cfgs   )
 
       st%pm%nsensor = 0
       st%use_pm = .false.
