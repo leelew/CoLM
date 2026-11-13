@@ -17,8 +17,8 @@ MODULE MOD_DA_Data_PseudoType
 !   pseudo-observations for subsequent land-surface data assimilation.
 !
 ! WORKFLOW:
-!   1. Read: Pack selected records on each worker, gather them on master,
-!      and broadcast the combined observation vectors to all processes.
+!   1. Read: Pack selected records on each worker, gather them on master, and
+!      broadcast the combined observation vectors to all processes.
 !   2. Clear: Release the observation vectors and reset the record count.
 !
 ! HISTORY:
@@ -36,16 +36,16 @@ MODULE MOD_DA_Data_PseudoType
 !-----------------------------------------------------------------------------
    type :: pseudo_obs_type
 
-      integer :: nobs = 0                                       ! Number of selected patches
-      real(r8), allocatable :: lat(:)                           ! Patch latitude
-      real(r8), allocatable :: lon(:)                           ! Patch longitude
-      real(r8), allocatable :: y(:)                             ! Analysis ensemble means of the pseudo-observation variable
-      real(r8), allocatable :: r(:)                             ! Observation error standard deviations
+      integer                               :: nobs = 0                   ! Number of selected patches
+      real(r8), allocatable                 :: lat(:)                     ! Patch latitude
+      real(r8), allocatable                 :: lon(:)                     ! Patch longitude
+      real(r8), allocatable                 :: y(:)                       ! Analysis ensemble means of the pseudo-observation variable
+      real(r8), allocatable                 :: r(:)                       ! Observation error standard deviations
 
    CONTAINS
 
-      procedure, PUBLIC :: read  => pseudo_obs_read             ! Gather and broadcast selected patch observations
-      procedure, PUBLIC :: clear => pseudo_obs_clear            ! Deallocate observation arrays and reset the record count
+      procedure, PUBLIC                     :: read  => pseudo_obs_read   ! Gather and broadcast selected patch observations
+      procedure, PUBLIC                     :: clear => pseudo_obs_clear  ! Deallocate observation arrays and reset the record count
 
    END type pseudo_obs_type
 
@@ -58,18 +58,18 @@ CONTAINS
    SUBROUTINE pseudo_obs_read(this, mask, y, r)
 
 !-----------------------------------------------------------------------------
-      class(pseudo_obs_type), intent(inout) :: this     ! Pseudo-observation collection
-      logical, allocatable, intent(in)      :: mask(:)  ! Selected local patches; allocated only on workers
-      real(r8), allocatable, intent(in)     :: y(:)     ! Analysis means on local patches; allocated only on workers
-      real(r8), intent(in)                  :: r        ! Observation error standard deviation
+      class(pseudo_obs_type), intent(inout) :: this
+      logical, allocatable, intent(in)      :: mask(:)                    ! Selected local patches
+      real(r8), allocatable, intent(in)     :: y(:)                       ! Analysis means on local patches
+      real(r8), intent(in)                  :: r                          ! Observation error standard deviation
 
-      integer               :: np               ! Local patch index
-      integer               :: nlocal           ! Number of selected patches on one worker
-      integer               :: iobs             ! Record index in the worker send buffer
-      integer               :: iworker          ! Worker index in the global worker list
-      integer               :: offset           ! Number of records already received on master
-      real(r8), allocatable :: obs(:,:)         ! Selected latitude, longitude, y and r on each worker
-      real(r8), allocatable :: obs_global(:,:)  ! Observation records gathered on master
+      integer                               :: np
+      integer                               :: nlocal                     ! Number of selected patches on one worker
+      integer                               :: iobs                       ! Record index in the worker send buffer
+      integer                               :: iworker                    ! Worker index in the global worker list
+      integer                               :: offset                     ! Number of records already received on master
+      real(r8), allocatable                 :: obs(:,:)                   ! Selected latitude, longitude, y and r on each worker
+      real(r8), allocatable                 :: obs_global(:,:)            ! Observation records gathered on master
 !-----------------------------------------------------------------------------
       CALL this%clear()
 
@@ -122,14 +122,14 @@ CONTAINS
       ENDIF
       CALL mpi_bcast(this%lat, this%nobs, MPI_REAL8, p_address_master, p_comm_glb, p_err)
       CALL mpi_bcast(this%lon, this%nobs, MPI_REAL8, p_address_master, p_comm_glb, p_err)
-      CALL mpi_bcast(this%y, this%nobs, MPI_REAL8, p_address_master, p_comm_glb, p_err)
-      CALL mpi_bcast(this%r, this%nobs, MPI_REAL8, p_address_master, p_comm_glb, p_err)
+      CALL mpi_bcast(this%y,   this%nobs, MPI_REAL8, p_address_master, p_comm_glb, p_err)
+      CALL mpi_bcast(this%r,   this%nobs, MPI_REAL8, p_address_master, p_comm_glb, p_err)
 
    END SUBROUTINE pseudo_obs_read
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE pseudo_obs_clear (this)
+   SUBROUTINE pseudo_obs_clear(this)
 
 !-----------------------------------------------------------------------------
       class(pseudo_obs_type), intent(inout) :: this
@@ -145,4 +145,3 @@ CONTAINS
 !-----------------------------------------------------------------------------
 END MODULE MOD_DA_Data_PseudoType
 #endif
-
