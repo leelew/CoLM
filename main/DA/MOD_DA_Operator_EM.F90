@@ -303,7 +303,6 @@ CONTAINS
 
          ! 3) has veg and no snow
          ELSEIF ((lai + sai > 1e-6) .and. (snowdp < 0.01)) THEN
-            ! Calculate brightness temperature of vegetation
             CALL veg(sat_theta, patchclass, lai, htop, 0.0, tleaf, tb_veg, gamma_p)
 
             DO i = 1, 2
@@ -317,10 +316,8 @@ CONTAINS
          ! 4) has veg and has snow
          ELSEIF ((lai + sai > 1e-6) .and. (snowdp > 0.01)) THEN
             IF (htop < snowdp) THEN
-               ! Calculate brightness temperature of low vegetation
                CALL veg(sat_theta, patchclass, lai, htop, snowdp, tleaf, tb_veg, gamma_p)
 
-               ! Calculate brightness temperature of top of vegetation
                DO i = 1, 2
                   tb_2(i) = tb_veg(i)*gamma_p(i)*r_r(i)
                   tb_3(i) = tb_soil(i)*gamma_p(i)
@@ -333,8 +330,7 @@ CONTAINS
                r_sn(:) = 1.0 - tb_tov_noad(:)/t_soisno(1)
 
                ! Calculate brightness temperature of snow-covered ground
-               CALL snow(sat_fghz, sat_theta, t_soisno(1), t_soisno(1), snowdp, rho_snow, liq_snow, r_sn, r_snow, &
-                  tb_tos)
+               CALL snow(sat_fghz, sat_theta, t_soisno(1), t_soisno(1), snowdp, rho_snow, liq_snow, r_sn, r_snow, tb_tos)
 
                ! Calculate brightness temperature of top of snow
                tb_tov = tb_tos + tb_ad*r_snow
@@ -342,8 +338,7 @@ CONTAINS
 
             ELSE
                ! Calculate brightness temperature of snow-covered ground
-               CALL snow(sat_fghz, sat_theta, t_soisno(1), t_soisno(1), snowdp, rho_snow, liq_snow, r_r, r_snow, &
-                  tb_tos)
+               CALL snow(sat_fghz, sat_theta, t_soisno(1), t_soisno(1), snowdp, rho_snow, liq_snow, r_r, r_snow, tb_tos)
 
                ! Calculate brightness temperature of high vegetation
                CALL veg(sat_theta, patchclass, lai, htop, snowdp, tleaf, tb_veg, gamma_p)
@@ -392,10 +387,10 @@ CONTAINS
       tau_atm = exp(-3.9262 - 0.2211*z/1000 - 0.00369*tref)/cos(theta)
       gossat = exp(-tau_atm)
 
-      ! Calculate equivalent layer temperature
+      ! Calculate equivalent layer temperature ([11])
       t_eq = exp(4.9274 + 0.002195*tref)
 
-      ! Upwelling radiation (brightness temperature) of atmosphere
+      ! Upwelling radiation (brightness temperature) of atmosphere ([11])
       tb_au(:) = t_eq*(1.-gossat)
 
       ! Downwelling atmospheric and attenuated cosmic emission ([11])
@@ -440,7 +435,7 @@ CONTAINS
       is_desert = .false.
       IF (liq_surf < 0.02 .and. wf_sand_surf > 90) THEN
          is_desert = .true.
-      END IF
+      ENDIF
 
       ! Calculate ratio of freezed soil
       IF (liq_surf + ice_surf <= 0.0d0) THEN
@@ -490,7 +485,7 @@ CONTAINS
          CALL desert(fghz, t_eff, r_r, eps_soil, tb_soil)
       ELSE
          tb_soil = t_eff * (1 - r_r)
-      END IF
+      ENDIF
 
    END SUBROUTINE soil
 
@@ -508,13 +503,14 @@ CONTAINS
       real(r8)                 :: w0 = 0.30                         ! Reference soil moisture [m3/m3]
       real(r8)                 :: bw = 0.30                         ! Moisture-weighting exponent
 !-----------------------------------------------------------------------------
+      ! Calculate moisture-dependent weight ([21])
       IF (wc_surf < 0.0) THEN
          C = 0.001
       ELSE
-         ! Moisture weighting from ([21]); existing lower bound retained.
          C = max(0.001, (wc_surf/w0)**bw)
       ENDIF
-      ! ([14], Eq. 11)
+
+      ! Calculate effective soil temperature ([14], Eq. 11)
       t_eff(:) = t_deep + (t_surf - t_deep)*C + tfrz
 
    END SUBROUTINE eff_tsoi
@@ -605,7 +601,8 @@ CONTAINS
 
       ELSEIF (type == 1) THEN                                       
          ! Ionic conductivity ([2], Eqs. 9-12).
-         sigma = sal*(0.182521 - 1.46192e-3*sal + 2.09324e-5*sal**2 - 1.28205e-7*sal**3) &
+         sigma =                                                                         &
+            sal*(0.182521 - 1.46192e-3*sal + 2.09324e-5*sal**2 - 1.28205e-7*sal**3)      &
             *exp(-1.*(25 - t)*                                                           &
             (2.033e-2 + 1.266e-4*(25 - t) + 2.464e-6*(25 - t)**2                         &
             - sal*(1.849e-5 - 2.551e-7*(25 - t) + 2.551e-8*(25 - t)**2)))
@@ -620,13 +617,13 @@ CONTAINS
          ! Negative for very sandy soils with low bulk density
          IF (sigma < 0.) THEN
             sigma = 0.                                             
-         END IF
+         ENDIF
 
          ! Calculate dielectric constant of soil-water by modified Debye expression
          wc = max(0.001, swc)
          eps_w = eps_w_inf + (eps_w0 - eps_w_inf)/(1 - jj*omega*tau_w) &
             + jj*sigma/(omega*eps_0)*(rho_soil - BD_all)/(rho_soil*wc)
-      END IF
+      ENDIF
 
    END SUBROUTINE diel_water
 
@@ -990,42 +987,41 @@ CONTAINS
 !-----------------------------------------------------------------------------
       kcm = (2*pi/(C/(fghz*1e9)))/100.0
 
-      ! ([16], Eq. 16).
+      ! Calculate parameter for polarization mixing due to surface roughness ([16], Eq. 16).
       IF (is_desert) THEN
          r_r = r_s
       ELSE
-         ! Calculate parameter for polarization mixing due to surface roughness
          IF (fghz < 2.) THEN
-            Q = 0.                                                  ! Q is assumed zero at low frequency
+            Q = 0.                                                
          ELSE
             Q = 0.35*(1.0 - exp(-0.6*rgh_surf**2*fghz))
-         END IF
+         ENDIF
 
          ! Roughness parameters summarized in ([14], Table 2).
          IF (DEF_DA_OPERATOR_RTM_ROUGH == 0) THEN
             hr(:) = (2.0*kcm*rgh_surf)**2.0
             nrh(:) = 0.0
             nrv(:) = 0.0
-         ELSE IF (DEF_DA_OPERATOR_RTM_ROUGH == 1) THEN
+         ELSEIF (DEF_DA_OPERATOR_RTM_ROUGH == 1) THEN
             hr(:) = hr_SMOS
             nrh(:) = 2.0
             nrv(:) = 0.0
-         ELSE IF (DEF_DA_OPERATOR_RTM_ROUGH == 2) THEN
+         ELSEIF (DEF_DA_OPERATOR_RTM_ROUGH == 2) THEN
             hr(:) = hr_SMAP
             nrh(:) = 2.0
             nrv(:) = 2.0
-         ELSE IF (DEF_DA_OPERATOR_RTM_ROUGH == 3) THEN
+         ELSEIF (DEF_DA_OPERATOR_RTM_ROUGH == 3) THEN
             hr(:) = hr_P16
             nrh(:) = -1.0
             nrv(:) = -1.0
-         END IF
+         ENDIF
 
          ! Rough surface reflectivity for H and V polarizations ([14], Eq. 5).
          r_r(1) = (Q*r_s(2) + (1.-Q)*r_s(1))*exp(-hr(patchclass)*cos(theta) &
             **nrh(patchclass))
          r_r(2) = (Q*r_s(1) + (1.-Q)*r_s(2))*exp(-hr(patchclass)*cos(theta) &
             **nrv(patchclass))
-      END IF
+      ENDIF
 
    END SUBROUTINE rough_reflectivity
 
@@ -1090,16 +1086,14 @@ CONTAINS
       real(r8)                 :: tau_veg(2)                        ! Vegetation opacity for H- and V- polarization
       integer                  :: i
 !-----------------------------------------------------------------------------
-      ! Calculate vegetation opacity (optical depth) at nadir b*VWC
+      ! Calculate vegetation opacity (optical depth) at nadir b*VWC ([12], Eq. 22)
       IF (htop < snowdp) THEN
-         ! Low vegetation ([12], Eq. 22).
          tau_nadir = b1(patchclass)*lai + b2(patchclass)
       ELSE
-         tau_nadir = b3(patchclass)                                 ! High vegetation; land-cover coefficients from MOD_DA_Operator_Const.
-      END IF
+         tau_nadir = b3(patchclass)                               
+      ENDIF
 
-      ! Calculate vegetation optical depth at H- and V- polarizations
-      ! ([12], Eqs. 23-24).
+      ! Calculate vegetation optical depth at H- and V- polarizations ([12], Eqs. 23-24).
       tau_veg(1) = tau_nadir*(cos(theta)**2 + tth(patchclass)*sin(theta)**2)
       tau_veg(2) = tau_nadir*(cos(theta)**2 + ttv(patchclass)*sin(theta)**2)
 
@@ -1107,7 +1101,7 @@ CONTAINS
       DO i = 1, 2
          gamma_p(i) = exp(-tau_veg(i)/cos(theta))
          tb_veg(i) = (1.-w_CMEM(patchclass))*(1.-gamma_p(i))*tleaf
-      END DO
+      ENDDO
 
    END SUBROUTINE veg
 
@@ -1173,7 +1167,7 @@ CONTAINS
       omega = 2.0*pi*(fghz*1e9)
       k = 2*pi/(C/(fghz*1e9))
 
-      IF (snowdp > 0.01) THEN                                       ! > 1cm
+      IF (snowdp > 0.01) THEN                                    
          ! Calculate dielectric constant of ice
          CALL diel_ice(fghz, t_snow - tfrz, eps_i)
          eps_i_r = real(eps_i)
@@ -1281,8 +1275,7 @@ CONTAINS
                l2_apu = min(sqrt(HUGE(1.)), exp((ke - q*ks)*(1./cos(theta_s))*wk_h))
             END IF
 
-            ! Snow-layer emission transmitted through the upper interface;
-            ! ([20]).
+            ! Snow-layer emission transmitted through the upper interface ([20]).
             tb_2 = (1.+r_sn(i)/l2_apu)*(1.-r_sa)*t_snow* &
                (ka_ws/(ke - q*ks))*(1.-1./l2_apu)/       &
                (1.-r_sn(i)*r_sa/l2_apu**2.)

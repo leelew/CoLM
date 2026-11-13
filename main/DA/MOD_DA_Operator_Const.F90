@@ -28,7 +28,7 @@ MODULE MOD_DA_Operator_Const
 !       238-262.
 !       https://doi.org/10.1016/j.rse.2017.01.024
 !
-! AUTHOR:
+! HISTORY:
 !   Lu Li, 12/2024: Initial version
 !   Lu Li, Zhilong Fan, 11/2026: DA v1.0
 !-----------------------------------------------------------------------
