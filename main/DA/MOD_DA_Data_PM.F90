@@ -24,9 +24,9 @@ MODULE MOD_DA_Data_PM
 !      configuration, reference grid, and spatial mapping.
 !
 ! SUPPORTED:
-!   TB_H / TB_V: Horizontally / vertically polarized brightness temperatures.
-!   Forward modeling uses MOD_DA_Operator_RTM with the configured Frequency
-!   and observation-specific incidence angles.
+!   TB_H / TB_V: 
+!     Horizontally / vertically polarized brightness temperatures.
+!     Forward modeling uses microwave emission models
 !   SM:
 !      Retrieved soil moisture. H(x) is the mean liquid volumetric soil
 !      moisture in the upper 5 cm.
@@ -241,8 +241,7 @@ CONTAINS
 
       IF (.not. DEF_DA) RETURN
 
-      ! Keep the mapped numerator and area denominator on the same valid
-      ! patches.
+      ! Keep the mapped numerator and area denominator on the same valid patches.
       allocate(filter(numpatch))
       IF (p_is_worker) filter(:) = all(this%hx_model(1:DEF_DA_ENS_NUM,:) /= spval, dim=1)
 
@@ -411,8 +410,7 @@ CONTAINS
       IF (allocated(this%hx_obs)) deallocate(this%hx_obs)
       IF (.not. allocated(this%sensors)) RETURN
 
-      ! Count observations with model equivalents and allocate combined
-      ! arrays.
+      ! Count observations with model equivalents and allocate combined arrays.
       DO is = 1, this%nsensor
          IF (this%sensors(is)%y%nobs == 0) CYCLE
          IF (.not. allocated(this%sensors(is)%hx_obs)) CYCLE

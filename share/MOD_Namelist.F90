@@ -587,108 +587,56 @@ MODULE MOD_Namelist
 ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 !---------------------------------------------------------------------------------
 ! DEF_DA
-!    If true, run ensemble forecasts and sequential assimilation.
-!    If false, use the current model trajectory and prepared observations
-!    to compute and save open-loop H(x), without analysis or model feedback.
+!    Logical flag to run ensemble forecasts and sequential assimilation or 
+!    use the current model trajectory to compute and save open-loop H(x).
+!
+! DEF_DA_ONLINE
+!    Logical flag to write the analysis ensemble mean back to the model
+!    states and fluxes.
 !
 ! DEF_DA_OBS_DIR
 !    Root directory of all observation files used by data assimilation.
 !
 ! DEF_DA_OBS_SOURCE(:)
 !    Observation source type for each configured observation stream.
-!    Supported examples: 'PM', 'GNOS', 'AM', 'site', 'GRACE', 'SR'
-!    'ANATQ' with VAR='2MTQ', TARGET='SM' uses patch SYNOP analyses;
-!    requires 'SYNOP' streams with TARGET='2MT' and TARGET='2MQ'.
 !
 ! DEF_DA_OBS_SENSOR(:)
-!    Sensor or product name for each observation stream. This name is also used
-!    to locate source-specific observation files when applicable.
-!    Examples: 'SMAP_L1C_D', 'FY3D_L1', 'CYGNSS', 'ISMN', etc.
+!    Sensor or product name for each observation stream. 
 !
 ! DEF_DA_OBS_VAR(:)
-!    Observed variable name for each stream. This name is also used to locate
-!    the observation file and to read the variable from it.
-!    Examples: 'TB_H', 'TB_V', 'SM', 'DDM', '2MT', '2MQ'.
-!    For SYNOP streams '2MT' reads <sensor>/2MT_YYYY_MM_DD_HH.nc (station 2 m
-!    air temperature [K]) and '2MQ' reads <sensor>/2MQ_YYYY_MM_DD_HH.nc
-!    (station 2 m relative humidity [0-1]); TARGET selects the analyzed
-!    variable (tref_ens for '2MT', qref_ens for '2MQ'). The model 2 m specific
-!    humidity is converted to relative humidity with tref and surface
-!    pressure when building H(x).
-!    For passive microwave, TB is simulated only where the file supplies the
-!    incidence angle 'theta'; a domain-wide theta field yields domain-wide TB.
+!    Observed variable name for each stream. 
 !
 ! DEF_DA_OBS_TARGET(:)
 !    Assimilation target controlled by each observation stream.
-!    Examples: 'SM' for soil moisture, 'ST' for soil temperature, 'SNOW' for
-!    snow-related variables, '2MT' for SYNOP 2 m air temperature (updates
-!    tref_ens) and '2MQ' for SYNOP 2 m relative humidity (updates qref_ens).
-!    2MT is analyzed before 2MQ so the RH observation operator sees the
-!    analyzed 2 m temperature.
 !
 ! DEF_DA_OBS_FGHZ(:)
 !    Sensor frequency in GHz used by observation operators when needed.
 !    Mainly used by passive-microwave brightness temperature operators.
 !
 ! DEF_DA_ENS_NUM
-!    Number of perturbed ensemble members, excluding the open-loop member 0.
-!    Must be greater than 1 and even for Box-Muller ensemble sampling.
+!    Number of perturbed ensemble members.
 !
 ! DEF_DA_ENS_SM
 !    Enable ensemble perturbations or ensemble DA workflow for soil moisture.
 !
-! DEF_DA_FEEDBACK
-!    Logical flag to write the analysis ensemble mean back to the model
-!    states and fluxes. If false, the open-loop trajectory is restored for
-!    diagnostic output.
+! DEF_DA_OPERATOR_EM_DIEL
+!    Dielectric model option used by the emission model
 !
-! DEF_DA_OPERATOR_RTM_DIEL
-!    Dielectric model option used by the radiative transfer observation operator.
+! DEF_DA_OPERATOR_EM_ROUGH
+!    Surface roughness model option used by the emission model
 !
-! DEF_DA_OPERATOR_RTM_ROUGH
-!    Surface roughness model option used by the radiative transfer observation
-!    operator.
+! DEF_DA_ASSIM_*_DRES
+!    Search radius used to select observations around each target patch.
 !
-! DEF_DA_ASSIM_SM_DRES
-!    Search radius used to select observations around each target patch for soil
-!    moisture assimilation. Unit follows the current observation search logic.
+! DEF_DA_ASSIM_*_LOCR
+!    Localization radius used to inflate observation error.
 !
-! DEF_DA_ASSIM_SM_LOCR
-!    Localization radius used to inflate observation error with patch-observation
-!    distance in soil moisture assimilation.
-!
-! DEF_DA_ASSIM_SM_INFL
-!    Inflation factor used to inflate the analysis ensemble spread after soil
-!    moisture assimilation.
-!
-! DEF_DA_ASSIM_ST_DRES
-!    Search radius used to select observations around each target patch for soil
-!    temperature assimilation. Unit follows the current observation search logic.
-!
-! DEF_DA_ASSIM_ST_LOCR
-!    Localization radius used to inflate observation error with patch-observation
-!    distance in soil temperature assimilation.
-!
-! DEF_DA_ASSIM_ST_INFL
-!    Inflation factor used to inflate the analysis ensemble spread after soil
-!    temperature assimilation.
-!
-! DEF_DA_ASSIM_TQ_DRES
-!    Search radius used to select SYNOP stations around each target patch for
-!    2 m temperature and humidity assimilation.
-!
-! DEF_DA_ASSIM_TQ_LOCR
-!    Localization radius used to inflate observation error with
-!    patch-observation distance in 2 m temperature/humidity assimilation.
-!
-! DEF_DA_ASSIM_TQ_INFL
-!    Inflation factor used to inflate the analysis ensemble spread after 2 m
-!    temperature/humidity assimilation. The analysis variables are the model
-!    2 m air temperature (tref_ens) and specific humidity (qref_ens).
-!    The same set of parameters applies to both SYNOP targets, '2MT' and
-!    '2MQ'.
+! DEF_DA_ASSIM_*_INFL
+!    Inflation factor used to inflate the analysis ensemble spread.
 !---------------------------------------------------------------------------------
-   logical            :: DEF_DA                   = .true.
+   logical            :: DEF_DA                    = .true.
+   logical            :: DEF_DA_ONLINE             = .false.
+
    character(len=256) :: DEF_DA_OBS_DIR            = ''
    character(len=16)  :: DEF_DA_OBS_SOURCE(10)     = ''
    character(len=16)  :: DEF_DA_OBS_SENSOR(10)     = ''
@@ -697,20 +645,17 @@ MODULE MOD_Namelist
    real(r8)           :: DEF_DA_OBS_FGHZ(10)       = 1.4
 
    integer            :: DEF_DA_ENS_NUM            = 20
-   logical            :: DEF_DA_ENS_SM             = .false.  ! (optional)
-   logical            :: DEF_DA_FEEDBACK           = .false. ! (optional)
+   logical            :: DEF_DA_ENS_SM             = .false.
 
-   integer            :: DEF_DA_OPERATOR_RTM_DIEL  = 0
-   integer            :: DEF_DA_OPERATOR_RTM_ROUGH = 0
+   integer            :: DEF_DA_OPERATOR_EM_DIEL   = 0
+   integer            :: DEF_DA_OPERATOR_EM_ROUGH  = 0
 
    real(r8)           :: DEF_DA_ASSIM_SM_DRES      = 0.4
    real(r8)           :: DEF_DA_ASSIM_SM_LOCR      = 40.0
    real(r8)           :: DEF_DA_ASSIM_SM_INFL      = 1.0
-
    real(r8)           :: DEF_DA_ASSIM_ST_DRES      = 0.4
    real(r8)           :: DEF_DA_ASSIM_ST_LOCR      = 40.0
    real(r8)           :: DEF_DA_ASSIM_ST_INFL      = 1.0
-
    real(r8)           :: DEF_DA_ASSIM_TQ_DRES      = 0.4
    real(r8)           :: DEF_DA_ASSIM_TQ_LOCR      = 40.0
    real(r8)           :: DEF_DA_ASSIM_TQ_INFL      = 1.0
@@ -1373,6 +1318,10 @@ CONTAINS
    logical :: fexists
    integer :: ivar
    integer :: ierr
+#ifdef DataAssimilation
+   integer :: nstream_da
+   integer :: jstream_da
+#endif
    character(len=256) :: iomesg
 
    namelist /nl_colm/                         &
@@ -1565,6 +1514,7 @@ CONTAINS
       DEF_ReservoirPara_file,                 &
 
       DEF_DA,                                 &
+      DEF_DA_ONLINE,                          &
       DEF_DA_OBS_DIR,                         &
       DEF_DA_OBS_SOURCE,                      &
       DEF_DA_OBS_SENSOR,                      &
@@ -1573,9 +1523,8 @@ CONTAINS
       DEF_DA_OBS_FGHZ,                        &
       DEF_DA_ENS_NUM,                         &
       DEF_DA_ENS_SM,                          &
-      DEF_DA_FEEDBACK,                        &
-      DEF_DA_OPERATOR_RTM_DIEL,               &
-      DEF_DA_OPERATOR_RTM_ROUGH,              &
+      DEF_DA_OPERATOR_EM_DIEL,                &
+      DEF_DA_OPERATOR_EM_ROUGH,               &
       DEF_DA_ASSIM_SM_DRES,                   &
       DEF_DA_ASSIM_SM_LOCR,                   &
       DEF_DA_ASSIM_SM_INFL,                   &
@@ -1680,11 +1629,32 @@ CONTAINS
          ENDIF
 
 #ifdef DataAssimilation
-         IF (DEF_DA_ENS_NUM <= 1 .or. mod(DEF_DA_ENS_NUM, 2) /= 0) THEN
-            write(*,*) '                  *****                  '
-            write(*,'(A,I0,A)') 'ERROR: DEF_DA_ENS_NUM = ', DEF_DA_ENS_NUM, &
-               ' must be greater than 1 and even for Box-Muller ensemble sampling.'
-            CALL CoLM_Stop ()
+         ! Ensure ensemble forecast
+         IF (DEF_DA) THEN
+            IF (DEF_DA_ENS_NUM <= 1 .or. mod(DEF_DA_ENS_NUM, 2) /= 0) THEN
+               write(*,'(A,I0,A)') 'ERROR: DEF_DA_ENS_NUM = ', DEF_DA_ENS_NUM, ' must be greater than 1 and even.'
+               CALL CoLM_Stop ()
+            ENDIF
+         ELSE
+            DEF_DA_ENS_NUM = 0
+         ENDIF
+
+         ! Validate stream ordering and supported source/variable/target combinations.
+         nstream = count(len_trim(DEF_DA_OBS_TARGET) > 0)
+         IF (nstream == 0) CALL CoLM_Stop('DA requires at least one observation stream.')
+         IF (any(len_trim(DEF_DA_OBS_TARGET(1:nstream)) == 0)) &
+            CALL CoLM_Stop('DA observation streams must be contiguous from the first entry.')
+         IF (any(len_trim(DEF_DA_OBS_SOURCE(nstream+1:)) > 0) .or. &
+             any(len_trim(DEF_DA_OBS_SENSOR(nstream+1:)) > 0) .or. &
+             any(len_trim(DEF_DA_OBS_VAR(nstream+1:)) > 0)) &
+            CALL CoLM_Stop('DA observation entries require a target.')
+
+         ! Pseudo-observations require both screen-level analyses.
+         IF (any(DEF_DA_OBS_SOURCE == 'ANATQ')) THEN
+            IF (.not. DEF_DA) CALL CoLM_Stop('ANATQ requires ensemble assimilation.')
+            IF (.not. any(DEF_DA_OBS_TARGET == '2MT') .or. &
+                .not. any(DEF_DA_OBS_TARGET == '2MQ')) &
+               CALL CoLM_Stop('ANATQ requires both 2MT and 2MQ analysis streams.')
          ENDIF
 #endif
          IF (DEF_UnitCatchment_regional) THEN
@@ -2354,17 +2324,17 @@ ENDIF
       CALL mpi_bcast (DEF_ReservoirPara_file                 ,256 ,mpi_character ,p_address_master ,p_comm_glb ,p_err)
 
       CALL mpi_bcast (DEF_DA                                 ,1   ,mpi_logical   ,p_address_master ,p_comm_glb ,p_err)
+      CALL mpi_bcast (DEF_DA_ONLINE                          ,1   ,mpi_logical   ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_OBS_DIR                         ,256 ,mpi_character ,p_address_master ,p_comm_glb ,p_err)
-      CALL mpi_bcast (DEF_DA_OBS_SOURCE                      ,160,mpi_character ,p_address_master ,p_comm_glb  ,p_err)
-      CALL mpi_bcast (DEF_DA_OBS_SENSOR                      ,160,mpi_character ,p_address_master ,p_comm_glb  ,p_err)
-      CALL mpi_bcast (DEF_DA_OBS_VAR                         ,160,mpi_character ,p_address_master ,p_comm_glb  ,p_err)
-      CALL mpi_bcast (DEF_DA_OBS_TARGET                      ,160,mpi_character ,p_address_master ,p_comm_glb  ,p_err)
+      CALL mpi_bcast (DEF_DA_OBS_SOURCE                      ,160 ,mpi_character ,p_address_master ,p_comm_glb ,p_err)
+      CALL mpi_bcast (DEF_DA_OBS_SENSOR                      ,160 ,mpi_character ,p_address_master ,p_comm_glb ,p_err)
+      CALL mpi_bcast (DEF_DA_OBS_VAR                         ,160 ,mpi_character ,p_address_master ,p_comm_glb ,p_err)
+      CALL mpi_bcast (DEF_DA_OBS_TARGET                      ,160 ,mpi_character ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_OBS_FGHZ                        ,10  ,mpi_real8     ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_ENS_NUM                         ,1   ,mpi_integer   ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_ENS_SM                          ,1   ,mpi_logical   ,p_address_master ,p_comm_glb ,p_err)
-      CALL mpi_bcast (DEF_DA_FEEDBACK                        ,1   ,mpi_logical   ,p_address_master ,p_comm_glb ,p_err)
-      CALL mpi_bcast (DEF_DA_OPERATOR_RTM_DIEL               ,1   ,mpi_integer   ,p_address_master ,p_comm_glb ,p_err)
-      CALL mpi_bcast (DEF_DA_OPERATOR_RTM_ROUGH              ,1   ,mpi_integer   ,p_address_master ,p_comm_glb ,p_err)
+      CALL mpi_bcast (DEF_DA_OPERATOR_EM_DIEL                ,1   ,mpi_integer   ,p_address_master ,p_comm_glb ,p_err)
+      CALL mpi_bcast (DEF_DA_OPERATOR_EM_ROUGH               ,1   ,mpi_integer   ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_ASSIM_SM_DRES                   ,1   ,mpi_real8     ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_ASSIM_SM_LOCR                   ,1   ,mpi_real8     ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_ASSIM_SM_INFL                   ,1   ,mpi_real8     ,p_address_master ,p_comm_glb ,p_err)
@@ -3091,19 +3061,19 @@ ENDIF
       ENDIF
 
 #ifdef DataAssimilation
-      CALL sync_hist_vars_one (DEF_hist_vars%DA_wliq_soisno_ol         , set_defaults)
-      CALL sync_hist_vars_one (DEF_hist_vars%DA_wliq_soisno_f          , set_defaults)
-      CALL sync_hist_vars_one (DEF_hist_vars%DA_wliq_soisno_a          , set_defaults)
-      CALL sync_hist_vars_one (DEF_hist_vars%DA_wliq_soisno_ens        , set_defaults)
-      CALL sync_hist_vars_one (DEF_hist_vars%DA_t_soisno_ol            , set_defaults)
-      CALL sync_hist_vars_one (DEF_hist_vars%DA_t_soisno_f             , set_defaults)
-      CALL sync_hist_vars_one (DEF_hist_vars%DA_t_soisno_a             , set_defaults)
-      CALL sync_hist_vars_one (DEF_hist_vars%DA_hx_ol                  , set_defaults)
-      CALL sync_hist_vars_one (DEF_hist_vars%DA_hx_f                   , set_defaults)
-      CALL sync_hist_vars_one (DEF_hist_vars%DA_hx_a                   , set_defaults)
-      CALL sync_hist_vars_one (DEF_hist_vars%DA_hx_f_ens               , set_defaults)
-      CALL sync_hist_vars_one (DEF_hist_vars%DA_hx_a_ens               , set_defaults)
-      CALL sync_hist_vars_one (DEF_hist_vars%DA_discharge              , set_defaults)
+      CALL sync_hist_vars_one (DEF_hist_vars%DA_wliq_soisno_ol               , set_defaults)
+      CALL sync_hist_vars_one (DEF_hist_vars%DA_wliq_soisno_f                , set_defaults)
+      CALL sync_hist_vars_one (DEF_hist_vars%DA_wliq_soisno_a                , set_defaults)
+      CALL sync_hist_vars_one (DEF_hist_vars%DA_wliq_soisno_ens              , set_defaults)
+      CALL sync_hist_vars_one (DEF_hist_vars%DA_t_soisno_ol                  , set_defaults)
+      CALL sync_hist_vars_one (DEF_hist_vars%DA_t_soisno_f                   , set_defaults)
+      CALL sync_hist_vars_one (DEF_hist_vars%DA_t_soisno_a                   , set_defaults)
+      CALL sync_hist_vars_one (DEF_hist_vars%DA_hx_ol                        , set_defaults)
+      CALL sync_hist_vars_one (DEF_hist_vars%DA_hx_f                         , set_defaults)
+      CALL sync_hist_vars_one (DEF_hist_vars%DA_hx_a                         , set_defaults)
+      CALL sync_hist_vars_one (DEF_hist_vars%DA_hx_f_ens                     , set_defaults)
+      CALL sync_hist_vars_one (DEF_hist_vars%DA_hx_a_ens                     , set_defaults)
+      CALL sync_hist_vars_one (DEF_hist_vars%DA_discharge                    , set_defaults)
 #endif
 
       CALL sync_hist_vars_one (DEF_hist_vars%t_soisno    , set_defaults)

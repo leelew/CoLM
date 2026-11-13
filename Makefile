@@ -301,23 +301,26 @@ OBJS_MAIN = \
 				MOD_UserSpecifiedForcing.o                \
 				MOD_ForcingDownscaling.o                  \
 				MOD_Forcing.o                             \
-				MOD_DA_Assim_TWS.o                        \
 				MOD_DA_Operator_Const.o                   \
-				MOD_DA_Operator_RTM.o                     \
+				MOD_DA_Operator_EM.o                      \
 				MOD_DA_EnKF.o                             \
 				MOD_DA_Ens.o                              \
-				MOD_DA_Obs_GridType.o                     \
-				MOD_DA_Obs_SiteType.o                     \
-				MOD_DA_Obs_PM.o                           \
-				MOD_DA_Obs_PseudoType.o                   \
-				MOD_DA_Obs_SYNOP.o                        \
-				MOD_DA_Obs_TQ.o                           \
+				MOD_DA_Data_GridType.o                    \
+				MOD_DA_Data_SiteType.o                    \
+				MOD_DA_Data_PseudoType.o                  \
+				MOD_DA_Data_PM.o                          \
+				MOD_DA_Data_MR.o                          \
+				MOD_DA_Data_INSITU.o                      \
+				MOD_DA_Data_ANATQ.o                       \
+				MOD_DA_Data_SM.o                          \
+				MOD_DA_Data_ST.o                          \
+				MOD_DA_Data_SNOW.o                        \
+				MOD_DA_Data_TQ.o                          \
 				MOD_DA_Assim_TQ.o                         \
-				MOD_DA_Obs_ANATQ.o                       \
-				MOD_DA_Obs_SM.o                           \
-				MOD_DA_Obs_ST.o                           \
 				MOD_DA_Assim_SM.o                         \
 				MOD_DA_Assim_ST.o                         \
+				MOD_DA_Assim_SNOW.o                       \
+				MOD_DA_Assim_DISC.o                       \
 				MOD_Opt_Baseflow.o                        \
 				MOD_ParameterOptimization.o               \
 				MOD_AssimStomataConductance.o             \
@@ -366,7 +369,6 @@ OBJS_MAIN = \
 				MOD_LightningData.o                       \
 				MOD_Catch_LateralFlow.o                   \
 				MOD_Grid_RiverLakeFlow.o                  \
-				MOD_DA_Assim_DISC.o                       \
 				MOD_DA_Main.o                             \
 				MOD_Urban_Longwave.o                      \
 				MOD_Urban_NetSolar.o                      \

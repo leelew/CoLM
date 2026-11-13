@@ -143,10 +143,8 @@ CONTAINS
 #endif
    USE MOD_Forcing, only: forcmask_pch
 #ifdef DataAssimilation
-   USE MOD_DA_Assim_TWS, only: fslp_k_mon
    USE MOD_Vars_Global
    USE MOD_DA_Vars_TimeVars
-   USE MOD_Const_Physical, only: denh2o
 #endif
 
    IMPLICIT NONE
@@ -599,19 +597,6 @@ CONTAINS
          CALL write_history_variable_2d ( DEF_hist_vars%rnof, &
             a_rnof, file_hist, 'f_rnof', itime_in_file, sumarea, filter, &
             'total runoff','mm/s')
-
-#ifdef DataAssimilation
-         IF (ANY(DEF_DA_OBS_TARGET == 'TWS')) THEN
-            ! slope factors for runoff [-]
-            IF (p_is_worker .and. (numpatch > 0)) THEN
-               vecacc = fslp_k_mon(month, :)
-               WHERE (vecacc /= spval) vecacc = vecacc*nac
-            ENDIF
-            CALL write_history_variable_2d(.true., &
-               vecacc, file_hist, 'f_slope_factor_k', itime_in_file, sumarea, filter, &
-               'slope factor [k] for runoff', '-')
-         ENDIF
-#endif
 
 #ifdef CatchLateralFlow
          ! rate of surface water depth change [mm/s]
@@ -5084,8 +5069,7 @@ ENDIF
 #endif
 
 #ifdef DataAssimilation
-         CALL save_DA_hist (file_hist, itime_in_file, idate, &
-            sumarea, filter)
+         CALL save_DA_hist(file_hist, itime_in_file, idate)
 #endif
 
          IF (allocated(nac_one   )) deallocate (nac_one   )

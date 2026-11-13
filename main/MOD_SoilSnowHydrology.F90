@@ -578,9 +578,6 @@ ENDIF
    USE MOD_Vars_TimeInvariants, only: vic_b_infilt, vic_Dsmax, vic_Ds, vic_Ws, vic_c
    USE MOD_Vars_1DFluxes,       only: fevpg
    USE MOD_Opt_Baseflow,        only: scale_baseflow
-#ifdef DataAssimilation
-   USE MOD_DA_Assim_TWS,        only: fslp_k
-#endif
 #ifdef CROP
    USE MOD_Vars_Global, only : irrig_method_paddy, pondmxc
    use MOD_LandPFT, only : patch_pft_s, patch_pft_e
@@ -920,13 +917,6 @@ IF((patchtype<=1) .or. is_dry_lake &
          ENDIF
 
          rsubst = rsubst * scale_baseflow(ipatch)
-
-#ifdef DataAssimilation
-         IF (ANY(DEF_DA_OBS_TARGET == 'TWS')) THEN
-            rsur = max(min(rsur * fslp_k(ipatch), gwat), 0.)
-            rsubst = rsubst * fslp_k(ipatch)
-         ENDIF
-#endif
 
 #ifdef CROP
          IF(patchtype.eq.0 .AND. DEF_USE_IRRIGATION)THEN

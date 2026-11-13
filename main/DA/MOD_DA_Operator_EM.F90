@@ -998,19 +998,19 @@ CONTAINS
          ENDIF
 
          ! Roughness parameters summarized in ([14], Table 2).
-         IF (DEF_DA_OPERATOR_RTM_ROUGH == 0) THEN
+         IF (DEF_DA_OPERATOR_EM_ROUGH == 0) THEN
             hr(:) = (2.0*kcm*rgh_surf)**2.0
             nrh(:) = 0.0
             nrv(:) = 0.0
-         ELSEIF (DEF_DA_OPERATOR_RTM_ROUGH == 1) THEN
+         ELSEIF (DEF_DA_OPERATOR_EM_ROUGH == 1) THEN
             hr(:) = hr_SMOS
             nrh(:) = 2.0
             nrv(:) = 0.0
-         ELSEIF (DEF_DA_OPERATOR_RTM_ROUGH == 2) THEN
+         ELSEIF (DEF_DA_OPERATOR_EM_ROUGH == 2) THEN
             hr(:) = hr_SMAP
             nrh(:) = 2.0
             nrv(:) = 2.0
-         ELSEIF (DEF_DA_OPERATOR_RTM_ROUGH == 3) THEN
+         ELSEIF (DEF_DA_OPERATOR_EM_ROUGH == 3) THEN
             hr(:) = hr_P16
             nrh(:) = -1.0
             nrv(:) = -1.0
