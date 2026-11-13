@@ -5,11 +5,11 @@ MODULE MOD_DA_Main
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
 !   Coordinate ensemble forecasting, sequential data assimilation, and
-!   Observation-equivalent diagnostics.
+!   observation-equivalent diagnostics.
 !
 ! NOTES:
 !   Enabled analyses follow a fixed order, independent of the order of
-!   Observation streams in the namelist:
+!   observation streams in the namelist:
 !      2 m temperature -> 2 m relative humidity ->
 !      Snow -> soil moisture -> soil & snow temperature -> discharge.
 !
@@ -17,51 +17,49 @@ MODULE MOD_DA_Main
 !   for subsequent land-atmosphere coupling, while offline mode restores
 !   the unperturbed trajectory for evaluation.
 !
-! AUTHOR:
-!   Lu Li, 12/2024: Initial implemention
-!   Zhilong Fan, Lu Li, 03/2025: Clean codes
-!   Lu Li, Zhilong Fan, 11/2026: DA v1.0
-!
 ! VERSION:
-!   v1.0 (Lu Li, Zhilong Fan, Zhuo Wang):
+!   [v1.0] (11/2026) (Lu Li, Zhilong Fan, Zhuo Wang):
 !      Provides a unified workflow for observation processing, ensemble
-!      Forecasting, analysis updates, diagnostic output, and model feedback.
+!      forecasting, analysis updates, diagnostic output, and model feedback.
 !      Implemented analyses include screen-level temperature and humidity,
-!      Snow, soil moisture, and soil temperature, with a common structure for
-!      Extending assimilation to additional land-surface variables.
+!      snow, soil moisture, and soil temperature, with a common structure for
+!      extending assimilation to additional land-surface variables.
 !
-!      1. Organizes observations into site, grid, and pseudo-observation types.
-!         Source-specific modules construct observation equivalents, while
-!         Target-specific modules select and localize observations for analysis.
-!         Screen-level analysis products provide pseudo-observations for
-!         Subsequent land data assimilation.
+!      1. Organizes observations into site, grid, and pseudo-observation
+!         types. Source-specific modules construct observation equivalents,
+!         while Target-specific modules select and localize observations for
+!         analysis. Screen-level analysis products provide pseudo-observations
+!         for subsequent land data assimilation.
 !      2. Establishes an observation-operator library, including a passive
-!         Microwave radiative-transfer operator for brightness temperatures.
-!      3. Uses the existing ensemble-generation scheme to represent uncertainty
-!         Through perturbations to atmospheric forcing, model states, and parameters.
-!      4. Applies LETKF to update model states using the configured observations.
-!      5. Manages ensemble states, forcing, fluxes, restart data, and diagnostic
-!         History within the DA modules. Supports open-loop H(x) simulation
-!         And optional analysis feedback for land-atmosphere coupling.
+!         microwave radiative-transfer operator for brightness temperatures.
+!      3. Uses the existing ensemble-generation scheme to represent
+!         uncertainty Through perturbations to atmospheric forcing, model
+!         states, and parameters.
+!      4. Applies LETKF to update model states using the configured
+!         observations.
+!      5. Manages ensemble states, forcing, fluxes, restart data, and
+!         diagnostic History within the DA modules. Supports open-loop H(x)
+!         simulation And optional analysis feedback for land-atmosphere
+!         coupling.
 !-----------------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_Spmd_task
    USE MOD_Namelist
    USE MOD_LandPatch
-#ifdef GridRiverLakeFlow
    USE MOD_Vars_1DFluxes
    USE MOD_Vars_Global
+#ifdef GridRiverLakeFlow
    USE MOD_Grid_RiverLakeFlow
    USE MOD_Grid_RiverLakeNetwork
    USE MOD_Grid_RiverLakeTimeVars
    USE MOD_Grid_RiverLakeHist
-   USE MOD_DA_Assim_DISC
-   USE MOD_DA_Vars_AccVars
 #endif
    USE MOD_DA_Ens
    USE MOD_DA_Assim_TQ
    USE MOD_DA_Assim_SM
    USE MOD_DA_Assim_ST
+   USE MOD_DA_Assim_DISC
+   USE MOD_DA_Vars_AccVars
    IMPLICIT NONE
    SAVE
 
@@ -77,7 +75,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE init_DA ()
+   SUBROUTINE init_DA()
 
 !-----------------------------------------------------------------------------
       use_assim_2mt  = any(DEF_DA_OBS_TARGET == '2MT')
@@ -88,15 +86,15 @@ CONTAINS
       use_assim_sm   = any(DEF_DA_OBS_TARGET == 'SM' )
       use_assim_st   = any(DEF_DA_OBS_TARGET == 'ST' )
 
-      IF (use_assim_2mt .or. use_assim_2mq) CALL init_DA_TQ ()
-      IF (use_assim_sm) CALL init_DA_SM ()
-      IF (use_assim_st) CALL init_DA_ST ()
+      IF (use_assim_2mt .or. use_assim_2mq) CALL init_DA_TQ()
+      IF (use_assim_sm) CALL init_DA_SM()
+      IF (use_assim_st) CALL init_DA_ST()
 
    END SUBROUTINE init_DA
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE run_DA (idate, deltim, dolai, doalb, dosst, oro, is_spinup)
+   SUBROUTINE run_DA(idate, deltim, dolai, doalb, dosst, oro, is_spinup)
 
 !-----------------------------------------------------------------------------
       integer,  intent(in)    :: idate(3)
@@ -116,21 +114,21 @@ CONTAINS
 
       ! Generate ensemble members
       IF (DEF_DA) THEN
-         CALL ensemble (deltim)
+         CALL ensemble(deltim)
          DO i = 1, DEF_DA_ENS_NUM
             CALL load_member(i)
-            CALL CoLMDRIVER (idate, deltim, dolai, doalb, dosst, oro)
+            CALL CoLMDRIVER(idate, deltim, dolai, doalb, dosst, oro)
             CALL save_member(i)
          ENDDO
       ENDIF
 
       ! Prepare H(x) diagnostics and apply enabled analyses.
       IF (.not. is_spinup) THEN
-         IF (use_assim_2mt .or. use_assim_2mq) CALL run_DA_TQ (idate, deltim)
-         IF (use_assim_sm) CALL run_DA_SM (idate, deltim)
-         IF (use_assim_st) CALL run_DA_ST (idate, deltim)
+         IF (use_assim_2mt .or. use_assim_2mq) CALL run_DA_TQ(idate, deltim)
+         IF (use_assim_sm) CALL run_DA_SM(idate, deltim)
+         IF (use_assim_st) CALL run_DA_ST(idate, deltim)
 #ifdef GridRiverLakeFlow
-         IF (use_assim_disc) CALL run_DA_DISC (idate, deltim)
+         IF (use_assim_disc) CALL run_DA_DISC(idate, deltim)
 #endif
       ENDIF
 
@@ -141,15 +139,16 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE end_DA ()
+   SUBROUTINE end_DA()
 
 !-----------------------------------------------------------------------------
-      IF (use_assim_2mt .or. use_assim_2mq) CALL end_DA_TQ ()
+      IF (use_assim_2mt .or. use_assim_2mq) CALL end_DA_TQ()
+      IF (use_assim_sm) CALL end_DA_SM()
+      IF (use_assim_st) CALL end_DA_ST()
+
       use_assim_2mt  = .false.
       use_assim_2mq  = .false.
-      IF (use_assim_sm) CALL end_DA_SM ()
       use_assim_sm   = .false.
-      IF (use_assim_st) CALL end_DA_ST ()
       use_assim_st   = .false.
       use_assim_disc = .false.
 

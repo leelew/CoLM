@@ -27,7 +27,7 @@ MODULE MOD_DA_Ens
 !       Water Resources Research, 62, e2025WR042324.
 !       https://doi.org/10.1029/2025WR042324
 !
-! AUTHOR:
+! HISTORY:
 !   Lu Li, 12/2024: Initial version
 !   Lu Li, 10/2025: Consider correlation & AR(1) process
 !   Lu Li, Zhilong Fan, 11/2026: DA v1.0
@@ -104,10 +104,10 @@ CONTAINS
       ! Initialize persistent variables
       IF (.not. initialized) THEN
          CALL random_seed()
-         allocate (r_prev_forc (numpatch,nvar_forc,DEF_DA_ENS_NUM))
-         allocate (r_curr_forc (numpatch,nvar_forc,DEF_DA_ENS_NUM))
-         allocate (r_prev_sm   (numpatch,nvar_sm,  DEF_DA_ENS_NUM))
-         allocate (r_curr_sm   (numpatch,nvar_sm,  DEF_DA_ENS_NUM))
+         allocate(r_prev_forc (numpatch,nvar_forc,DEF_DA_ENS_NUM))
+         allocate(r_curr_forc (numpatch,nvar_forc,DEF_DA_ENS_NUM))
+         allocate(r_prev_sm   (numpatch,nvar_sm,  DEF_DA_ENS_NUM))
+         allocate(r_curr_sm   (numpatch,nvar_sm,  DEF_DA_ENS_NUM))
          r_prev_forc = 0.0_r8
          r_curr_forc = 0.0_r8
          r_prev_sm   = 0.0_r8

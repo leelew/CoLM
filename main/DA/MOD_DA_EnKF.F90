@@ -6,7 +6,7 @@ MODULE MOD_DA_EnKF
 ! DESCRIPTION:
 !   Ensemble Kalman filter (EnKF) types
 !
-! AUTHOR:
+! HISTORY:
 !   Lu Li, 12/2024: Initial version
 !   Zhilong Fan, Lu Li, 03/2024: Debug and clean codes
 !   Lu Li, Zhilong Fan, 11/2026: DA v1.0
@@ -22,7 +22,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE letkf (&
+   SUBROUTINE letkf( &
       num_ens, num_obs, &
       hx, y, R, infl, &
       trans)
@@ -78,7 +78,7 @@ CONTAINS
       pa_inv = M1
       do i=1, num_ens
          pa_inv(i,i) = M1(i,i) + (num_ens-1)*1.0d0/infl
-      end do
+      ENDDO
 
       ! Eigenvalues and eigenvectors of inverse of background error
       CALL dsyev('V', 'U', num_ens, pa_inv, num_ens, eigval, work, 4*num_ens, err)
