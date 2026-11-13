@@ -170,6 +170,8 @@ CONTAINS
             hx_f(is,:) = spval
          ENDIF
 
+         IF (this%insitu%sensors(iinsitu)%y%nobs == 0) CYCLE
+
          DO np = 1, numpatch
             IF (.not. DEF_DA) THEN
                hx_ol(is,np) = this%insitu%sensors(iinsitu)%hx_model(0,np)

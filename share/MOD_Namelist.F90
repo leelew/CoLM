@@ -587,8 +587,7 @@ MODULE MOD_Namelist
 ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 !---------------------------------------------------------------------------------
 ! DEF_DA
-!    Logical flag to run ensemble forecasts and sequential assimilation or 
-!    use the current model trajectory to compute and save open-loop H(x).
+!    Logical flag to forward mode or assimilation mode.
 !
 ! DEF_DA_ONLINE
 !    Logical flag to write the analysis ensemble mean back to the model
@@ -619,6 +618,9 @@ MODULE MOD_Namelist
 ! DEF_DA_ENS_SM
 !    Enable ensemble perturbations or ensemble DA workflow for soil moisture.
 !
+! DEF_DA_ENS_SOILPARAM
+!    Enable ensemble perturbations or ensemble DA workflow for soil hydrologic parameters.
+!
 ! DEF_DA_OPERATOR_EM_DIEL
 !    Dielectric model option used by the emission model
 !
@@ -646,6 +648,7 @@ MODULE MOD_Namelist
 
    integer            :: DEF_DA_ENS_NUM            = 20
    logical            :: DEF_DA_ENS_SM             = .false.
+   logical            :: DEF_DA_ENS_SOILPARAM      = .false.
 
    integer            :: DEF_DA_OPERATOR_EM_DIEL   = 0
    integer            :: DEF_DA_OPERATOR_EM_ROUGH  = 0
@@ -659,6 +662,8 @@ MODULE MOD_Namelist
    real(r8)           :: DEF_DA_ASSIM_TQ_DRES      = 0.4
    real(r8)           :: DEF_DA_ASSIM_TQ_LOCR      = 40.0
    real(r8)           :: DEF_DA_ASSIM_TQ_INFL      = 1.0
+
+   integer            :: nstream = 0
 
 ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ! ----- Part 14: parameter optimization -----
@@ -1318,10 +1323,6 @@ CONTAINS
    logical :: fexists
    integer :: ivar
    integer :: ierr
-#ifdef DataAssimilation
-   integer :: nstream_da
-   integer :: jstream_da
-#endif
    character(len=256) :: iomesg
 
    namelist /nl_colm/                         &
@@ -1523,6 +1524,7 @@ CONTAINS
       DEF_DA_OBS_FGHZ,                        &
       DEF_DA_ENS_NUM,                         &
       DEF_DA_ENS_SM,                          &
+      DEF_DA_ENS_SOILPARAM,                   &
       DEF_DA_OPERATOR_EM_DIEL,                &
       DEF_DA_OPERATOR_EM_ROUGH,               &
       DEF_DA_ASSIM_SM_DRES,                   &
@@ -1637,6 +1639,8 @@ CONTAINS
             ENDIF
          ELSE
             DEF_DA_ENS_NUM = 0
+            DEF_DA_ENS_SM  = .false.
+            DEF_DA_ENS_SOILPARAM = .false.
          ENDIF
 
          ! Validate stream ordering and supported source/variable/target combinations.
@@ -1644,10 +1648,6 @@ CONTAINS
          IF (nstream == 0) CALL CoLM_Stop('DA requires at least one observation stream.')
          IF (any(len_trim(DEF_DA_OBS_TARGET(1:nstream)) == 0)) &
             CALL CoLM_Stop('DA observation streams must be contiguous from the first entry.')
-         IF (any(len_trim(DEF_DA_OBS_SOURCE(nstream+1:)) > 0) .or. &
-             any(len_trim(DEF_DA_OBS_SENSOR(nstream+1:)) > 0) .or. &
-             any(len_trim(DEF_DA_OBS_VAR(nstream+1:)) > 0)) &
-            CALL CoLM_Stop('DA observation entries require a target.')
 
          ! Pseudo-observations require both screen-level analyses.
          IF (any(DEF_DA_OBS_SOURCE == 'ANATQ')) THEN
@@ -2323,6 +2323,7 @@ ENDIF
       CALL mpi_bcast (DEF_UnitCatchment_regional             ,1   ,mpi_logical   ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_ReservoirPara_file                 ,256 ,mpi_character ,p_address_master ,p_comm_glb ,p_err)
 
+#ifdef DataAssimilation
       CALL mpi_bcast (DEF_DA                                 ,1   ,mpi_logical   ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_ONLINE                          ,1   ,mpi_logical   ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_OBS_DIR                         ,256 ,mpi_character ,p_address_master ,p_comm_glb ,p_err)
@@ -2333,6 +2334,7 @@ ENDIF
       CALL mpi_bcast (DEF_DA_OBS_FGHZ                        ,10  ,mpi_real8     ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_ENS_NUM                         ,1   ,mpi_integer   ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_ENS_SM                          ,1   ,mpi_logical   ,p_address_master ,p_comm_glb ,p_err)
+      CALL mpi_bcast (DEF_DA_ENS_SOILPARAM                   ,1   ,mpi_logical   ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_OPERATOR_EM_DIEL                ,1   ,mpi_integer   ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_OPERATOR_EM_ROUGH               ,1   ,mpi_integer   ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_ASSIM_SM_DRES                   ,1   ,mpi_real8     ,p_address_master ,p_comm_glb ,p_err)
@@ -2344,6 +2346,8 @@ ENDIF
       CALL mpi_bcast (DEF_DA_ASSIM_TQ_DRES                   ,1   ,mpi_real8     ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_ASSIM_TQ_LOCR                   ,1   ,mpi_real8     ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_ASSIM_TQ_INFL                   ,1   ,mpi_real8     ,p_address_master ,p_comm_glb ,p_err)
+      CALL mpi_bcast (nstream                                ,1   ,mpi_integer   ,p_address_master ,p_comm_glb ,p_err)
+#endif
 
       CALL mpi_bcast (DEF_Optimize_Baseflow                  ,1   ,mpi_logical   ,p_address_master ,p_comm_glb ,p_err)
 

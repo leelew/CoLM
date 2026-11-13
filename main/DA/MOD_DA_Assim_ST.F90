@@ -75,14 +75,14 @@ CONTAINS
       integer,  intent(in)              :: idate(3)
       real(r8), intent(in)              :: deltim
 
-      integer                           :: np, iens      ! Loop indices
-      integer                           :: nobs_p        ! Number of observations selected for the target patch
-      real(r8), allocatable             :: y_p(:)        ! Selected observation values
-      real(r8), allocatable             :: hx_p(:,:)     ! Forecast ensemble H(x) at selected observation locations
-      real(r8), allocatable             :: r_p(:)        ! Localized observation error variances
-      real(r8), allocatable             :: trans(:,:)    ! LETKF ensemble transform matrix
-      real(r8), allocatable             :: state_f(:,:)  ! Forecast soil temperature [K]
-      real(r8), allocatable             :: state_a(:,:)  ! Transformed soil temperature [K]
+      integer                           :: np, iens      
+      integer                           :: nobs_p        
+      real(r8), allocatable             :: y_p(:)      
+      real(r8), allocatable             :: hx_p(:,:)     
+      real(r8), allocatable             :: r_p(:)        
+      real(r8)                          :: trans(DEF_DA_ENS_NUM, DEF_DA_ENS_NUM)  
+      real(r8)                          :: state_f(nl_soil, DEF_DA_ENS_NUM)       
+      real(r8)                          :: state_a(nl_soil, DEF_DA_ENS_NUM)   
 !-----------------------------------------------------------------------------
       ! Prepare observations and forecast H(x).
       CALL st%forward(idate, deltim)
@@ -104,11 +104,8 @@ CONTAINS
             IF (nobs_p == 0) CYCLE
 
             ! Compute the ensemble transform.
-            allocate(trans(DEF_DA_ENS_NUM, DEF_DA_ENS_NUM))
             CALL letkf(DEF_DA_ENS_NUM, nobs_p, hx_p, y_p, r_p, st%infl, trans)
 
-            allocate(state_f(nl_soil, DEF_DA_ENS_NUM))
-            allocate(state_a(nl_soil, DEF_DA_ENS_NUM))
             DO iens = 1, DEF_DA_ENS_NUM
                state_f(:,iens) = t_soisno_ens(1:,iens,np)
             ENDDO
@@ -122,8 +119,7 @@ CONTAINS
                   max(-20.0_r8, min(20.0_r8, state_a(1:2,iens) - t_soisno_ens(1:2,iens,np)))
             ENDDO
 
-            deallocate(y_p, r_p, hx_p, trans)
-            deallocate(state_f, state_a)
+            deallocate(y_p, r_p, hx_p)
          ENDDO
       ENDIF
 

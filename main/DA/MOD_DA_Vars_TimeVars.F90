@@ -117,7 +117,6 @@ MODULE MOD_DA_Vars_TimeVars
 !=============================================================================
 ! Diagnostic variables for output history
 !=============================================================================
-   integer                         :: nstream = 0                 ! Number of configured observation streams
    real(r8), allocatable           :: hx_f_ens         (:,:,:  )  ! Prior H(x_f)
    real(r8), allocatable           :: hx_a_ens         (:,:,:  )  ! Posterior H(x_a)
    real(r8), allocatable           :: hx_ol            (:,:    )  ! Open-loop H(x)
@@ -147,8 +146,6 @@ CONTAINS
    SUBROUTINE allocate_DA_TimeVars()
 
 !-----------------------------------------------------------------------------
-      nstream = count(len_trim(DEF_DA_OBS_TARGET) > 0)
-
       IF (p_is_worker) THEN
          IF (numpatch > 0) THEN
             allocate(z_sno_ens        (  maxsnl+1:0,      0:DEF_DA_ENS_NUM,numpatch)); z_sno_ens        (:,:,:  ) = spval
@@ -548,6 +545,7 @@ CONTAINS
 
    END SUBROUTINE READ_DA_TimeVars
 
+#ifdef RangeCheck
 !-----------------------------------------------------------------------
 
    SUBROUTINE check_DA_TimeVars()
@@ -596,5 +594,6 @@ CONTAINS
    END SUBROUTINE check_DA_TimeVars
 
 !-----------------------------------------------------------------------
+#endif
 END MODULE MOD_DA_Vars_TimeVars
 #endif

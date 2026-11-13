@@ -210,7 +210,7 @@ CONTAINS
 
          allocate(valid(size(time)))
          valid = time >= sdate(3)          .and.  &
-            time <= sdate(3) + deltim      .and.  &
+            time <  sdate(3) + deltim      .and.  &
             lat  >= DEF_domain%edges       .and.  &
             lat  <= DEF_domain%edgen       .and.  &
             lon  >= DEF_domain%edgew       .and.  &

@@ -44,7 +44,7 @@ CONTAINS
 !-----------------------------------------------------------------------------
       integer,  intent(in) :: idate(3)
       real(r8), intent(in) :: deltim
-!-----------------------------------------------------------------------------
+!-----------------------------------------------------------------------------      
       IF (p_is_worker) THEN
          ! Back up ordinary catchment states and load the retained DA states.
          IF (numucat > 0) THEN

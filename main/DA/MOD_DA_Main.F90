@@ -53,12 +53,12 @@ MODULE MOD_DA_Main
    USE MOD_Grid_RiverLakeNetwork
    USE MOD_Grid_RiverLakeTimeVars
    USE MOD_Grid_RiverLakeHist
+   USE MOD_DA_Assim_DISC
 #endif
    USE MOD_DA_Ens
    USE MOD_DA_Assim_TQ
    USE MOD_DA_Assim_SM
    USE MOD_DA_Assim_ST
-   USE MOD_DA_Assim_DISC
    USE MOD_DA_Vars_AccVars
    IMPLICIT NONE
    SAVE
@@ -81,7 +81,7 @@ CONTAINS
       use_assim_2mt  = any(DEF_DA_OBS_TARGET == '2MT')
       use_assim_2mq  = any(DEF_DA_OBS_TARGET == '2MQ')
 #ifdef GridRiverLakeFlow
-      use_assim_disc = .true.
+      use_assim_disc = DEF_DA
 #endif
       use_assim_sm   = any(DEF_DA_OBS_TARGET == 'SM' )
       use_assim_st   = any(DEF_DA_OBS_TARGET == 'ST' )
@@ -107,19 +107,19 @@ CONTAINS
 
       integer                 :: i
 !-----------------------------------------------------------------------------
-      IF (.not. p_is_worker) RETURN
+      IF (p_is_worker) THEN
+         ! Save the open-loop trajectory
+         CALL save_member(0)
 
-      ! Save the open-loop trajectory
-      CALL save_member(0)
-
-      ! Generate ensemble members
-      IF (DEF_DA) THEN
-         CALL ensemble(deltim)
-         DO i = 1, DEF_DA_ENS_NUM
-            CALL load_member(i)
-            CALL CoLMDRIVER(idate, deltim, dolai, doalb, dosst, oro)
-            CALL save_member(i)
-         ENDDO
+         ! Generate ensemble members
+         IF (DEF_DA) THEN
+            CALL ensemble(deltim)
+            DO i = 1, DEF_DA_ENS_NUM
+               CALL load_member(i)
+               CALL CoLMDRIVER(idate, deltim, dolai, doalb, dosst, oro)
+               CALL save_member(i)
+            ENDDO
+         ENDIF
       ENDIF
 
       ! Prepare H(x) diagnostics and apply enabled analyses.
@@ -133,7 +133,11 @@ CONTAINS
       ENDIF
 
       ! Restore open-loop (if offline) or analysis (if online) to model states
-      IF (DEF_DA) CALL postprocess()
+      IF (p_is_worker) THEN
+         IF (DEF_DA) THEN
+            CALL postprocess()
+         ENDIF
+      ENDIF
 
    END SUBROUTINE run_DA
 

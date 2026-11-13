@@ -56,7 +56,7 @@ CONTAINS
       character(len=96)                    :: stream_label
       character(len=256)                   :: file_hist_ucat
       integer                              :: itime_in_file_ucat
-      integer                              :: i, s
+      integer                              :: i
 !-----------------------------------------------------------------------------
       IF (HistForm == 'Gridded' .and. p_is_io) CALL allocate_block_data(ghist, sumarea_model)
       IF (HistForm == 'Gridded' .and. p_is_io) CALL allocate_block_data(ghist, sumarea_obs  )
@@ -102,9 +102,7 @@ CONTAINS
          'Ensemble liquid water in soil layers','kg/m2')
 
       ! Write H(x) diagnostics for each observation stream, excluding ANATQ.
-      s = 0
-      DO i = 1, size(DEF_DA_OBS_TARGET)
-         s = s + 1
+      DO i = 1, nstream
          IF (trim(DEF_DA_OBS_SOURCE(i)) == 'ANATQ') CYCLE
 
          stream_suffix = '_'//trim(DEF_DA_OBS_SENSOR(i))//'_'//                                           &
@@ -113,30 +111,30 @@ CONTAINS
             trim(DEF_DA_OBS_VAR(i))//' for '//trim(DEF_DA_OBS_TARGET(i))
 
          IF (p_is_worker .and. numpatch > 0) THEN
-            filter_obs = filter_model .and. a_hx_ol(s,:) /= spval
+            filter_obs = filter_model .and. a_hx_ol(i,:) /= spval
          ENDIF
          IF (HistForm == 'Gridded') CALL mp2g_hist%get_sumarea(sumarea_obs, filter_obs)
 
          CALL write_history_variable_2d( DEF_hist_vars%DA_hx_ol,                                          &
-            a_hx_ol(s,:), file_hist, 'f_hx_ol'//trim(stream_suffix), itime_in_file,                       &
+            a_hx_ol(i,:), file_hist, 'f_hx_ol'//trim(stream_suffix), itime_in_file,                       &
             sumarea_obs, filter_obs,                                                                      &
-            'Open-loop H(x) of '//trim(stream_label), '', nac_obs(s,:))
+            'Open-loop H(x) of '//trim(stream_label), '', nac_obs(i,:))
          CALL write_history_variable_2d( DEF_hist_vars%DA_hx_f,                                           &
-            a_hx_f(s,:), file_hist, 'f_hx_f'//trim(stream_suffix), itime_in_file,                         &
+            a_hx_f(i,:), file_hist, 'f_hx_f'//trim(stream_suffix), itime_in_file,                         &
             sumarea_obs, filter_obs,                                                                      &
-            'Prior ensemble-mean H(x) of '//trim(stream_label), '', nac_obs(s,:))
+            'Prior ensemble-mean H(x) of '//trim(stream_label), '', nac_obs(i,:))
          CALL write_history_variable_2d( DEF_hist_vars%DA_hx_a,                                           &
-            a_hx_a(s,:), file_hist, 'f_hx_a'//trim(stream_suffix), itime_in_file,                         &
+            a_hx_a(i,:), file_hist, 'f_hx_a'//trim(stream_suffix), itime_in_file,                         &
             sumarea_obs, filter_obs,                                                                      &
-            'Analysis ensemble-mean H(x) of '//trim(stream_label), '', nac_obs(s,:))
+            'Analysis ensemble-mean H(x) of '//trim(stream_label), '', nac_obs(i,:))
          CALL write_history_variable_3d( DEF_hist_vars%DA_hx_f_ens,                                       &
-            a_hx_f_ens(s,:,:), file_hist, 'f_hx_f_ens'//trim(stream_suffix), itime_in_file,               &
+            a_hx_f_ens(i,:,:), file_hist, 'f_hx_f_ens'//trim(stream_suffix), itime_in_file,               &
             'ens', 1, DEF_DA_ENS_NUM, sumarea_obs, filter_obs,                                            &
-            'Prior ensemble H(x) of '//trim(stream_label), '', nac_obs(s,:))
+            'Prior ensemble H(x) of '//trim(stream_label), '', nac_obs(i,:))
          CALL write_history_variable_3d( DEF_hist_vars%DA_hx_a_ens,                                       &
-            a_hx_a_ens(s,:,:), file_hist, 'f_hx_a_ens'//trim(stream_suffix), itime_in_file,               &
+            a_hx_a_ens(i,:,:), file_hist, 'f_hx_a_ens'//trim(stream_suffix), itime_in_file,               &
             'ens', 1, DEF_DA_ENS_NUM, sumarea_obs, filter_obs,                                            &
-            'Analysis ensemble H(x) of '//trim(stream_label), '', nac_obs(s,:))
+            'Analysis ensemble H(x) of '//trim(stream_label), '', nac_obs(i,:))
       ENDDO
 
       ! Write discharge diagnostics.
@@ -161,11 +159,6 @@ CONTAINS
             'Discharge in river and flood plain from the ensemble-mean state', 'm^3/s')
       ENDIF
 #endif
-
-      IF (allocated(filter_model  )) deallocate(filter_model)
-      IF (allocated(filter_obs    )) deallocate(filter_obs  )
-      IF (allocated(a_discharge_a )) a_discharge_a  = 0.0_r8
-      IF (allocated(acctime_ucat_a)) acctime_ucat_a = 0.0_r8
 
    END SUBROUTINE save_DA_hist
 

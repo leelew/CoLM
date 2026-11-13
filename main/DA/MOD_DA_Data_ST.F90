@@ -230,6 +230,7 @@ CONTAINS
          IF (trim(this%cfgs(istream)%source_name) == 'PM') THEN
             ipm = ipm + 1
             is = this%cfgs(istream)%istream
+            IF (this%pm%sensors(ipm)%y%nobs == 0) CYCLE
 
             IF (is_analysis) THEN
                DO np = 1, numpatch

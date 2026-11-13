@@ -187,7 +187,7 @@ CONTAINS
 
       IF (p_is_worker) THEN
          DO np = 1, numpatch
-            IF (patchtype(np) /= 1) CYCLE
+            IF (patchtype(np) >= 1) CYCLE
 
             SELECT CASE (trim(this%y%var_name))
 !-----------------------------------------------------------------------------

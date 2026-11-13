@@ -33,7 +33,7 @@ MODULE MOD_DA_Data_SiteType
 !
 !   <var_name>_YYYY_MM_DD_HH.nc stores observations for each time period as
 !   vectors of station records. Each record contains 'latitude', 'longitude',
-!   'time', 'id', <var_name>, and 'r'. The 1-based row index id locates the
+!   'time', 'isite', <var_name>, and 'r'. The row index 'isite' locates the
 !   station in sites.nc, linking each observation to its mapped model patch.
 !
 ! SUPPORTED:
@@ -267,13 +267,13 @@ CONTAINS
 
          allocate(valid(size(time)))
          valid = time >= sdate(3)          .and.  &
-            time <= sdate(3) + deltim      .and.  &
+            time <  sdate(3) + deltim      .and.  &
             lat  >= DEF_domain%edges       .and.  &
             lat  <= DEF_domain%edgen       .and.  &
             lon  >= DEF_domain%edgew       .and.  &
             lon  <= DEF_domain%edgee       
          DO i = 1, size(valid)
-            IF (valid(i)) valid(i) = this%site_iworker(id(i)) /= -1
+            IF (valid(i)) valid(i) = this%site_iworker(isite(i)) /= -1
          ENDDO
          this%nobs = count(valid)
 

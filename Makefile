@@ -311,12 +311,12 @@ OBJS_MAIN = \
 				MOD_DA_Data_PM.o                          \
 				MOD_DA_Data_MR.o                          \
 				MOD_DA_Data_INSITU.o                      \
-				MOD_DA_Data_ANATQ.o                       \
-				MOD_DA_Data_SM.o                          \
 				MOD_DA_Data_ST.o                          \
 				MOD_DA_Data_SNOW.o                        \
 				MOD_DA_Data_TQ.o                          \
 				MOD_DA_Assim_TQ.o                         \
+				MOD_DA_Data_ANATQ.o                       \
+				MOD_DA_Data_SM.o                          \
 				MOD_DA_Assim_SM.o                         \
 				MOD_DA_Assim_ST.o                         \
 				MOD_DA_Assim_SNOW.o                       \

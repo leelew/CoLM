@@ -115,7 +115,7 @@ CONTAINS
       CALL this%clear()
 
       ! Select valid patches with changed analysis ensemble means.
-      IF (p_is_worker .and. numpatch > 0) THEN
+      IF (p_is_worker) THEN
          allocate(mask(numpatch), y(numpatch))
          mask = .false.
 

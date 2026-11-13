@@ -138,8 +138,8 @@ CONTAINS
 #ifdef GridRiverLakeFlow
       IF (allocated(a_discharge_ol   )) a_discharge_ol    = spval
       IF (allocated(acctime_ucat_ol  )) acctime_ucat_ol   = spval
-      IF (allocated(a_discharge_a    )) a_discharge_a     = spval
-      IF (allocated(acctime_ucat_a   )) acctime_ucat_a    = spval
+      IF (allocated(a_discharge_a    )) a_discharge_a     = 0.0
+      IF (allocated(acctime_ucat_a   )) acctime_ucat_a    = 0.0
 #endif
 
    END SUBROUTINE flush_DA_AccVars
@@ -149,19 +149,23 @@ CONTAINS
    SUBROUTINE accumulate_DA_AccVars()
 
 !-----------------------------------------------------------------------------
-      WHERE (hx_ol /= spval) nac_obs = nac_obs + 1.0
-      CALL acc_DA_hist(hx_ol,                   a_hx_ol          )
-      CALL acc_DA_hist(hx_f_ens,                a_hx_f_ens       )
-      CALL acc_DA_hist(hx_a_ens,                a_hx_a_ens       )
-      CALL acc_DA_hist(hx_f,                    a_hx_f           )
-      CALL acc_DA_hist(hx_a,                    a_hx_a           )
-      CALL acc_DA_hist(wliq_soisno_ol,          a_wliq_soisno_ol )
-      CALL acc_DA_hist(wliq_soisno_f,           a_wliq_soisno_f  )
-      CALL acc_DA_hist(wliq_soisno_a,           a_wliq_soisno_a  )
-      CALL acc_DA_hist(wliq_soisno_ens(:,1:,:), a_wliq_soisno_ens)
-      CALL acc_DA_hist(t_soisno_ol,             a_t_soisno_ol    )
-      CALL acc_DA_hist(t_soisno_f,              a_t_soisno_f     )
-      CALL acc_DA_hist(t_soisno_a,              a_t_soisno_a     )
+      IF (p_is_worker) THEN
+         IF (numpatch > 0) THEN
+            WHERE (hx_ol /= spval) nac_obs = nac_obs + 1.0
+            CALL acc_DA_hist(hx_ol,                   a_hx_ol          )
+            CALL acc_DA_hist(hx_f_ens,                a_hx_f_ens       )
+            CALL acc_DA_hist(hx_a_ens,                a_hx_a_ens       )
+            CALL acc_DA_hist(hx_f,                    a_hx_f           )
+            CALL acc_DA_hist(hx_a,                    a_hx_a           )
+            CALL acc_DA_hist(wliq_soisno_ol,          a_wliq_soisno_ol )
+            CALL acc_DA_hist(wliq_soisno_f,           a_wliq_soisno_f  )
+            CALL acc_DA_hist(wliq_soisno_a,           a_wliq_soisno_a  )
+            CALL acc_DA_hist(wliq_soisno_ens(:,1:,:), a_wliq_soisno_ens)
+            CALL acc_DA_hist(t_soisno_ol,             a_t_soisno_ol    )
+            CALL acc_DA_hist(t_soisno_f,              a_t_soisno_f     )
+            CALL acc_DA_hist(t_soisno_a,              a_t_soisno_a     )
+         ENDIF
+      ENDIF
 
    END SUBROUTINE accumulate_DA_AccVars
 

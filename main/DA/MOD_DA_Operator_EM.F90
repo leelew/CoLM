@@ -260,8 +260,13 @@ CONTAINS
 ! Run the forward operator.
 !#############################################################################
       IF (patchtype == 0) THEN
+
 !-----------------------------------------------------------------------------
-         ! Soil module.
+! Atmosphere module.
+!-----------------------------------------------------------------------------
+         CALL atm(sat_theta, forc_topo, tref, tau_atm, tb_au, tb_ad)
+!-----------------------------------------------------------------------------
+! Soil module.
 !-----------------------------------------------------------------------------
          CALL soil(sat_fghz, sat_theta,                          &
             patchclass,                                          &
@@ -270,7 +275,7 @@ CONTAINS
             wf_sand_surf, wf_clay_surf, BD_all_surf, porsl_surf, &
             r_r, tb_soil)
 !-----------------------------------------------------------------------------
-         ! Vegetation and snow module.
+! Vegetation and snow module.
 !-----------------------------------------------------------------------------
          ! Roughly judge low or high vegetation (only for IGBP)
          is_low_veg = .true.
@@ -290,19 +295,19 @@ CONTAINS
          ENDIF
 
          ! 1) no veg and no snow
-         IF ((lai + sai < 1e-6) .and. (snowdp < 0.01)) THEN
+         IF ((lai + sai <= 1e-6) .and. (snowdp <= 0.01)) THEN
             tb_tov = tb_soil + tb_ad*r_r
             tb_tov_noad = tb_soil
 
          ! 2) no veg and has snow
-         ELSEIF ((lai + sai < 1e-6) .and. (snowdp > 0.01)) THEN
+         ELSEIF ((lai + sai <= 1e-6) .and. (snowdp > 0.01)) THEN
             CALL snow(sat_fghz, sat_theta, t_soisno(1), t_soisno(1), snowdp, rho_snow, liq_snow, r_r, r_snow, tb_tos)
 
             tb_tov = tb_tos + tb_ad*r_snow
             tb_tov_noad = tb_tos
 
          ! 3) has veg and no snow
-         ELSEIF ((lai + sai > 1e-6) .and. (snowdp < 0.01)) THEN
+         ELSEIF ((lai + sai > 1e-6) .and. (snowdp <= 0.01)) THEN
             CALL veg(sat_theta, patchclass, lai, htop, 0.0, tleaf, tb_veg, gamma_p)
 
             DO i = 1, 2
@@ -353,9 +358,6 @@ CONTAINS
                ENDDO
             ENDIF
          ENDIF
-
-         ! Atmosphere module.
-         CALL atm(sat_theta, forc_topo, tref, tau_atm, tb_au, tb_ad)
 
          ! Calculate brightness temperature of top-of-atmosphere.
          tb_toa = tb_tov*exp(-tau_atm) + tb_au
@@ -469,7 +471,7 @@ CONTAINS
          ELSEIF (DEF_DA_OPERATOR_EM_DIEL == 3) THEN
             CALL diel_soil_M09(fghz, liq_surf, t_surf, wf_clay_surf, eps_soil)
          ENDIF
-      END IF
+      ENDIF
 
       ! Mix dielectric constant of frozen and non-frozen soil
       eps_soil = eps_soil*(1.-ffrz) + eps_f*ffrz
@@ -669,7 +671,7 @@ CONTAINS
       ELSE
          eps_x = eps_i + (ew - eps_i)*gamma
          eps = wt*eps_x + (wc - wt)*ew + (porsl - wc)*eps_a + (1.-porsl)*eps_r
-      END IF
+      ENDIF
 
       ! Add conductivity loss for imaginary part ([4], Eq. 6).
       alpha = min(100.*wp, 26.)
@@ -1171,7 +1173,7 @@ CONTAINS
          ! Calculate dielectric constant of ice
          CALL diel_ice(fghz, t_snow - tfrz, eps_i)
          eps_i_r = real(eps_i)
-         eps_i_i = aimag(eps_i)
+         eps_i_i = -aimag(eps_i)
 
          ! Consider the effect of salinity on the dielectric constant of ice
          eps_i_is = 0.0026/fghz + 0.00023*(fghz**0.87)              ! Impure ice -5(C)

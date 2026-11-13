@@ -80,9 +80,9 @@ CONTAINS
       real(r8), allocatable             :: y_p(:)                                 ! Selected observation values
       real(r8), allocatable             :: hx_p(:,:)                              ! Forecast ensemble H(x) at selected observation locations
       real(r8), allocatable             :: r_p(:)                                 ! Localized observation error variances
-      real(r8), allocatable             :: trans(DEF_DA_ENS_NUM, DEF_DA_ENS_NUM)  ! LETKF ensemble transform matrix
-      real(r8), allocatable             :: state_f(nl_soil, DEF_DA_ENS_NUM)       ! Forecast soil liquid water [kg/m2]
-      real(r8), allocatable             :: state_a(nl_soil, DEF_DA_ENS_NUM)       ! Transformed soil liquid water [kg/m2]
+      real(r8)                          :: trans(DEF_DA_ENS_NUM, DEF_DA_ENS_NUM)  ! LETKF ensemble transform matrix
+      real(r8)                          :: state_f(nl_soil, DEF_DA_ENS_NUM)       ! Forecast soil liquid water [kg/m2]
+      real(r8)                          :: state_a(nl_soil, DEF_DA_ENS_NUM)       ! Transformed soil liquid water [kg/m2]
 !-----------------------------------------------------------------------------
       ! Prepare observations and forecast H(x).
       CALL sm%forward(idate, deltim)
@@ -143,8 +143,7 @@ CONTAINS
             wa_ens(1:DEF_DA_ENS_NUM,np) = wa_ens(1:DEF_DA_ENS_NUM,np) - &
                sum(wliq_soisno_ens(1:,1:DEF_DA_ENS_NUM,np) - state_f, dim=1)
 
-            deallocate(y_p, r_p, hx_p, trans)
-            deallocate(state_f, state_a)
+            deallocate(y_p, r_p, hx_p)
          ENDDO
       ENDIF
 

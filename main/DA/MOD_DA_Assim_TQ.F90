@@ -98,6 +98,7 @@ CONTAINS
 
       integer                           :: np, iens                               ! Loop indices
       integer                           :: nobs_p                                 ! Number of observations selected for the target patch
+      logical                           :: has_analysis                           ! Whether temperature or RH analysis was applied to the patch
       real(r8)                          :: tc                                     ! 2 m air temperature [degrees Celsius]
       real(r8)                          :: es                                     ! Saturation vapor pressure [hPa]
       real(r8)                          :: e                                      ! Water vapor pressure [hPa]
@@ -137,6 +138,7 @@ CONTAINS
          allocate(rhref_ens_a(0:DEF_DA_ENS_NUM, numpatch))
 
          DO np = 1, numpatch
+            has_analysis = .false.
             ! Compute relative humidity and preserve the forecast background.
             DO iens = 0, DEF_DA_ENS_NUM
                IF (tref_ens(iens,np) == spval .or. &
@@ -167,6 +169,8 @@ CONTAINS
                      ! Limit temperature increments to +/-20 K.
                      tref_ens(1:DEF_DA_ENS_NUM,np) = state_f(1,:) + &
                         max(-20.0_r8, min(20.0_r8, state_a(1,:) - state_f(1,:)))
+                     has_analysis = .true.
+                     deallocate(y_p, r_p, hx_p)
                   ENDIF
                ENDIF
 
@@ -182,12 +186,13 @@ CONTAINS
 
                      ! Bound analyzed relative humidity to [0, 1].
                      rhref_ens(1:DEF_DA_ENS_NUM,np) = max(0.0_r8, min(1.0_r8, state_a(1,:)))
+                     has_analysis = .true.
+                     deallocate(y_p, r_p, hx_p)
                   ENDIF
                ENDIF
-               deallocate(y_p, r_p, hx_p)
 
-               ! Convert changed analyses to specific humidity.
-               IF (forc_psrf(np) /= spval) THEN
+               ! Recompute specific humidity only after a local analysis.
+               IF (has_analysis) THEN
                   DO iens = 1, DEF_DA_ENS_NUM
                      tc = tref_ens(iens,np) - 273.15_r8
                      es = 6.112_r8 * exp((17.67_r8*tc)/(tc + 243.5_r8))
