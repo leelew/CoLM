@@ -1219,7 +1219,7 @@ CONTAINS
          ELSE
             eps_ws_r = eps_ds_r
             eps_ws_i = eps_ds_i
-         END IF
+         ENDIF
 
          ! Calculate propagation angle in snow (change medium from air to snow)
          alpha = k*abs(aimag(sqrt(eps_ws_r - jj*eps_ws_i)))
@@ -1241,7 +1241,7 @@ CONTAINS
             ELSE
                r_sa = abs((z0*cos(theta) - z_s*cos(theta_s))/ &
                   (z0*cos(theta) + z_s*cos(theta_s)))**2
-            END IF
+            ENDIF
 
             ! Density-based snow grain diameter; capped at 3 mm here ([19]).
             d = min(1000*(1.6e-4 + 1.1e-13*((rho_snow*1000.0)**4)), 3.0)
@@ -1273,7 +1273,7 @@ CONTAINS
                l2_apu = sqrt(HUGE(1.))
             ELSE
                l2_apu = min(sqrt(HUGE(1.)), exp((ke - q*ks)*(1./cos(theta_s))*wk_h))
-            END IF
+            ENDIF
 
             ! Snow-layer emission transmitted through the upper interface ([20]).
             tb_2 = (1.+r_sn(i)/l2_apu)*(1.-r_sa)*t_snow* &
@@ -1290,8 +1290,8 @@ CONTAINS
             ! Emission by layers 2 (snow) and 3 (soil)
             ! Reflectivity by layers 2 (snow) and 3 (soil)
             r_snow(i) = 1 - (tb_2/t_snow + tb_3/t)
-         END DO
-      END IF
+         ENDDO
+      ENDIF
 
    END SUBROUTINE snow
 !-----------------------------------------------------------------------------
