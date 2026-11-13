@@ -1657,6 +1657,7 @@ CONTAINS
                CALL CoLM_Stop('ANATQ requires both 2MT and 2MQ analysis streams.')
          ENDIF
 #endif
+
          IF (DEF_UnitCatchment_regional) THEN
             IF (trim(DEF_UnitCatchment_file) == 'null') &
                CALL CoLM_Stop ('Regional unit catchment requires DEF_UnitCatchment_file.')

@@ -471,7 +471,7 @@ CONTAINS
          forc_soll    = forc_soll_ens   (    iens,:)
          forc_solsd   = forc_solsd_ens  (    iens,:)
          forc_solld   = forc_solld_ens  (    iens,:)
-         forc_rhoair = (forc_pbot - 0.378_r8*forc_q*forc_pbot / (0.622_r8 + 0.378_r8*forc_q)) / (rgas*forc_t)
+         forc_rhoair  = (forc_pbot - 0.378_r8*forc_q*forc_pbot / (0.622_r8 + 0.378_r8*forc_q)) / (rgas*forc_t)
 
          ! Surface fluxes
          taux         = taux_ens        (    iens,:)
