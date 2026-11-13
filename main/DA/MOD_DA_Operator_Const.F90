@@ -4,17 +4,29 @@
 MODULE MOD_DA_Operator_Const
 !-----------------------------------------------------------------------
 ! DESCRIPTION:
-! 1. Define constants (do not rely on satellite parameters) used in RTM.
-! 2. Define parameters (IGBP) used in RTM.
+!   1. Define constants (do not rely on satellite parameters) used in EM.
+!   2. Define parameters (IGBP) used in EM.
 !
 ! REFERENCES:
-!   [1] L-band Microwave Emission of the Biosphere (L-MEB) Model:  Description
-!       and calibration against experimental data sets over crop fields.
+!   [1] Wigneron, J.-P., Kerr, Y. H., Waldteufel, P., Saleh, K.,
+!       Escorihuela, M.-J., Richaume, P., Ferrazzoli, P., de Rosnay, P.,
+!       Gurney, R., Calvet, J.-C., Grant, J. P., Guglielmetti, M.,
+!       Hornbuckle, B., Mätzler, C., Pellarin, T., & Schwank, M. (2007).
+!       L-band microwave emission of the biosphere (L-MEB) model:
+!       Description and calibration against experimental data sets over
+!       crop fields. Remote Sensing of Environment, 107(4), 639-655.
+!       https://doi.org/10.1016/j.rse.2006.10.014
 !
-!   [2] Wigneron, J. P., Jackson, T. J., O'neill, P., De Lannoy, G., de Rosnay, P., Walker,
-!       J. P., ... & Kerr, Y. (2017). Modelling the passive microwave signature from land surfaces:
-!       A review of recent results and application to the L-band SMOS & SMAP soil moisture retrieval algorithms.
-!       Remote Sensing of Environment, 192, 238-262.
+!   [2] Wigneron, J.-P., Jackson, T. J., O'Neill, P., De Lannoy, G., de
+!       Rosnay, P., Walker, J. P., Ferrazzoli, P., Mironov, V., Bircher,
+!       S., Grant, J. P., Kurum, M., Schwank, M., Muñoz-Sabater, J.,
+!       Das, N., Royer, A., Al-Yaari, A., Al Bitar, A., Fernandez-Moran,
+!       R., Lawrence, H., ... Kerr, Y. (2017). Modelling the passive
+!       microwave signature from land surfaces: A review of recent
+!       results and application to the L-band SMOS & SMAP soil moisture
+!       retrieval algorithms. Remote Sensing of Environment, 192,
+!       238-262.
+!       https://doi.org/10.1016/j.rse.2017.01.024
 !
 ! AUTHOR:
 !   Lu Li, 12/2024: Initial version
@@ -26,15 +38,15 @@ MODULE MOD_DA_Operator_Const
    SAVE
 
    ! Constant variables
-   real(r8), parameter :: C = 2.998e8           ! speed of light (m/s)
-   real(r8), parameter :: mu0 = 4.*pi*1e-7      ! vacuum permeability (H/m)
-   real(r8), parameter :: eps_0 = 8.854e-12     ! dielectric constant of free space (Klein and Swift 1977) [Farads/meter]
-   real(r8), parameter :: z0 = sqrt(mu0/eps_0)  ! impedance of free space (Ohm)
-   real(r8), parameter :: eps_w_inf = 4.9       ! dielectric constant at infinite frequency (Stogryn 1971),
-   real(r8), parameter :: rho_soil = 2.66       ! soil specific density (g/cm3)
-   real(r8), parameter :: f0w = 9.              ! relaxation frequency of liquid water (GHz)
-   real(r8), parameter :: rgh_surf = 2.2        ! soil surface roughness (cm)
-   complex(r8), parameter :: jj = (0., 1.)      ! imaginary unit for complex number
+   real(r8), parameter    :: C = 2.998e8           ! speed of light (m/s)
+   real(r8), parameter    :: mu0 = 4.*pi*1e-7      ! vacuum permeability (H/m)
+   real(r8), parameter    :: eps_0 = 8.854e-12     ! dielectric constant of free space (Klein and Swift 1977) [Farads/meter]
+   real(r8), parameter    :: z0 = sqrt(mu0/eps_0)  ! impedance of free space (Ohm)
+   real(r8), parameter    :: eps_w_inf = 4.9       ! dielectric constant at infinite frequency (Stogryn 1971),
+   real(r8), parameter    :: rho_soil = 2.66       ! soil specific density (g/cm3)
+   real(r8), parameter    :: f0w = 9.              ! relaxation frequency of liquid water (GHz)
+   real(r8), parameter    :: rgh_surf = 2.2        ! soil surface roughness (cm)
+   complex(r8), parameter :: jj = (0., 1.)         ! imaginary unit for complex number
 
 #ifdef LULC_IGBP
    ! 0  Ocean
@@ -56,7 +68,8 @@ MODULE MOD_DA_Operator_Const
    !16  Barren
    !17  Water Bodies
 
-   ! empirical parameters to account for the dependence of optical depth on incidence angle [1]
+   ! empirical parameters to account for the dependence of optical depth
+   ! on incidence angle [1]
    real(r8), parameter, dimension(N_land_classification) :: tth &
       = (/0.80, 1.00, 0.80, 0.49, 0.49, &
       1.00, 1.00, 1.00, 1.00, 1.00,  &
