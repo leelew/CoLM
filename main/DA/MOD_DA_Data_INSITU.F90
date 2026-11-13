@@ -10,17 +10,17 @@ MODULE MOD_DA_Data_INSITU
 !   collection of streams (INSITU_set_type). Each stream represents one
 !   source/network/variable configuration and owns the observation reader,
 !   patch-space forward calculation, and extraction at observation locations.
-!   Station networks such as SYNOP, ISMN, and SNOTEL share this structure;
-!   the network name selects the dataset, while the variable selects H(x).
+!   Station networks such as SYNOP, ISMN, and SNOTEL share this structure; the
+!   network name selects the dataset, while the variable selects H(x).
 !
 ! WORKFLOW:
-!   1. Init: Store the stream configuration. Initialize SiteType to read
-!      the site table and build the site-to-patch mapping.
-!   2. Forward: Read current observations through SiteType when needed.
-!      Apply the selected operator to compute H(x) on local patches.
-!      For assimilation, extract H(x) at the mapped site patches and share
-!      observation-space H(x) across all processes.
-!      For multiple streams, concatenate observations and matching H(x).
+!   1. Init: Store the stream configuration. Initialize SiteType to read the
+!      site table and build the site-to-patch mapping.
+!   2. Forward: Read current observations through SiteType when needed. Apply
+!      the selected operator to compute H(x) on local patches. For
+!      assimilation, extract H(x) at the mapped site patches and share
+!      observation-space H(x) across all processes. For multiple streams,
+!      concatenate observations and matching H(x).
 !   3. Clear: Release current observations and H(x), retaining the stream
 !      configuration, site table, and site-to-patch mapping.
 !
@@ -51,15 +51,15 @@ MODULE MOD_DA_Data_INSITU
 !-----------------------------------------------------------------------------
    type :: INSITU_type
 
-      real(r8), allocatable                 :: hx_model(:,:)                     ! Model-space H(x) on local patches
-      type(site_obs_type)                   :: y                                 ! Observations, site table, and patch mapping
-      real(r8), allocatable                 :: hx_obs(:,:)                       ! Observation-space ensemble H(x)
+      real(r8), allocatable                    :: hx_model(:,:)                     ! Model-space H(x) on local patches
+      type(site_obs_type)                      :: y                                 ! Observations, site table, and patch mapping
+      real(r8), allocatable                    :: hx_obs(:,:)                       ! Observation-space ensemble H(x)
 
    CONTAINS
 
-      procedure, PUBLIC                     :: init       => INSITU_init         ! Initialize the observation reader and patch mapping
-      procedure, PUBLIC                     :: forward    => INSITU_forward      ! Compute patch H(x) and map it to observation locations
-      procedure, PUBLIC                     :: clear      => INSITU_clear        ! Clear current observations and H(x), retaining the mapping
+      procedure, PUBLIC                        :: init       => INSITU_init         ! Initialize the observation reader and patch mapping
+      procedure, PUBLIC                        :: forward    => INSITU_forward      ! Compute patch H(x) and map it to observation locations
+      procedure, PUBLIC                        :: clear      => INSITU_clear        ! Clear current observations and H(x), retaining the mapping
 
    END type INSITU_type
 
@@ -68,9 +68,9 @@ MODULE MOD_DA_Data_INSITU
 !-----------------------------------------------------------------------------
    type :: INSITU_config_type
 
-      character(len=16)                     :: source_name                       ! Observation source class
-      character(len=32)                     :: sensor_name                       ! Sensor or station network name
-      character(len=16)                     :: var_name                          ! Observation variable and file prefix
+      character(len=16)                        :: source_name                       
+      character(len=32)                        :: sensor_name                       
+      character(len=16)                        :: var_name                          
 
    END type INSITU_config_type
 
@@ -79,23 +79,23 @@ MODULE MOD_DA_Data_INSITU
 !-----------------------------------------------------------------------------
    type :: INSITU_set_type
 
-      integer                               :: nsensor = 0                       ! Number of configured observation streams
-      type(INSITU_type), allocatable        :: sensors(:)                        ! Individual observation streams
-      type(INSITU_config_type), allocatable :: cfgs(:)                           ! Configuration of each observation stream
+      integer                                  :: nsensor = 0                       ! Number of configured observation streams
+      type(INSITU_type), allocatable           :: sensors(:)                        ! Individual observation streams
+      type(INSITU_config_type), allocatable    :: cfgs(:)                           ! Configuration of each observation stream
 
-      integer                               :: nobs = 0                          ! Total number of observations across streams
-      real(r8), allocatable                 :: lat(:)                            ! Observation latitudes
-      real(r8), allocatable                 :: lon(:)                            ! Observation longitudes
-      real(r8), allocatable                 :: y(:)                              ! Observed values
-      real(r8), allocatable                 :: r(:)                              ! Observation error standard deviations
-      real(r8), allocatable                 :: hx_obs(:,:)                       ! Observation-space ensemble H(x)
+      integer                                  :: nobs = 0                          ! Total number of observations across streams
+      real(r8), allocatable                    :: lat(:)                            ! Observation latitudes
+      real(r8), allocatable                    :: lon(:)                            ! Observation longitudes
+      real(r8), allocatable                    :: y(:)                              ! Observed values
+      real(r8), allocatable                    :: r(:)                              ! Observation error standard deviations
+      real(r8), allocatable                    :: hx_obs(:,:)                       ! Observation-space ensemble H(x)
 
    CONTAINS
 
-      procedure, PUBLIC                     :: init       => INSITU_set_init     ! Initialize all observation streams
-      procedure, PUBLIC                     :: concat     => INSITU_set_concat   ! Combine observations and matching H(x) in stream order
-      procedure, PUBLIC                     :: forward    => INSITU_set_forward  ! Run forward calculations for all streams and combine their records
-      procedure, PUBLIC                     :: clear      => INSITU_set_clear    ! Clear current observations and H(x), retaining stream configurations
+      procedure, PUBLIC                        :: init       => INSITU_set_init     ! Initialize all observation streams
+      procedure, PUBLIC                        :: concat     => INSITU_set_concat   ! Combine observations and matching H(x) in stream order
+      procedure, PUBLIC                        :: forward    => INSITU_set_forward  ! Run forward calculations for all streams and combine their records
+      procedure, PUBLIC                        :: clear      => INSITU_set_clear    ! Clear current observations and H(x), retaining stream configurations
 
    END type INSITU_set_type
 
@@ -108,11 +108,11 @@ CONTAINS
    SUBROUTINE INSITU_init(this, pixelset, source_name, sensor_name, var_name)
 
 !-----------------------------------------------------------------------------
-      class(INSITU_type), intent(inout) :: this
-      type(pixelset_type), intent(in)   :: pixelset
-      character(len=*), intent(in)      :: source_name
-      character(len=*), intent(in)      :: sensor_name
-      character(len=*), intent(in)      :: var_name
+      class(INSITU_type), intent(inout)        :: this
+      type(pixelset_type), intent(in)          :: pixelset
+      character(len=*), intent(in)             :: source_name
+      character(len=*), intent(in)             :: sensor_name
+      character(len=*), intent(in)             :: var_name
 
       CALL this%y%init(pixelset, source_name, sensor_name, var_name)
 
@@ -123,18 +123,18 @@ CONTAINS
    SUBROUTINE INSITU_forward(this, idate, deltim)
 
 !-----------------------------------------------------------------------------
-      class(INSITU_type), intent(inout) :: this
-      integer, intent(in)               :: idate(3)
-      real(r8), intent(in)              :: deltim
+      class(INSITU_type), intent(inout)        :: this
+      integer, intent(in)                      :: idate(3)
+      real(r8), intent(in)                     :: deltim
 
-      integer                           :: iobs      ! Observation index
-      integer                           :: isite     ! Site-table index
-      integer                           :: np        ! Local patch index
-      integer                           :: iens      ! Ensemble member index
-      real(r8)                          :: tc        ! 2 m air temperature [degrees Celsius]
-      real(r8)                          :: es        ! Saturation vapor pressure [hPa]
-      real(r8)                          :: e         ! Water vapor pressure [hPa]
-      integer, allocatable              :: owner(:)  ! Number of workers contributing to each observation
+      integer                                  :: iobs                              ! Observation index
+      integer                                  :: isite                             ! Site-table index
+      integer                                  :: np                                ! Local patch index
+      integer                                  :: iens                              ! Ensemble member index
+      real(r8)                                 :: tc                                ! 2 m air temperature [degrees Celsius]
+      real(r8)                                 :: es                                ! Saturation vapor pressure [hPa]
+      real(r8)                                 :: e                                 ! Water vapor pressure [hPa]
+      integer, allocatable                     :: owner(:)                          ! Number of workers contributing to each observation
 !-----------------------------------------------------------------------------
       CALL this%clear()
 
@@ -187,9 +187,9 @@ CONTAINS
       IF (.not. DEF_DA) RETURN
 
       ! Extract H(x) at the mapped station patches.
-      allocate (this%hx_obs(this%y%nobs, 1:DEF_DA_ENS_NUM))
+      allocate(this%hx_obs(this%y%nobs, 1:DEF_DA_ENS_NUM))
       this%hx_obs(:,:) = 0.0_r8
-      allocate (owner(this%y%nobs))
+      allocate(owner(this%y%nobs))
       owner(:) = 0
 
       IF (p_is_worker .and. numpatch > 0 .and. allocated(this%hx_model)) THEN
@@ -220,7 +220,7 @@ CONTAINS
          IF (owner(iobs) /= 1) this%hx_obs(iobs, 1:DEF_DA_ENS_NUM) = spval
       ENDDO
 
-      deallocate (owner)
+      deallocate(owner)
 
    END SUBROUTINE INSITU_forward
 
@@ -229,7 +229,7 @@ CONTAINS
    SUBROUTINE INSITU_clear(this)
 
 !-----------------------------------------------------------------------------
-      class(INSITU_type), intent(inout) :: this
+      class(INSITU_type), intent(inout)        :: this
 !-----------------------------------------------------------------------------
       CALL this%y%clear()
       IF (allocated(this%hx_model)) deallocate(this%hx_model)
@@ -273,9 +273,9 @@ CONTAINS
    SUBROUTINE INSITU_set_clear(this)
 
 !-----------------------------------------------------------------------------
-      class(INSITU_set_type), intent(inout) :: this
+      class(INSITU_set_type), intent(inout)    :: this
 
-      integer                               :: i
+      integer                                  :: i
 !-----------------------------------------------------------------------------
       this%nobs = 0
       IF (allocated(this%lat   )) deallocate(this%lat   )
@@ -297,11 +297,11 @@ CONTAINS
    SUBROUTINE INSITU_set_forward(this, idate, deltim)
 
 !-----------------------------------------------------------------------------
-      class(INSITU_set_type), intent(inout) :: this
-      integer, intent(in)                   :: idate(3)
-      real(r8), intent(in)                  :: deltim
+      class(INSITU_set_type), intent(inout)    :: this
+      integer, intent(in)                      :: idate(3)
+      real(r8), intent(in)                     :: deltim
 
-      integer                               :: is
+      integer                                  :: is
 !-----------------------------------------------------------------------------
       DO is = 1, this%nsensor
          CALL this%sensors(is)%forward(idate, deltim)
@@ -315,9 +315,9 @@ CONTAINS
    SUBROUTINE INSITU_set_concat(this)
 
 !-----------------------------------------------------------------------------
-      class(INSITU_set_type), intent(inout) :: this
+      class(INSITU_set_type), intent(inout)    :: this
 
-      integer                               :: is, n, offset
+      integer                                  :: is, n, offset
 !-----------------------------------------------------------------------------
       this%nobs = 0
       IF (allocated(this%lat   )) deallocate(this%lat   )

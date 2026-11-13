@@ -6,31 +6,30 @@ MODULE MOD_DA_Data_PM
 ! DESCRIPTION:
 !   Passive-microwave observation handling for data assimilation.
 !
-!   This module defines one passive-microwave observation stream (PM_type)
-!   and a collection of streams (PM_set_type). A PM_type instance represents
-!   one source/sensor/variable configuration and owns the observation reader,
+!   This module defines one passive-microwave observation stream (PM_type) and
+!   a collection of streams (PM_set_type). A PM_type instance represents one
+!   source/sensor/variable configuration and owns the observation reader,
 !   patch-space forward calculation, and mapping to observation-grid cells.
 !
 ! WORKFLOW:
 !   1. Init: Store the stream configuration and microwave frequency.
 !      Initialize GridType to read the reference grid and build the mapping.
-!   2. Forward: Read current observations through GridType when needed.
-!      Apply the selected operator to compute H(x) on model patches.
-!      For assimilation, map patch H(x) to the observation grid and extract
-!      Values at the current observation locations.
-!      Gather and broadcast observation-space H(x) across all processes.
-!      For multiple streams, concatenate observations and matching H(x).
+!   2. Forward: Read current observations through GridType when needed. Apply
+!      the selected operator to compute H(x) on model patches. For
+!      assimilation, map patch H(x) to the observation grid and extract values
+!      at the current observation locations. Gather and broadcast
+!      observation-space H(x) across all processes. For multiple streams,
+!      concatenate observations and matching H(x).
 !   3. Clear: Release current observations and H(x), retaining the stream
-!      Configuration, reference grid, and spatial mapping.
+!      configuration, reference grid, and spatial mapping.
 !
 ! SUPPORTED:
-!   TB_H / TB_V:
-!      Horizontally / vertically polarized brightness temperatures.
-!      Forward modeling uses MOD_DA_Operator_RTM with the configured
-!      Frequency and observation-specific incidence angles.
+!   TB_H / TB_V: Horizontally / vertically polarized brightness temperatures.
+!   Forward modeling uses MOD_DA_Operator_RTM with the configured Frequency
+!   and observation-specific incidence angles.
 !   SM:
-!      Retrieved soil moisture.
-!      H(x) is the mean liquid volumetric soil moisture in the upper 5 cm.
+!      Retrieved soil moisture. H(x) is the mean liquid volumetric soil
+!      moisture in the upper 5 cm.
 !
 ! NOTES:
 !   Forward-only runs compute model-space H(x) for diagnostic output.
@@ -64,25 +63,25 @@ MODULE MOD_DA_Data_PM
 !-----------------------------------------------------------------------------
    type :: PM_type
 
-      real(r8)                          :: fghz                          ! Microwave frequency [GHz]
-      real(r8), allocatable             :: hx_model(:,:)                 ! Model-space H(x) on local patches
-      type(grid_obs_type)               :: y                             ! Observations, reference grid, and patch mapping
-      real(r8), allocatable             :: hx_obs(:,:)                   ! Observation-space ensemble H(x)
+      real(r8)                            :: fghz                          ! Microwave frequency [GHz]
+      real(r8), allocatable               :: hx_model(:,:)                 ! Model-space H(x) on local patches
+      type(grid_obs_type)                 :: y                             ! Observations, reference grid, and patch mapping
+      real(r8), allocatable               :: hx_obs(:,:)                   ! Observation-space ensemble H(x)
 
    CONTAINS
 
-      procedure, PUBLIC                 :: init       => PM_init         ! Initialize the observation reader and grid mapping
-      procedure, PUBLIC                 :: forward    => PM_forward      ! Compute patch H(x) and map it to observation locations
-      procedure, PUBLIC                 :: clear      => PM_clear        ! Clear current observations and H(x), retaining the mapping
+      procedure, PUBLIC                   :: init       => PM_init         ! Initialize the observation reader and grid mapping
+      procedure, PUBLIC                   :: forward    => PM_forward      ! Compute patch H(x) and map it to observation locations
+      procedure, PUBLIC                   :: clear      => PM_clear        ! Clear current observations and H(x), retaining the mapping
 
    END type PM_type
 
    type :: PM_config_type
 
-      character(len=16)                 :: source_name
-      character(len=32)                 :: sensor_name
-      character(len=16)                 :: var_name
-      real(r8)                          :: fghz
+      character(len=16)                   :: source_name
+      character(len=32)                   :: sensor_name
+      character(len=16)                   :: var_name
+      real(r8)                            :: fghz
 
    END type PM_config_type
 
@@ -91,23 +90,23 @@ MODULE MOD_DA_Data_PM
 !-----------------------------------------------------------------------------
    type :: PM_set_type
 
-      integer                           :: nsensor = 0                   ! Number of configured observation streams
-      type(PM_type), allocatable        :: sensors(:)                    ! Individual observation streams
-      type(PM_config_type), allocatable :: cfgs(:)                       ! Configuration of each observation stream
+      integer                             :: nsensor = 0                   ! Number of configured observation streams
+      type(PM_type), allocatable          :: sensors(:)                    ! Individual observation streams
+      type(PM_config_type), allocatable   :: cfgs(:)                       ! Configuration of each observation stream
 
-      integer                           :: nobs = 0                      ! Total number of observations across streams
-      real(r8), allocatable             :: lat(:)                        ! Observation latitudes
-      real(r8), allocatable             :: lon(:)                        ! Observation longitudes
-      real(r8), allocatable             :: y(:)                          ! Observed values
-      real(r8), allocatable             :: r(:)                          ! Observation error standard deviations
-      real(r8), allocatable             :: hx_obs(:,:)                   ! Observation-space ensemble H(x)
+      integer                             :: nobs = 0                      ! Total number of observations across streams
+      real(r8), allocatable               :: lat(:)                        ! Observation latitudes
+      real(r8), allocatable               :: lon(:)                        ! Observation longitudes
+      real(r8), allocatable               :: y(:)                          ! Observed values
+      real(r8), allocatable               :: r(:)                          ! Observation error standard deviations
+      real(r8), allocatable               :: hx_obs(:,:)                   ! Observation-space ensemble H(x)
 
    CONTAINS
 
-      procedure, PUBLIC                 :: init       => PM_set_init     ! Initialize all observation streams
-      procedure, PUBLIC                 :: concat     => PM_set_concat   ! Combine observations and matching H(x) in stream order
-      procedure, PUBLIC                 :: forward    => PM_set_forward  ! Run forward calculations for all streams and combine their records
-      procedure, PUBLIC                 :: clear      => PM_set_clear    ! Clear current observations and H(x), retaining stream configurations
+      procedure, PUBLIC                   :: init       => PM_set_init     ! Initialize all observation streams
+      procedure, PUBLIC                   :: concat     => PM_set_concat   ! Combine observations and matching H(x) in stream order
+      procedure, PUBLIC                   :: forward    => PM_set_forward  ! Run forward calculations for all streams and combine their records
+      procedure, PUBLIC                   :: clear      => PM_set_clear    ! Clear current observations and H(x), retaining stream configurations
 
    END type PM_set_type
 
@@ -120,12 +119,12 @@ CONTAINS
    SUBROUTINE PM_init(this, pixelset, source_name, sensor_name, var_name, fghz)
 
 !-----------------------------------------------------------------------------
-      class(PM_type),      intent(inout) :: this
-      type(pixelset_type), intent(in)    :: pixelset
-      character(len=*),    intent(in)    :: source_name
-      character(len=*),    intent(in)    :: sensor_name
-      character(len=*),    intent(in)    :: var_name
-      real(r8),            intent(in)    :: fghz
+      class(PM_type),      intent(inout)  :: this
+      type(pixelset_type), intent(in)     :: pixelset
+      character(len=*),    intent(in)     :: source_name
+      character(len=*),    intent(in)     :: sensor_name
+      character(len=*),    intent(in)     :: var_name
+      real(r8),            intent(in)     :: fghz
 !-----------------------------------------------------------------------------
       CALL this%y%init(pixelset, source_name, sensor_name, var_name)
       this%fghz = fghz
@@ -141,14 +140,14 @@ CONTAINS
       integer,            intent(in)      :: idate(3)
       real(r8),           intent(in)      :: deltim
 
-      type(block_data_real8_2d)           :: theta_wgrid                ! Incidence angles on the observation grid
-      type(pointer_real8_1d), allocatable :: theta_part(:)              ! Incidence angles on patch-grid parts
-      logical,  allocatable               :: filter(:)                  ! Local patch mask used for mapping
-      real(r8)                            :: tb_part(2)                 ! Brightness temperatures of the current patch-grid intersection
-      real(r8)                            :: sumarea(0:DEF_DA_ENS_NUM)  ! Valid part area for each member
-      real(r8)                            :: area_obs                   ! Mapped patch area in one observation grid cell
-      type(block_data_real8_2d)           :: area_wgrid                 ! Mapped patch area on obs world grid
-      type(block_data_real8_3d)           :: hx_wgrid                   ! Ensemble H(x) mapped to obs world grid
+      type(block_data_real8_2d)           :: theta_wgrid                   ! Incidence angles on the observation grid
+      type(pointer_real8_1d), allocatable :: theta_part(:)                 ! Incidence angles on patch-grid parts
+      logical,  allocatable               :: filter(:)                     ! Local patch mask used for mapping
+      real(r8)                            :: tb_part(2)                    ! Brightness temperatures of the current patch-grid intersection
+      real(r8)                            :: sumarea(0:DEF_DA_ENS_NUM)     ! Valid part area for each member
+      real(r8)                            :: area_obs                      ! Mapped patch area in one observation grid cell
+      type(block_data_real8_2d)           :: area_wgrid                    ! Mapped patch area on obs world grid
+      type(block_data_real8_3d)           :: hx_wgrid                      ! Ensemble H(x) mapped to obs world grid
       integer,  allocatable               :: iloc(:)
       integer,  allocatable               :: tmp_idx(:)
       real(r8), allocatable               :: tmp_data(:,:)
@@ -192,7 +191,8 @@ CONTAINS
 
             SELECT CASE (trim(this%y%var_name))
 !-----------------------------------------------------------------------------
-! Level-1 brightness temperature observations from passive microwave radiometers.
+! Level-1 brightness temperature observations from passive microwave
+! radiometers.
 !-----------------------------------------------------------------------------
             CASE ('TB_H', 'TB_V')
                ipol = merge(2, 1, this%y%var_name == 'TB_V')
@@ -202,7 +202,7 @@ CONTAINS
                   IF (theta_part(np)%val(ipart) == spval) CYCLE
 
                   DO iens = 0, DEF_DA_ENS_NUM
-                     CALL PM_RTM(                                                                     &
+                     CALL EM(                                                                         &
                         patchtype(np), patchclass(np), dz_sno_ens(:,iens,np),                         &
                         forc_topo(np), htop(np),                                                      &
                         tref_ens(iens,np), t_soisno_ens(:,iens,np), tleaf_ens(iens,np),               &
@@ -241,8 +241,9 @@ CONTAINS
 
       IF (.not. DEF_DA) RETURN
 
-      ! Keep the mapped numerator and area denominator on the same valid patches.
-      allocate (filter(numpatch))
+      ! Keep the mapped numerator and area denominator on the same valid
+      ! patches.
+      allocate(filter(numpatch))
       IF (p_is_worker) filter(:) = all(this%hx_model(1:DEF_DA_ENS_NUM,:) /= spval, dim=1)
 
       ! Map model-space H(x) to the observation grid.
@@ -252,13 +253,13 @@ CONTAINS
       ENDIF
       CALL this%y%mg2p%get_sumarea(area_wgrid, filter)
       CALL this%y%mg2p%pset2grid(this%hx_model(1:DEF_DA_ENS_NUM,:), hx_wgrid, spv=spval, msk=filter)
-      deallocate (filter)
+      deallocate(filter)
 
       ! Extract H(x) at the current observation locations.
-      allocate (this%hx_obs(this%y%nobs, DEF_DA_ENS_NUM))
+      allocate(this%hx_obs(this%y%nobs, DEF_DA_ENS_NUM))
 
       IF (p_is_io) THEN
-         allocate (iloc(this%y%nobs))
+         allocate(iloc(this%y%nobs))
          this%hx_obs = spval
 
          ndata = 0
@@ -285,12 +286,12 @@ CONTAINS
 
          IF (ndata > 0) THEN
             CALL mpi_send(iloc(1:ndata), ndata, MPI_INTEGER, p_address_master, mpi_tag_data, p_comm_glb, p_err)
-            allocate (tmp_data(ndata, DEF_DA_ENS_NUM))
+            allocate(tmp_data(ndata, DEF_DA_ENS_NUM))
             tmp_data = this%hx_obs(1:ndata,:)
             CALL mpi_send(tmp_data, ndata*DEF_DA_ENS_NUM, MPI_REAL8, p_address_master, mpi_tag_data+1, p_comm_glb, p_err)
-            deallocate (tmp_data)
+            deallocate(tmp_data)
          ENDIF
-         deallocate (iloc)
+         deallocate(iloc)
          IF (allocated(hx_wgrid%blk  )) deallocate(hx_wgrid%blk  )
          IF (allocated(area_wgrid%blk)) deallocate(area_wgrid%blk)
       ENDIF
@@ -303,16 +304,16 @@ CONTAINS
 
             ndata = rmesg(2)
             IF (ndata > 0) THEN
-               allocate (tmp_idx(ndata))
-               allocate (tmp_data(ndata, DEF_DA_ENS_NUM))
+               allocate(tmp_idx(ndata))
+               allocate(tmp_data(ndata, DEF_DA_ENS_NUM))
 
                isrc = rmesg(1)
                CALL mpi_recv(tmp_idx, ndata, MPI_INTEGER, isrc, mpi_tag_data, p_comm_glb, p_stat, p_err)
                CALL mpi_recv(tmp_data, ndata*DEF_DA_ENS_NUM, MPI_REAL8, isrc, mpi_tag_data+1, p_comm_glb, p_stat, p_err)
                this%hx_obs(tmp_idx,:) = tmp_data
 
-               deallocate (tmp_idx)
-               deallocate (tmp_data)
+               deallocate(tmp_idx)
+               deallocate(tmp_data)
             ENDIF
          ENDDO
       ENDIF
@@ -326,7 +327,7 @@ CONTAINS
    SUBROUTINE PM_clear(this)
 
 !-----------------------------------------------------------------------------
-      class(PM_type), intent(inout) :: this
+      class(PM_type), intent(inout)       :: this
 !-----------------------------------------------------------------------------
       CALL this%y%clear()
       IF (allocated(this%hx_model)) deallocate(this%hx_model)
@@ -374,9 +375,9 @@ CONTAINS
    SUBROUTINE PM_set_clear(this)
 
 !-----------------------------------------------------------------------------
-      class(PM_set_type), intent(inout) :: this
+      class(PM_set_type), intent(inout)   :: this
 
-      integer                           :: is
+      integer                             :: is
 !-----------------------------------------------------------------------------
       this%nobs = 0
       IF (allocated(this%lat   )) deallocate(this%lat   )
@@ -398,9 +399,9 @@ CONTAINS
    SUBROUTINE PM_set_concat(this)
 
 !-----------------------------------------------------------------------------
-      class(PM_set_type), intent(inout) :: this
+      class(PM_set_type), intent(inout)   :: this
 
-      integer                           :: is, n, offset
+      integer                             :: is, n, offset
 !-----------------------------------------------------------------------------
       this%nobs = 0
       IF (allocated(this%lat   )) deallocate(this%lat   )
@@ -410,7 +411,8 @@ CONTAINS
       IF (allocated(this%hx_obs)) deallocate(this%hx_obs)
       IF (.not. allocated(this%sensors)) RETURN
 
-      ! Count observations with model equivalents and allocate combined arrays.
+      ! Count observations with model equivalents and allocate combined
+      ! arrays.
       DO is = 1, this%nsensor
          IF (this%sensors(is)%y%nobs == 0) CYCLE
          IF (.not. allocated(this%sensors(is)%hx_obs)) CYCLE
@@ -448,11 +450,11 @@ CONTAINS
    SUBROUTINE PM_set_forward(this, idate, deltim)
 
 !-----------------------------------------------------------------------------
-      class(PM_set_type),  intent(inout) :: this
-      integer,            intent(in)     :: idate(3)
-      real(r8),           intent(in)     :: deltim
+      class(PM_set_type),  intent(inout)  :: this
+      integer,            intent(in)      :: idate(3)
+      real(r8),           intent(in)      :: deltim
 
-      integer                            :: is
+      integer                             :: is
 !-----------------------------------------------------------------------------
       IF (.not. allocated(this%sensors)) RETURN
 

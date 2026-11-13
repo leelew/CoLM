@@ -4,17 +4,17 @@
 MODULE MOD_DA_Data_ANATQ
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
-!   Analysis-derived 2m temperature and relative humidity pseudo-observation 
+!   Analysis-derived 2m temperature and relative humidity pseudo-observation
 !   handling for land data assimilation.
 !
 ! WORKFLOW:
 !   1. Init: Initialize empty temperature and relative humidity collections.
 !   2. Forward: Select patches with changed forecast and analysis ensemble
-!      Means independently for each variable. Use analysis ensemble means
-!      As pseudo-observations and forecast members as matching H(x).
-!      Gather observations through PseudoType, then gather and broadcast H(x)
-!      In the same record order. Combine temperature records first, followed
-!      By relative humidity records.
+!      means independently for each variable. Use analysis ensemble means as
+!      pseudo-observations and forecast members as matching H(x). Gather
+!      observations through PseudoType, then gather and broadcast H(x) in the
+!      same record order. Combine temperature records first, followed by
+!      relative humidity records.
 !   3. Clear: Release current pseudo-observations and H(x).
 !
 ! SUPPORTED:
@@ -43,14 +43,14 @@ MODULE MOD_DA_Data_ANATQ
 !-----------------------------------------------------------------------------
    type :: ANATQ_type
 
-      type(pseudo_obs_type) :: y                            ! Pseudo-observations and patch locations
-      real(r8), allocatable :: hx_obs(:,:)                  ! Observation-space forecast ensemble H(x)
+      type(pseudo_obs_type)                :: y                             ! Pseudo-observations and patch locations
+      real(r8), allocatable                :: hx_obs(:,:)                   ! Observation-space forecast ensemble H(x)
 
    CONTAINS
 
-      procedure             :: init    => ANATQ_init        ! Initialize an empty pseudo-observation collection
-      procedure             :: forward => ANATQ_forward     ! Construct y and matching observation-space H(x)
-      procedure             :: clear   => ANATQ_clear       ! Clear current pseudo-observations and H(x)
+      procedure                            :: init    => ANATQ_init         ! Initialize an empty pseudo-observation collection
+      procedure                            :: forward => ANATQ_forward      ! Construct y and matching observation-space H(x)
+      procedure                            :: clear   => ANATQ_clear        ! Clear current pseudo-observations and H(x)
 
    END type ANATQ_type
 
@@ -59,22 +59,22 @@ MODULE MOD_DA_Data_ANATQ
 !-----------------------------------------------------------------------------
    type :: ANATQ_set_type
 
-      type(ANATQ_type)      :: tref                          ! 2 m temperature pseudo-observations [K]
-      type(ANATQ_type)      :: rhref                         ! 2 m relative humidity pseudo-observations [0-1]
+      type(ANATQ_type)                     :: tref                          ! 2 m temperature pseudo-observations [K]
+      type(ANATQ_type)                     :: rhref                         ! 2 m relative humidity pseudo-observations [0-1]
 
-      integer               :: nobs = 0                      ! Total number of temperature and relative humidity records
-      real(r8), allocatable :: lat(:)                        ! Observation latitudes [deg]
-      real(r8), allocatable :: lon(:)                        ! Observation longitudes [deg]
-      real(r8), allocatable :: y(:)                          ! Analysis ensemble means of the selected variable
-      real(r8), allocatable :: r(:)                          ! Observation error standard deviations
-      real(r8), allocatable :: hx_obs(:,:)                   ! Observation-space forecast ensemble H(x)
+      integer                              :: nobs = 0                      ! Total number of temperature and relative humidity records
+      real(r8), allocatable                :: lat(:)                        ! Observation latitudes [deg]
+      real(r8), allocatable                :: lon(:)                        ! Observation longitudes [deg]
+      real(r8), allocatable                :: y(:)                          ! Analysis ensemble means of the selected variable
+      real(r8), allocatable                :: r(:)                          ! Observation error standard deviations
+      real(r8), allocatable                :: hx_obs(:,:)                   ! Observation-space forecast ensemble H(x)
 
    CONTAINS
 
-      procedure             :: init    => ANATQ_set_init     ! Initialize the temperature and humidity collections
-      procedure             :: forward => ANATQ_set_forward  ! Prepare both variables and combine their records
-      procedure             :: concat  => ANATQ_set_concat   ! Combine temperature records followed by humidity
-      procedure             :: clear   => ANATQ_set_clear    ! Clear both variables and their combined arrays
+      procedure                            :: init    => ANATQ_set_init     ! Initialize the temperature and humidity collections
+      procedure                            :: forward => ANATQ_set_forward  ! Prepare both variables and combine their records
+      procedure                            :: concat  => ANATQ_set_concat   ! Combine temperature records followed by humidity
+      procedure                            :: clear   => ANATQ_set_clear    ! Clear both variables and their combined arrays
 
    END type ANATQ_set_type
 
@@ -87,7 +87,7 @@ CONTAINS
    SUBROUTINE ANATQ_init(this)
 
 !-----------------------------------------------------------------------------
-      class(ANATQ_type), intent(inout) :: this
+      class(ANATQ_type), intent(inout)     :: this
 !-----------------------------------------------------------------------------
       CALL this%clear()
 
@@ -98,19 +98,19 @@ CONTAINS
    SUBROUTINE ANATQ_forward(this, var_name)
 
 !-----------------------------------------------------------------------------
-      class(ANATQ_type), intent(inout) :: this
-      character(len=*), intent(in)     :: var_name
+      class(ANATQ_type), intent(inout)     :: this
+      character(len=*), intent(in)         :: var_name
 
-      real(r8)                         :: r                  ! Observation error standard deviation
-      integer                          :: iens         
-      integer                          :: iworker       
-      integer                          :: nlocal             ! Number of selected patches on one worker
-      integer                          :: nobs         
-      integer                          :: offset             ! Number of records already received on master
-      logical,  allocatable            :: mask(:)            ! Local patches with valid, changed analysis means
-      real(r8), allocatable            :: y(:)               ! Analysis means on local patches
-      real(r8), allocatable            :: hx_obs(:,:)        ! Forecast H(x) at selected patches on each worker
-      real(r8), allocatable            :: hx_recv(:,:)       ! Forecast H(x) gathered on master
+      real(r8)                             :: r                             ! Observation error standard deviation
+      integer                              :: iens
+      integer                              :: iworker
+      integer                              :: nlocal                        ! Number of selected patches on one worker
+      integer                              :: nobs
+      integer                              :: offset                        ! Number of records already received on master
+      logical,  allocatable                :: mask(:)                       ! Local patches with valid, changed analysis means
+      real(r8), allocatable                :: y(:)                          ! Analysis means on local patches
+      real(r8), allocatable                :: hx_obs(:,:)                   ! Forecast H(x) at selected patches on each worker
+      real(r8), allocatable                :: hx_recv(:,:)                  ! Forecast H(x) gathered on master
 !-----------------------------------------------------------------------------
       CALL this%clear()
 
@@ -185,7 +185,7 @@ CONTAINS
    SUBROUTINE ANATQ_clear(this)
 
 !-----------------------------------------------------------------------------
-      class(ANATQ_type), intent(inout) :: this
+      class(ANATQ_type), intent(inout)     :: this
 !-----------------------------------------------------------------------------
       CALL this%y%clear()
       IF (allocated(this%hx_obs)) deallocate(this%hx_obs)
@@ -225,7 +225,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
       class(ANATQ_set_type), intent(inout) :: this
-      integer :: nt, nq
+      integer                              :: nt, nq
 !-----------------------------------------------------------------------------
       nt = this%tref%y%nobs
       nq = this%rhref%y%nobs
