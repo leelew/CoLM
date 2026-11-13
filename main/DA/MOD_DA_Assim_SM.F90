@@ -8,12 +8,12 @@ MODULE MOD_DA_Assim_SM
 !
 ! WORKFLOW:
 !   1. Init: Select soil moisture observation streams from the namelist and
-!      Initialize Data_SM with their configurations.
-!   2. Run: Prepare observations and forecast H(x), then save diagnostics.
-!      For assimilation, select nearby observations for each soil patch and
-!      Apply LETKF to update liquid water in the upper two soil layers.
-!      Enforce soil-water constraints and adjust aquifer storage for the
-!      Change in soil liquid water. Recompute H(x) and save analysis diagnostics.
+!      initialize Data_SM with their configurations.
+!   2. Run: Prepare observations and forecast H(x), then save diagnostics. For
+!      assimilation, select nearby observations for each soil patch and apply
+!      LETKF to update liquid water in the upper two soil layers. Enforce
+!      soil-water constraints and adjust aquifer storage for the change in
+!      soil liquid water. Recompute H(x) and save analysis diagnostics.
 !   3. End: Release observation data and stream configurations.
 !
 ! HISTORY:
@@ -31,7 +31,7 @@ MODULE MOD_DA_Assim_SM
    USE MOD_DA_Vars_TimeVars
    IMPLICIT NONE
 
-   type(SM_type) :: sm  
+   type(SM_type)                        :: sm
 
 !-----------------------------------------------------------------------------
 
@@ -42,8 +42,8 @@ CONTAINS
    SUBROUTINE init_DA_SM()
 
 !-----------------------------------------------------------------------------
-      integer                           :: is, i, nsensor  
-      type(SM_config_type), allocatable :: configs(:)     
+      integer                           :: is, i, nsensor
+      type(SM_config_type), allocatable :: configs(:)
 !-----------------------------------------------------------------------------
       nsensor = count(DEF_DA_OBS_TARGET == 'SM')
       IF (nsensor == 0) RETURN
@@ -72,17 +72,17 @@ CONTAINS
    SUBROUTINE run_DA_SM(idate, deltim)
 
 !-----------------------------------------------------------------------------
-      integer,  intent(in)  :: idate(3)  
-      real(r8), intent(in)  :: deltim 
+      integer,  intent(in)              :: idate(3)
+      real(r8), intent(in)              :: deltim
 
-      integer               :: np, iens, il              
-      integer               :: nobs_p                                 ! Number of observations selected for the target patch
-      real(r8), allocatable :: y_p(:)                                 ! Selected observation values
-      real(r8), allocatable :: hx_p(:,:)                              ! Forecast ensemble H(x) at selected observation locations
-      real(r8), allocatable :: r_p(:)                                 ! Localized observation error variances
-      real(r8), allocatable :: trans(DEF_DA_ENS_NUM, DEF_DA_ENS_NUM)  ! LETKF ensemble transform matrix
-      real(r8), allocatable :: state_f(nl_soil, DEF_DA_ENS_NUM)       ! Forecast soil liquid water [kg/m2]
-      real(r8), allocatable :: state_a(nl_soil, DEF_DA_ENS_NUM)       ! Transformed soil liquid water [kg/m2]
+      integer                           :: np, iens, il
+      integer                           :: nobs_p                                 ! Number of observations selected for the target patch
+      real(r8), allocatable             :: y_p(:)                                 ! Selected observation values
+      real(r8), allocatable             :: hx_p(:,:)                              ! Forecast ensemble H(x) at selected observation locations
+      real(r8), allocatable             :: r_p(:)                                 ! Localized observation error variances
+      real(r8), allocatable             :: trans(DEF_DA_ENS_NUM, DEF_DA_ENS_NUM)  ! LETKF ensemble transform matrix
+      real(r8), allocatable             :: state_f(nl_soil, DEF_DA_ENS_NUM)       ! Forecast soil liquid water [kg/m2]
+      real(r8), allocatable             :: state_a(nl_soil, DEF_DA_ENS_NUM)       ! Transformed soil liquid water [kg/m2]
 !-----------------------------------------------------------------------------
       ! Prepare observations and forecast H(x).
       CALL sm%forward(idate, deltim)

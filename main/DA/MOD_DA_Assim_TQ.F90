@@ -8,10 +8,11 @@ MODULE MOD_DA_Assim_TQ
 !
 ! WORKFLOW:
 !   1. Init: Select temperature and humidity observation streams from the
-!      Namelist and initialize a Data_TQ collection for each analysis target.
-!   2. Run: Prepare observations and forecast H(x), then save diagnostics.
-!      For assimilation, preserve temperature and relative humidity forecasts.
-!   3. End: Release observation data, stream configurations and ANATQ products.
+!      namelist and initialize a Data_TQ collection for each analysis target.
+!   2. Run: Prepare observations and forecast H(x), then save diagnostics. For
+!      assimilation, preserve temperature and relative humidity forecasts.
+!   3. End: Release observation data, stream configurations and ANATQ
+!      products.
 !
 ! HISTORY:
 !   Lu Li, 05/2026: Initial implementation
@@ -28,13 +29,13 @@ MODULE MOD_DA_Assim_TQ
    USE MOD_DA_Vars_TimeVars
    IMPLICIT NONE
 
-   type(TQ_type)           :: tq_tref
-   type(TQ_type)           :: tq_qref
+   type(TQ_type)                        :: tq_tref
+   type(TQ_type)                        :: tq_qref
 
-   real(r8), allocatable   :: tref_ens_f(:,:)
-   real(r8), allocatable   :: tref_ens_a(:,:)
-   real(r8), allocatable   :: rhref_ens_f(:,:)
-   real(r8), allocatable   :: rhref_ens_a(:,:)
+   real(r8), allocatable                :: tref_ens_f(:,:)
+   real(r8), allocatable                :: tref_ens_a(:,:)
+   real(r8), allocatable                :: rhref_ens_f(:,:)
+   real(r8), allocatable                :: rhref_ens_a(:,:)
 
 !-----------------------------------------------------------------------------
 
@@ -92,20 +93,20 @@ CONTAINS
    SUBROUTINE run_DA_TQ(idate, deltim)
 
 !-----------------------------------------------------------------------------
-      integer,  intent(in) :: idate(3)
-      real(r8), intent(in) :: deltim
+      integer,  intent(in)              :: idate(3)
+      real(r8), intent(in)              :: deltim
 
-      integer               :: np, iens                               ! Loop indices
-      integer               :: nobs_p                                 ! Number of observations selected for the target patch
-      real(r8)              :: tc                                     ! 2 m air temperature [degrees Celsius]
-      real(r8)              :: es                                     ! Saturation vapor pressure [hPa]
-      real(r8)              :: e                                      ! Water vapor pressure [hPa]
-      real(r8), allocatable :: y_p(:)                                 ! Selected observation values
-      real(r8), allocatable :: hx_p(:,:)                              ! Forecast ensemble H(x) at selected observation locations
-      real(r8), allocatable :: r_p(:)                                 ! Localized observation error variances
-      real(r8)              :: trans(DEF_DA_ENS_NUM, DEF_DA_ENS_NUM)  ! LETKF ensemble transform matrix
-      real(r8)              :: state_f(1, DEF_DA_ENS_NUM)             ! Forecast temperature [K] or relative humidity [0-1]
-      real(r8)              :: state_a(1, DEF_DA_ENS_NUM)             ! Transformed temperature [K] or relative humidity [0-1]
+      integer                           :: np, iens                               ! Loop indices
+      integer                           :: nobs_p                                 ! Number of observations selected for the target patch
+      real(r8)                          :: tc                                     ! 2 m air temperature [degrees Celsius]
+      real(r8)                          :: es                                     ! Saturation vapor pressure [hPa]
+      real(r8)                          :: e                                      ! Water vapor pressure [hPa]
+      real(r8), allocatable             :: y_p(:)                                 ! Selected observation values
+      real(r8), allocatable             :: hx_p(:,:)                              ! Forecast ensemble H(x) at selected observation locations
+      real(r8), allocatable             :: r_p(:)                                 ! Localized observation error variances
+      real(r8)                          :: trans(DEF_DA_ENS_NUM, DEF_DA_ENS_NUM)  ! LETKF ensemble transform matrix
+      real(r8)                          :: state_f(1, DEF_DA_ENS_NUM)             ! Forecast temperature [K] or relative humidity [0-1]
+      real(r8)                          :: state_a(1, DEF_DA_ENS_NUM)             ! Transformed temperature [K] or relative humidity [0-1]
 !-----------------------------------------------------------------------------
       ! Discard products from the previous assimilation cycle.
       IF (allocated(tref_ens_f )) deallocate(tref_ens_f )

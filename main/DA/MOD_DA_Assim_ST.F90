@@ -8,12 +8,12 @@ MODULE MOD_DA_Assim_ST
 !
 ! WORKFLOW:
 !   1. Init: Select soil temperature observation streams from the namelist and
-!      Initialize Data_ST with their configurations.
-!   2. Run: Prepare observations and forecast H(x), then save diagnostics.
-!      For assimilation, select nearby observations for each soil patch and
-!      Apply LETKF to update temperature in the upper two soil layers.
-!      Limit temperature increments to +/-20 K. Recompute H(x) and save
-!      Analysis diagnostics.
+!      initialize Data_ST with their configurations.
+!   2. Run: Prepare observations and forecast H(x), then save diagnostics. For
+!      assimilation, select nearby observations for each soil patch and apply
+!      LETKF to update temperature in the upper two soil layers. Limit
+!      temperature increments to +/-20 K. Recompute H(x) and save analysis
+!      diagnostics.
 !   3. End: Release observation data and stream configurations.
 !
 ! HISTORY:
@@ -31,7 +31,7 @@ MODULE MOD_DA_Assim_ST
    USE MOD_DA_Vars_TimeVars
    IMPLICIT NONE
 
-   type(ST_type) :: st
+   type(ST_type)                        :: st
 
 !-----------------------------------------------------------------------------
 
@@ -72,17 +72,17 @@ CONTAINS
    SUBROUTINE run_DA_ST(idate, deltim)
 
 !-----------------------------------------------------------------------------
-      integer,  intent(in)  :: idate(3)
-      real(r8), intent(in)  :: deltim
+      integer,  intent(in)              :: idate(3)
+      real(r8), intent(in)              :: deltim
 
-      integer               :: np, iens         ! Loop indices
-      integer               :: nobs_p           ! Number of observations selected for the target patch
-      real(r8), allocatable :: y_p(:)           ! Selected observation values
-      real(r8), allocatable :: hx_p(:,:)        ! Forecast ensemble H(x) at selected observation locations
-      real(r8), allocatable :: r_p(:)           ! Localized observation error variances
-      real(r8), allocatable :: trans(:,:)       ! LETKF ensemble transform matrix
-      real(r8), allocatable :: state_f(:,:)     ! Forecast soil temperature [K]
-      real(r8), allocatable :: state_a(:,:)     ! Transformed soil temperature [K]
+      integer                           :: np, iens      ! Loop indices
+      integer                           :: nobs_p        ! Number of observations selected for the target patch
+      real(r8), allocatable             :: y_p(:)        ! Selected observation values
+      real(r8), allocatable             :: hx_p(:,:)     ! Forecast ensemble H(x) at selected observation locations
+      real(r8), allocatable             :: r_p(:)        ! Localized observation error variances
+      real(r8), allocatable             :: trans(:,:)    ! LETKF ensemble transform matrix
+      real(r8), allocatable             :: state_f(:,:)  ! Forecast soil temperature [K]
+      real(r8), allocatable             :: state_a(:,:)  ! Transformed soil temperature [K]
 !-----------------------------------------------------------------------------
       ! Prepare observations and forecast H(x).
       CALL st%forward(idate, deltim)
