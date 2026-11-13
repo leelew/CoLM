@@ -124,7 +124,6 @@ CONTAINS
       sigma_eps_sm = sqrt(1.0 - phi_sm**2)
 
       ! Calculate covariance matrix by cross-correlation matrix and standard deviation
-      cov_matrix = 0.0_r8
       DO i = 1, nvar_forc
          DO j = 1, nvar_forc
             cov_matrix(i,j) = C(i,j) * sigma_forc(i) * sigma_forc(j)
@@ -204,7 +203,7 @@ CONTAINS
          ENDDO
 
          ! Save current perturbation as previous perturbation for next time step
-         r_prev_forc = r_curr_forc
+         r_prev_forc(np,:,:) = r_curr_forc(np,:,:)
 
          ! Generate ensemble samples according different types
          DO j = 1, DEF_DA_ENS_NUM
@@ -247,10 +246,10 @@ CONTAINS
             ENDDO
 
             ! Save current perturbation as previous perturbation for next time step
-            r_prev_sm   = r_curr_sm
+            r_prev_sm(np,:,:) = r_curr_sm(np,:,:)
 
             ! Apply layer perturbations and the existing groundwater adjustment.
-            wa_ens(1:DEF_DA_ENS_NUM,np) = wa_ens(1:DEF_DA_ENS_NUM,np) + &
+            wa_ens(1:DEF_DA_ENS_NUM,np) = wa_ens(1:DEF_DA_ENS_NUM,np) - &
                sum(max(1e-10, wliq_soisno_ens(1:nvar_sm,1:DEF_DA_ENS_NUM,np) + r_curr_sm(np,:,:)) - &
                wliq_soisno_ens(1:nvar_sm,1:DEF_DA_ENS_NUM,np), dim=1)
             wliq_soisno_ens(1:nvar_sm,1:DEF_DA_ENS_NUM,np) = &

@@ -62,7 +62,7 @@ MODULE MOD_DA_Data_SM
       real(r8), allocatable               :: lon(:)                         ! Observation longitudes [deg]
       real(r8), allocatable               :: y(:)                           ! Observed values or analysis ensemble means
       real(r8), allocatable               :: hx_obs(:,:)                    ! Observation-space ensemble H(x)
-      real(r8), allocatable               :: r(:)                           ! Observation error standard deviations
+      real(r8), allocatable               :: sigma(:)                       ! Observation error standard deviations
 
    CONTAINS
 
@@ -70,7 +70,7 @@ MODULE MOD_DA_Data_SM
       procedure                           :: forward    => SM_type_forward  ! Compute model- and observation-space H(x) from enabled sources
       procedure                           :: save       => SM_type_save     ! Copy PM patch H(x) into forecast or analysis diagnostics
       procedure                           :: clear      => SM_type_clear    ! Deallocate combined records and clear source observations
-      procedure                           :: concat     => SM_type_concat   ! Combine enabled sources in matching y, hx_obs and r order
+      procedure                           :: concat     => SM_type_concat   ! Combine enabled sources in matching y, hx_obs and sigma order
       procedure                           :: prepare    => SM_type_prepare  ! Prepare 'data package' used for data assimilation at each patch
 
    END type SM_type
@@ -133,11 +133,8 @@ CONTAINS
          deallocate(pm_configs)
       ENDIF
 
-      ! Initialize temperature and humidity analysis pseudo-observations.
+      ! Enable temperature and humidity analysis pseudo-observations.
       this%use_anatq = any(configs%source_name == 'ANATQ')
-      IF (this%use_anatq) THEN
-         CALL this%anatq%init()
-      ENDIF
 
    END SUBROUTINE SM_type_init
 
@@ -149,11 +146,11 @@ CONTAINS
       class(SM_type), intent(inout)       :: this
 !-----------------------------------------------------------------------------
       this%nobs = 0
-      IF (allocated(this%lat   ))   deallocate(this%lat   )
-      IF (allocated(this%lon   ))   deallocate(this%lon   )
-      IF (allocated(this%y     ))   deallocate(this%y     )
-      IF (allocated(this%hx_obs))   deallocate(this%hx_obs)
-      IF (allocated(this%r     ))   deallocate(this%r     )
+      IF (allocated(this%lat   )) deallocate(this%lat   )
+      IF (allocated(this%lon   )) deallocate(this%lon   )
+      IF (allocated(this%y     )) deallocate(this%y     )
+      IF (allocated(this%hx_obs)) deallocate(this%hx_obs)
+      IF (allocated(this%sigma )) deallocate(this%sigma )
 
       CALL this%pm%clear()
       CALL this%anatq%clear()
@@ -171,11 +168,11 @@ CONTAINS
       integer                             :: offset
 !-----------------------------------------------------------------------------
       this%nobs = 0
-      IF (allocated(this%lat   ))   deallocate(this%lat   )
-      IF (allocated(this%lon   ))   deallocate(this%lon   )
-      IF (allocated(this%y     ))   deallocate(this%y     )
-      IF (allocated(this%hx_obs))   deallocate(this%hx_obs)
-      IF (allocated(this%r     ))   deallocate(this%r     )
+      IF (allocated(this%lat   )) deallocate(this%lat   )
+      IF (allocated(this%lon   )) deallocate(this%lon   )
+      IF (allocated(this%y     )) deallocate(this%y     )
+      IF (allocated(this%hx_obs)) deallocate(this%hx_obs)
+      IF (allocated(this%sigma )) deallocate(this%sigma )
 
       IF (this%use_pm) this%nobs = this%nobs + this%pm%nobs
       IF (this%use_anatq) this%nobs = this%nobs + this%anatq%nobs
@@ -185,7 +182,7 @@ CONTAINS
       allocate(this%lon(this%nobs))
       allocate(this%y(this%nobs))
       allocate(this%hx_obs(this%nobs, DEF_DA_ENS_NUM))
-      allocate(this%r(this%nobs))
+      allocate(this%sigma(this%nobs))
 
       offset = 0
 
@@ -196,7 +193,7 @@ CONTAINS
             this%lon(offset+1:offset+n) = this%pm%lon
             this%y(offset+1:offset+n) = this%pm%y
             this%hx_obs(offset+1:offset+n,:) = this%pm%hx_obs
-            this%r(offset+1:offset+n) = this%pm%r
+            this%sigma(offset+1:offset+n) = this%pm%sigma
             offset = offset + n
          ENDIF
       ENDIF
@@ -208,7 +205,7 @@ CONTAINS
             this%lon(offset+1:offset+n) = this%anatq%lon
             this%y(offset+1:offset+n) = this%anatq%y
             this%hx_obs(offset+1:offset+n,:) = this%anatq%hx_obs
-            this%r(offset+1:offset+n) = this%anatq%r
+            this%sigma(offset+1:offset+n) = this%anatq%sigma
             offset = offset + n
          ENDIF
       ENDIF
@@ -289,7 +286,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE SM_type_prepare(this, np, nobs_p, y_p, hx_p, r_p)
+   SUBROUTINE SM_type_prepare(this, np, nobs_p, y_p, hx_p, R_p)
 
 !-----------------------------------------------------------------------------
       class(SM_type),         intent(in)  :: this
@@ -297,7 +294,7 @@ CONTAINS
       integer,                intent(out) :: nobs_p
       real(r8), allocatable,  intent(out) :: y_p(:)
       real(r8), allocatable,  intent(out) :: hx_p(:,:)
-      real(r8), allocatable,  intent(out) :: r_p(:)
+      real(r8), allocatable,  intent(out) :: R_p(:)
 
       integer                             :: iens, iobs
       real(r8)                            :: lat_p, lon_p, dlat, dlon
@@ -321,13 +318,13 @@ CONTAINS
       nobs_p = count(valid)
       IF (nobs_p == 0) RETURN
 
-      allocate(y_p(nobs_p), hx_p(nobs_p,DEF_DA_ENS_NUM), r_p(nobs_p))
+      allocate(y_p(nobs_p), hx_p(nobs_p,DEF_DA_ENS_NUM), R_p(nobs_p))
       allocate(lat(nobs_p), lon(nobs_p), dist(nobs_p), hav(nobs_p))
       y_p = pack(this%y, valid)
       DO iens = 1, DEF_DA_ENS_NUM
          hx_p(:,iens) = pack(this%hx_obs(:,iens), valid)
       ENDDO
-      r_p = pack(this%r, valid)
+      r_p = pack(this%sigma, valid)
       lat = pack(this%lat, valid)
       lon = pack(this%lon, valid)
 

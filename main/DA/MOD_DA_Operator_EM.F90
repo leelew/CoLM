@@ -1081,7 +1081,7 @@ CONTAINS
       real(r8), intent(in)     :: lai                               ! Leaf area index
       real(r8), intent(in)     :: tleaf                             ! Leaf temperature (K)
       real(r8), intent(out)    :: tb_veg(2)                         ! Brightness temperature of vegetation for H- and V- polarization
-      real(r8), intent(out)    :: gamma_p(2)                        ! Vegetation opacity for H- and V- polarization
+      real(r8), intent(out)    :: gamma_p(2)                        ! Canopy transmissivity for H and V polarizations
       real(r8), intent(in)     :: htop, snowdp
 
       real(r8)                 :: tau_nadir                         ! Vegetation opacity at nadir

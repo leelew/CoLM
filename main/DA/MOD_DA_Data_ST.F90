@@ -56,7 +56,7 @@ MODULE MOD_DA_Data_ST
       real(r8), allocatable               :: lon(:)                         ! Observation longitudes [deg]
       real(r8), allocatable               :: y(:)                           ! Observed values
       real(r8), allocatable               :: hx_obs(:,:)                    ! Observation-space ensemble H(x)
-      real(r8), allocatable               :: r(:)                           ! Observation error standard deviations
+      real(r8), allocatable               :: sigma(:)                       ! Observation error standard deviations
 
    CONTAINS
 
@@ -64,7 +64,7 @@ MODULE MOD_DA_Data_ST
       procedure                           :: forward    => ST_type_forward  ! Compute model- and observation-space H(x) from enabled sources
       procedure                           :: save       => ST_type_save     ! Copy PM patch H(x) into forecast or analysis diagnostics
       procedure                           :: clear      => ST_type_clear    ! Deallocate combined records and clear source observations
-      procedure                           :: concat     => ST_type_concat   ! Combine enabled sources in matching y, hx_obs and r order
+      procedure                           :: concat     => ST_type_concat   ! Combine enabled sources in matching y, hx_obs and sigma order
       procedure                           :: prepare    => ST_type_prepare  ! Prepare 'data package' used for data assimilation at each patch
 
    END type ST_type
@@ -140,7 +140,7 @@ CONTAINS
       IF (allocated(this%lon   )) deallocate(this%lon   )
       IF (allocated(this%y     )) deallocate(this%y     )
       IF (allocated(this%hx_obs)) deallocate(this%hx_obs)
-      IF (allocated(this%r     )) deallocate(this%r     )
+      IF (allocated(this%sigma )) deallocate(this%sigma )
 
       CALL this%pm%clear()
 
@@ -161,7 +161,7 @@ CONTAINS
       IF (allocated(this%lon   )) deallocate(this%lon   )
       IF (allocated(this%y     )) deallocate(this%y     )
       IF (allocated(this%hx_obs)) deallocate(this%hx_obs)
-      IF (allocated(this%r     )) deallocate(this%r     )
+      IF (allocated(this%sigma )) deallocate(this%sigma )
 
       IF (this%use_pm) this%nobs = this%nobs + this%pm%nobs
       IF (this%nobs == 0) RETURN
@@ -170,7 +170,7 @@ CONTAINS
       allocate(this%lon(this%nobs))
       allocate(this%y(this%nobs))
       allocate(this%hx_obs(this%nobs, DEF_DA_ENS_NUM))
-      allocate(this%r(this%nobs))
+      allocate(this%sigma(this%nobs))
 
       offset = 0
 
@@ -181,7 +181,7 @@ CONTAINS
             this%lon(offset+1:offset+n) = this%pm%lon
             this%y(offset+1:offset+n) = this%pm%y
             this%hx_obs(offset+1:offset+n,:) = this%pm%hx_obs
-            this%r(offset+1:offset+n) = this%pm%r
+            this%sigma(offset+1:offset+n) = this%pm%sigma
             offset = offset + n
          ENDIF
       ENDIF
@@ -298,7 +298,7 @@ CONTAINS
       DO iens = 1, DEF_DA_ENS_NUM
          hx_p(:,iens) = pack(this%hx_obs(:,iens), valid)
       ENDDO
-      r_p = pack(this%r, valid)
+      r_p = pack(this%sigma, valid)
       lat = pack(this%lat, valid)
       lon = pack(this%lon, valid)
 

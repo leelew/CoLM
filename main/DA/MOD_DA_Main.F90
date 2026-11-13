@@ -27,18 +27,18 @@ MODULE MOD_DA_Main
 !
 !      1. Organizes observations into site, grid, and pseudo-observation
 !         types. Source-specific modules construct observation equivalents,
-!         while Target-specific modules select and localize observations for
+!         while target-specific modules select and localize observations for
 !         analysis. Screen-level analysis products provide pseudo-observations
 !         for subsequent land data assimilation.
 !      2. Establishes an observation-operator library, including a passive
 !         microwave radiative-transfer operator for brightness temperatures.
 !      3. Uses the existing ensemble-generation scheme to represent
-!         uncertainty Through perturbations to atmospheric forcing, model
+!         uncertainty through perturbations to atmospheric forcing, model
 !         states, and parameters.
 !      4. Applies LETKF to update model states using the configured
 !         observations.
 !      5. Manages ensemble states, forcing, fluxes, restart data, and
-!         diagnostic History within the DA modules. Supports open-loop H(x)
+!         diagnostic history within the DA modules. Supports open-loop H(x)
 !         simulation And optional analysis feedback for land-atmosphere
 !         coupling.
 !-----------------------------------------------------------------------------

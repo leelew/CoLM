@@ -93,7 +93,7 @@ MODULE MOD_DA_Data_GridType
       real(r8), allocatable                 :: lon(:)                   ! Longitude of each obs point
       real(r8), allocatable                 :: time(:)                  ! UTC time of each obs point (seconds since begin of current day)
       real(r8), allocatable                 :: y(:)                     ! Observed value
-      real(r8), allocatable                 :: r(:)                     ! Observation error standard deviation
+      real(r8), allocatable                 :: sigma(:)                 ! Observation error standard deviation
       real(r8), allocatable                 :: theta(:)                 ! Incidence angle for each obs point [rad]
       integer,  allocatable                 :: ii(:)                    ! Latitude index of each observation in the global reference grid
       integer,  allocatable                 :: jj(:)                    ! Longitude index of each observation in the global reference grid
@@ -141,14 +141,14 @@ CONTAINS
 !-----------------------------------------------------------------------------
       class(grid_obs_type),   intent(inout) :: this
 !-----------------------------------------------------------------------------
-      IF (allocated(this%lat  ))  deallocate(this%lat  )
-      IF (allocated(this%lon  ))  deallocate(this%lon  )
-      IF (allocated(this%time ))  deallocate(this%time )
-      IF (allocated(this%y    ))  deallocate(this%y    )
-      IF (allocated(this%r    ))  deallocate(this%r    )
-      IF (allocated(this%theta))  deallocate(this%theta)
-      IF (allocated(this%ii   ))  deallocate(this%ii   )
-      IF (allocated(this%jj   ))  deallocate(this%jj   )
+      IF (allocated(this%lat  )) deallocate(this%lat  )
+      IF (allocated(this%lon  )) deallocate(this%lon  )
+      IF (allocated(this%time )) deallocate(this%time )
+      IF (allocated(this%y    )) deallocate(this%y    )
+      IF (allocated(this%sigma)) deallocate(this%sigma)
+      IF (allocated(this%theta)) deallocate(this%theta)
+      IF (allocated(this%ii   )) deallocate(this%ii   )
+      IF (allocated(this%jj   )) deallocate(this%jj   )
       this%nobs = 0
 
    END SUBROUTINE grid_obs_clear
@@ -174,7 +174,7 @@ CONTAINS
       real(r8), allocatable                 :: lon(:)                   ! Raw obs longitudes 
       real(r8), allocatable                 :: time(:)                  ! Raw obs times [s since current UTC day]
       real(r8), allocatable                 :: y(:)                     ! Raw obs values 
-      real(r8), allocatable                 :: r(:)                     ! Raw obs error standard deviation 
+      real(r8), allocatable                 :: sigma(:)                 ! Raw obs error standard deviation
       real(r8), allocatable                 :: theta(:)                 ! Raw incidence angles [rad]
       integer,  allocatable                 :: ii(:)                    ! Raw obs ii index 
       integer,  allocatable                 :: jj(:)                    ! Raw obs jj index 
@@ -203,7 +203,7 @@ CONTAINS
          CALL ncio_read_bcast_serial(obs_file_name, 'longitude',         lon  )
          CALL ncio_read_bcast_serial(obs_file_name, 'time',              time )
          CALL ncio_read_bcast_serial(obs_file_name, trim(this%var_name), y    )
-         CALL ncio_read_bcast_serial(obs_file_name, 'r',                 r    )
+         CALL ncio_read_bcast_serial(obs_file_name, 'sigma',             sigma)
          CALL ncio_read_bcast_serial(obs_file_name, 'theta',             theta)
          CALL ncio_read_bcast_serial(obs_file_name, 'ii',                ii   )
          CALL ncio_read_bcast_serial(obs_file_name, 'jj',                jj   )
@@ -222,7 +222,7 @@ CONTAINS
             allocate(this%lon   (this%nobs))
             allocate(this%time  (this%nobs))
             allocate(this%y     (this%nobs))
-            allocate(this%r     (this%nobs))
+            allocate(this%sigma (this%nobs))
             allocate(this%theta (this%nobs))
             allocate(this%ii    (this%nobs))
             allocate(this%jj    (this%nobs))
@@ -231,7 +231,7 @@ CONTAINS
             this%lon    = pack(lon,   valid)
             this%time   = pack(time,  valid)
             this%y      = pack(y,     valid)
-            this%r      = pack(r,     valid)
+            this%sigma  = pack(sigma, valid)
             this%theta  = pack(theta, valid)
             this%ii     = pack(ii,    valid)
             this%jj     = pack(jj,    valid)
@@ -242,7 +242,7 @@ CONTAINS
          IF (allocated(lon  )) deallocate(lon  )
          IF (allocated(time )) deallocate(time )
          IF (allocated(y    )) deallocate(y    )
-         IF (allocated(r    )) deallocate(r    )
+         IF (allocated(sigma)) deallocate(sigma)
          IF (allocated(theta)) deallocate(theta)
          IF (allocated(ii   )) deallocate(ii   )
          IF (allocated(jj   )) deallocate(jj   )

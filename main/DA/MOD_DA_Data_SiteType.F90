@@ -85,7 +85,7 @@ MODULE MOD_DA_Data_SiteType
       real(r8), allocatable               :: lon(:)                    ! Longitude of each observation 
       real(r8), allocatable               :: time(:)                   ! UTC time of each observation [s since begin of current day]
       real(r8), allocatable               :: y(:)                      ! Observed value
-      real(r8), allocatable               :: r(:)                      ! Observation error standard deviation
+      real(r8), allocatable               :: sigma(:)                  ! Observation error standard deviation
 
    CONTAINS
 
@@ -210,7 +210,7 @@ CONTAINS
       IF (allocated(this%lon  )) deallocate(this%lon  )
       IF (allocated(this%time )) deallocate(this%time )
       IF (allocated(this%y    )) deallocate(this%y    )
-      IF (allocated(this%r    )) deallocate(this%r    )
+      IF (allocated(this%sigma)) deallocate(this%sigma)
       this%nobs = 0
 
    END SUBROUTINE site_obs_clear
@@ -237,7 +237,7 @@ CONTAINS
       real(r8), allocatable               :: lon(:)                    ! Raw obs longitudes
       real(r8), allocatable               :: time(:)                   ! Raw obs times [s since current UTC day]
       real(r8), allocatable               :: y(:)                      ! Raw obs values
-      real(r8), allocatable               :: r(:)                      ! Raw obs error standard deviation
+      real(r8), allocatable               :: sigma(:)                  ! Raw obs error standard deviation
       integer,  allocatable               :: isite(:)                  ! Raw obs site index in sites.nc
       logical,  allocatable               :: valid(:)                  ! Mask for obs inside time window and domain with mapped sites
 !-----------------------------------------------------------------------------
@@ -263,7 +263,7 @@ CONTAINS
          CALL ncio_read_bcast_serial(obs_file_name, 'time',              time )
          CALL ncio_read_bcast_serial(obs_file_name, 'isite',             isite)
          CALL ncio_read_bcast_serial(obs_file_name, trim(this%var_name), y    )
-         CALL ncio_read_bcast_serial(obs_file_name, 'r',                 r    )
+         CALL ncio_read_bcast_serial(obs_file_name, 'sigma',             sigma)
 
          allocate(valid(size(time)))
          valid = time >= sdate(3)          .and.  &
@@ -283,14 +283,14 @@ CONTAINS
             allocate(this%lon   (this%nobs))
             allocate(this%time  (this%nobs))
             allocate(this%y     (this%nobs))
-            allocate(this%r     (this%nobs))
+            allocate(this%sigma (this%nobs))
 
             this%isite = pack(isite, valid)
             this%lat   = pack(lat,   valid)
             this%lon   = pack(lon,   valid)
             this%time  = pack(time,  valid)
             this%y     = pack(y,     valid)
-            this%r     = pack(r,     valid)
+            this%sigma = pack(sigma, valid)
          ENDIF
 
          IF (allocated(valid)) deallocate(valid)
@@ -298,7 +298,7 @@ CONTAINS
          IF (allocated(lon  )) deallocate(lon  )
          IF (allocated(time )) deallocate(time )
          IF (allocated(y    )) deallocate(y    )
-         IF (allocated(r    )) deallocate(r    )
+         IF (allocated(sigma)) deallocate(sigma)
          IF (allocated(isite)) deallocate(isite)
       ENDIF
 

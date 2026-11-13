@@ -87,7 +87,7 @@ MODULE MOD_DA_Data_INSITU
       real(r8), allocatable                    :: lat(:)                            ! Observation latitudes
       real(r8), allocatable                    :: lon(:)                            ! Observation longitudes
       real(r8), allocatable                    :: y(:)                              ! Observed values
-      real(r8), allocatable                    :: r(:)                              ! Observation error standard deviations
+      real(r8), allocatable                    :: sigma(:)                          ! Observation error standard deviations
       real(r8), allocatable                    :: hx_obs(:,:)                       ! Observation-space ensemble H(x)
 
    CONTAINS
@@ -138,7 +138,7 @@ CONTAINS
 !-----------------------------------------------------------------------------
       CALL this%clear()
 
-      ! Reuse observations until clear is called at the end of the time step.
+      ! Read observations until clear is called at the end of the time step.
       CALL this%y%read(idate, deltim)
       IF (this%y%nobs == 0) RETURN
 
@@ -192,19 +192,15 @@ CONTAINS
       allocate(owner(this%y%nobs))
       owner(:) = 0
 
-      IF (p_is_worker .and. numpatch > 0 .and. allocated(this%hx_model)) THEN
-         IF (size(this%hx_model, 2) >= numpatch) THEN
-            DO iobs = 1, this%y%nobs
-               isite = this%y%isite(iobs)
-               IF (this%y%site_iworker(isite) == p_iam_glb) THEN
-                  np = this%y%site_iworker_ipatch(isite)
-                  IF (np >= 1 .and. np <= numpatch) THEN
-                     this%hx_obs(iobs, 1:DEF_DA_ENS_NUM) = this%hx_model(1:DEF_DA_ENS_NUM, np)
-                     owner(iobs) = 1
-                  ENDIF
-               ENDIF
-            ENDDO
-         ENDIF
+      IF (p_is_worker .and. numpatch > 0) THEN
+         DO iobs = 1, this%y%nobs
+            isite = this%y%isite(iobs)
+            IF (this%y%site_iworker(isite) == p_iam_glb) THEN
+               np = this%y%site_iworker_ipatch(isite)
+               this%hx_obs(iobs,:) = this%hx_model(1:DEF_DA_ENS_NUM, np)
+               owner(iobs) = 1
+            ENDIF
+         ENDDO
       ENDIF
 
       ! Share observation-space H(x) across all ranks.
@@ -282,7 +278,7 @@ CONTAINS
       IF (allocated(this%lon   )) deallocate(this%lon   )
       IF (allocated(this%y     )) deallocate(this%y     )
       IF (allocated(this%hx_obs)) deallocate(this%hx_obs)
-      IF (allocated(this%r     )) deallocate(this%r     )
+      IF (allocated(this%sigma )) deallocate(this%sigma )
 
       IF (allocated(this%sensors)) THEN
          DO i = 1, size(this%sensors)
@@ -323,7 +319,7 @@ CONTAINS
       IF (allocated(this%lat   )) deallocate(this%lat   )
       IF (allocated(this%lon   )) deallocate(this%lon   )
       IF (allocated(this%y     )) deallocate(this%y     )
-      IF (allocated(this%r     )) deallocate(this%r     )
+      IF (allocated(this%sigma )) deallocate(this%sigma )
       IF (allocated(this%hx_obs)) deallocate(this%hx_obs)
       IF (.not. allocated(this%sensors)) RETURN
 
@@ -339,7 +335,7 @@ CONTAINS
       allocate(this%lat(this%nobs))
       allocate(this%lon(this%nobs))
       allocate(this%y(this%nobs))
-      allocate(this%r(this%nobs))
+      allocate(this%sigma(this%nobs))
       allocate(this%hx_obs(this%nobs, DEF_DA_ENS_NUM))
 
       offset = 0
@@ -352,7 +348,7 @@ CONTAINS
          this%lat(offset+1:offset+n) = this%sensors(is)%y%lat
          this%lon(offset+1:offset+n) = this%sensors(is)%y%lon
          this%y(offset+1:offset+n) = this%sensors(is)%y%y
-         this%r(offset+1:offset+n) = this%sensors(is)%y%r
+         this%sigma(offset+1:offset+n) = this%sensors(is)%y%sigma
          this%hx_obs(offset+1:offset+n,:) = this%sensors(is)%hx_obs
 
          offset = offset + n

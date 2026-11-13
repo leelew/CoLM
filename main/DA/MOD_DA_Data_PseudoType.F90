@@ -40,7 +40,7 @@ MODULE MOD_DA_Data_PseudoType
       real(r8), allocatable                 :: lat(:)                     ! Patch latitude
       real(r8), allocatable                 :: lon(:)                     ! Patch longitude
       real(r8), allocatable                 :: y(:)                       ! Analysis ensemble means of the pseudo-observation variable
-      real(r8), allocatable                 :: r(:)                       ! Observation error standard deviations
+      real(r8), allocatable                 :: sigma(:)                   ! Observation error standard deviations
 
    CONTAINS
 
@@ -55,20 +55,20 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE pseudo_obs_read(this, mask, y, r)
+   SUBROUTINE pseudo_obs_read(this, mask, y, sigma)
 
 !-----------------------------------------------------------------------------
       class(pseudo_obs_type), intent(inout) :: this
       logical, allocatable, intent(in)      :: mask(:)                    ! Selected local patches
       real(r8), allocatable, intent(in)     :: y(:)                       ! Analysis means on local patches
-      real(r8), intent(in)                  :: r                          ! Observation error standard deviation
+      real(r8), intent(in)                  :: sigma                      ! Observation error standard deviation
 
       integer                               :: np
       integer                               :: nlocal                     ! Number of selected patches on one worker
       integer                               :: iobs                       ! Record index in the worker send buffer
       integer                               :: iworker                    ! Worker index in the global worker list
       integer                               :: offset                     ! Number of records already received on master
-      real(r8), allocatable                 :: obs(:,:)                   ! Selected latitude, longitude, y and r on each worker
+      real(r8), allocatable                 :: obs(:,:)                   ! Selected latitude, longitude, y and sigma on each worker
       real(r8), allocatable                 :: obs_global(:,:)            ! Observation records gathered on master
 !-----------------------------------------------------------------------------
       CALL this%clear()
@@ -91,7 +91,7 @@ CONTAINS
                obs(1,iobs) = patchlatr(np)*180.0_r8/pi
                obs(2,iobs) = (modulo(patchlonr(np)+pi,2.0_r8*pi)-pi)*180.0_r8/pi
                obs(3,iobs) = y(np)
-               obs(4,iobs) = r
+               obs(4,iobs) = sigma
             ENDDO
             CALL mpi_send(obs, 4*nlocal, MPI_REAL8, p_address_master, mpi_tag_data, p_comm_glb, p_err)
          ENDIF
@@ -113,17 +113,17 @@ CONTAINS
       ENDIF
 
       ! Broadcast complete observation vectors to all processes.
-      allocate(this%lat(this%nobs), this%lon(this%nobs), this%y(this%nobs), this%r(this%nobs))
+      allocate(this%lat(this%nobs), this%lon(this%nobs), this%y(this%nobs), this%sigma(this%nobs))
       IF (p_is_master) THEN
          this%lat = obs_global(1,:)
          this%lon = obs_global(2,:)
          this%y   = obs_global(3,:)
-         this%r   = obs_global(4,:)
+         this%sigma   = obs_global(4,:)
       ENDIF
       CALL mpi_bcast(this%lat, this%nobs, MPI_REAL8, p_address_master, p_comm_glb, p_err)
       CALL mpi_bcast(this%lon, this%nobs, MPI_REAL8, p_address_master, p_comm_glb, p_err)
       CALL mpi_bcast(this%y,   this%nobs, MPI_REAL8, p_address_master, p_comm_glb, p_err)
-      CALL mpi_bcast(this%r,   this%nobs, MPI_REAL8, p_address_master, p_comm_glb, p_err)
+      CALL mpi_bcast(this%sigma,   this%nobs, MPI_REAL8, p_address_master, p_comm_glb, p_err)
 
    END SUBROUTINE pseudo_obs_read
 
@@ -135,10 +135,10 @@ CONTAINS
       class(pseudo_obs_type), intent(inout) :: this
 !-----------------------------------------------------------------------------
       this%nobs = 0
-      IF (allocated(this%lat)) deallocate(this%lat)
-      IF (allocated(this%lon)) deallocate(this%lon)
-      IF (allocated(this%y  )) deallocate(this%y  )
-      IF (allocated(this%r  )) deallocate(this%r  )
+      IF (allocated(this%lat  )) deallocate(this%lat  )
+      IF (allocated(this%lon  )) deallocate(this%lon  )
+      IF (allocated(this%y    )) deallocate(this%y    )
+      IF (allocated(this%sigma)) deallocate(this%sigma)
 
    END SUBROUTINE pseudo_obs_clear
 

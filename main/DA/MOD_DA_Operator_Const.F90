@@ -38,15 +38,15 @@ MODULE MOD_DA_Operator_Const
    SAVE
 
    ! Constant variables
-   real(r8), parameter    :: C = 2.998e8           ! speed of light (m/s)
-   real(r8), parameter    :: mu0 = 4.*pi*1e-7      ! vacuum permeability (H/m)
-   real(r8), parameter    :: eps_0 = 8.854e-12     ! dielectric constant of free space (Klein and Swift 1977) [Farads/meter]
-   real(r8), parameter    :: z0 = sqrt(mu0/eps_0)  ! impedance of free space (Ohm)
-   real(r8), parameter    :: eps_w_inf = 4.9       ! dielectric constant at infinite frequency (Stogryn 1971),
-   real(r8), parameter    :: rho_soil = 2.66       ! soil specific density (g/cm3)
-   real(r8), parameter    :: f0w = 9.              ! relaxation frequency of liquid water (GHz)
-   real(r8), parameter    :: rgh_surf = 2.2        ! soil surface roughness (cm)
-   complex(r8), parameter :: jj = (0., 1.)         ! imaginary unit for complex number
+   real(r8), parameter    :: C = 2.998e8           ! Speed of light (m/s)
+   real(r8), parameter    :: mu0 = 4.*pi*1e-7      ! Vacuum permeability (H/m)
+   real(r8), parameter    :: eps_0 = 8.854e-12     ! Dielectric constant of free space (Klein and Swift 1977) [Farads/meter]
+   real(r8), parameter    :: z0 = sqrt(mu0/eps_0)  ! Impedance of free space (Ohm)
+   real(r8), parameter    :: eps_w_inf = 4.9       ! Dielectric constant at infinite frequency (Stogryn 1971),
+   real(r8), parameter    :: rho_soil = 2.66       ! Soil specific density (g/cm3)
+   real(r8), parameter    :: f0w = 9.              ! Relaxation frequency of liquid water (GHz)
+   real(r8), parameter    :: rgh_surf = 2.2        ! Soil surface roughness (cm)
+   complex(r8), parameter :: jj = (0., 1.)         ! Imaginary unit for complex number
 
 #ifdef LULC_IGBP
    ! 0  Ocean
@@ -68,8 +68,7 @@ MODULE MOD_DA_Operator_Const
    !16  Barren
    !17  Water Bodies
 
-   ! empirical parameters to account for the dependence of optical depth
-   ! on incidence angle [1]
+   ! Empirical parameters to account for the dependence of optical depth on incidence angle [1]
    real(r8), parameter, dimension(N_land_classification) :: tth &
       = (/0.80, 1.00, 0.80, 0.49, 0.49, &
       1.00, 1.00, 1.00, 1.00, 1.00,  &
@@ -81,7 +80,7 @@ MODULE MOD_DA_Operator_Const
       1.00, 2.00, 1.00, 2.00, 1.00,  &
       1.00, 1.00/)
 
-   ! empirical roughness parameters (Table 2 in [2])
+   ! Empirical roughness parameters (Table 2 in [2])
    real(r8), parameter, dimension(N_land_classification) :: hr_SMAP &
       = (/0.160, 0.160, 0.160, 0.160, 0.160, &
       0.110, 0.110, 0.125, 0.156, 0.156, &
@@ -119,7 +118,7 @@ MODULE MOD_DA_Operator_Const
       0.0000, 0.0000, 0.0000, 0.0000, 0.0000, &
       0.0000, 0.0000/)
 
-   ! effective diffusion albedo (Table 3 in [2])
+   ! Effective diffusion albedo (Table 3 in [2])
    real(r8), parameter, dimension(N_land_classification) :: w_SMAPL2 &
       = (/0.050, 0.050, 0.050, 0.050, 0.050, &
       0.050, 0.050, 0.050, 0.080, 0.050, &
