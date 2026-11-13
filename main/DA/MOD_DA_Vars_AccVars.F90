@@ -10,7 +10,7 @@ MODULE MOD_DA_Vars_AccVars
 !   Valid samples are summed here, the history output procedure converts
 !   These sums to means.
 !
-! AUTHOR:
+! HISTORY:
 !   Zhilong Fan, 10/2026
 !   Lu Li, Zhilong Fan, 11/2026: DA v1.0
 !-----------------------------------------------------------------------------
@@ -60,31 +60,31 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE allocate_DA_AccVars ()
+   SUBROUTINE allocate_DA_AccVars()
 
 !-----------------------------------------------------------------------------
       IF (p_is_worker) THEN
          IF (numpatch > 0) THEN
-            allocate (nac_obs           (nstream,                          numpatch))
-            allocate (a_hx_ol           (nstream,                          numpatch))
-            allocate (a_hx_f_ens        (nstream,          DEF_DA_ENS_NUM, numpatch))
-            allocate (a_hx_a_ens        (nstream,          DEF_DA_ENS_NUM, numpatch))
-            allocate (a_hx_f            (nstream,                          numpatch))
-            allocate (a_hx_a            (nstream,                          numpatch))
-            allocate (a_wliq_soisno_ol  (maxsnl+1:nl_soil,                 numpatch))
-            allocate (a_wliq_soisno_f   (maxsnl+1:nl_soil,                 numpatch))
-            allocate (a_wliq_soisno_a   (maxsnl+1:nl_soil,                 numpatch))
-            allocate (a_wliq_soisno_ens (maxsnl+1:nl_soil, DEF_DA_ENS_NUM, numpatch))
-            allocate (a_t_soisno_ol     (maxsnl+1:nl_soil,                 numpatch))
-            allocate (a_t_soisno_f      (maxsnl+1:nl_soil,                 numpatch))
-            allocate (a_t_soisno_a      (maxsnl+1:nl_soil,                 numpatch))
+            allocate(nac_obs           (nstream,                          numpatch))
+            allocate(a_hx_ol           (nstream,                          numpatch))
+            allocate(a_hx_f_ens        (nstream,          DEF_DA_ENS_NUM, numpatch))
+            allocate(a_hx_a_ens        (nstream,          DEF_DA_ENS_NUM, numpatch))
+            allocate(a_hx_f            (nstream,                          numpatch))
+            allocate(a_hx_a            (nstream,                          numpatch))
+            allocate(a_wliq_soisno_ol  (maxsnl+1:nl_soil,                 numpatch))
+            allocate(a_wliq_soisno_f   (maxsnl+1:nl_soil,                 numpatch))
+            allocate(a_wliq_soisno_a   (maxsnl+1:nl_soil,                 numpatch))
+            allocate(a_wliq_soisno_ens (maxsnl+1:nl_soil, DEF_DA_ENS_NUM, numpatch))
+            allocate(a_t_soisno_ol     (maxsnl+1:nl_soil,                 numpatch))
+            allocate(a_t_soisno_f      (maxsnl+1:nl_soil,                 numpatch))
+            allocate(a_t_soisno_a      (maxsnl+1:nl_soil,                 numpatch))
          ENDIF
 #ifdef GridRiverLakeFlow
          IF (numucat > 0) THEN
-            allocate (a_discharge_ol    (                                  numucat ))
-            allocate (acctime_ucat_ol   (                                  numucat ))
-            allocate (a_discharge_a     (                                  numucat ))
-            allocate (acctime_ucat_a    (                                  numucat ))
+            allocate(a_discharge_ol    (                                  numucat ))
+            allocate(acctime_ucat_ol   (                                  numucat ))
+            allocate(a_discharge_a     (                                  numucat ))
+            allocate(acctime_ucat_a    (                                  numucat ))
          ENDIF
 #endif
       ENDIF
@@ -93,37 +93,37 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE deallocate_DA_AccVars ()
+   SUBROUTINE deallocate_DA_AccVars()
 
 !-----------------------------------------------------------------------------
-      IF (allocated(nac_obs          )) deallocate (nac_obs          )
-      IF (allocated(a_hx_ol          )) deallocate (a_hx_ol          )
-      IF (allocated(a_hx_f_ens       )) deallocate (a_hx_f_ens       )
-      IF (allocated(a_hx_a_ens       )) deallocate (a_hx_a_ens       )
-      IF (allocated(a_hx_f           )) deallocate (a_hx_f           )
-      IF (allocated(a_hx_a           )) deallocate (a_hx_a           )
-      IF (allocated(a_wliq_soisno_ol )) deallocate (a_wliq_soisno_ol )
-      IF (allocated(a_wliq_soisno_f  )) deallocate (a_wliq_soisno_f  )
-      IF (allocated(a_wliq_soisno_a  )) deallocate (a_wliq_soisno_a  )
-      IF (allocated(a_wliq_soisno_ens)) deallocate (a_wliq_soisno_ens)
-      IF (allocated(a_t_soisno_ol    )) deallocate (a_t_soisno_ol    )
-      IF (allocated(a_t_soisno_f     )) deallocate (a_t_soisno_f     )
-      IF (allocated(a_t_soisno_a     )) deallocate (a_t_soisno_a     )
+      IF (allocated(nac_obs          )) deallocate(nac_obs          )
+      IF (allocated(a_hx_ol          )) deallocate(a_hx_ol          )
+      IF (allocated(a_hx_f_ens       )) deallocate(a_hx_f_ens       )
+      IF (allocated(a_hx_a_ens       )) deallocate(a_hx_a_ens       )
+      IF (allocated(a_hx_f           )) deallocate(a_hx_f           )
+      IF (allocated(a_hx_a           )) deallocate(a_hx_a           )
+      IF (allocated(a_wliq_soisno_ol )) deallocate(a_wliq_soisno_ol )
+      IF (allocated(a_wliq_soisno_f  )) deallocate(a_wliq_soisno_f  )
+      IF (allocated(a_wliq_soisno_a  )) deallocate(a_wliq_soisno_a  )
+      IF (allocated(a_wliq_soisno_ens)) deallocate(a_wliq_soisno_ens)
+      IF (allocated(a_t_soisno_ol    )) deallocate(a_t_soisno_ol    )
+      IF (allocated(a_t_soisno_f     )) deallocate(a_t_soisno_f     )
+      IF (allocated(a_t_soisno_a     )) deallocate(a_t_soisno_a     )
 #ifdef GridRiverLakeFlow
-      IF (allocated(a_discharge_ol   )) deallocate (a_discharge_ol   )
-      IF (allocated(acctime_ucat_ol  )) deallocate (acctime_ucat_ol  )
-      IF (allocated(a_discharge_a    )) deallocate (a_discharge_a    )
-      IF (allocated(acctime_ucat_a   )) deallocate (acctime_ucat_a   )
+      IF (allocated(a_discharge_ol   )) deallocate(a_discharge_ol   )
+      IF (allocated(acctime_ucat_ol  )) deallocate(acctime_ucat_ol  )
+      IF (allocated(a_discharge_a    )) deallocate(a_discharge_a    )
+      IF (allocated(acctime_ucat_a   )) deallocate(acctime_ucat_a   )
 #endif
 
    END SUBROUTINE deallocate_DA_AccVars
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE flush_DA_AccVars ()
+   SUBROUTINE flush_DA_AccVars()
 
 !-----------------------------------------------------------------------------
-      IF (allocated(nac_obs          )) nac_obs           = 0.0_r8
+      IF (allocated(nac_obs          )) nac_obs           = 0.0
       IF (allocated(a_hx_ol          )) a_hx_ol           = spval
       IF (allocated(a_hx_f_ens       )) a_hx_f_ens        = spval
       IF (allocated(a_hx_a_ens       )) a_hx_a_ens        = spval
@@ -147,22 +147,22 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE accumulate_DA_AccVars ()
+   SUBROUTINE accumulate_DA_AccVars()
 
 !-----------------------------------------------------------------------------
-      WHERE (hx_ol /= spval) nac_obs = nac_obs + 1.0_r8
-      CALL acc_DA_hist (hx_ol,                   a_hx_ol          )
-      CALL acc_DA_hist (hx_f_ens,                a_hx_f_ens       )
-      CALL acc_DA_hist (hx_a_ens,                a_hx_a_ens       )
-      CALL acc_DA_hist (hx_f,                    a_hx_f           )
-      CALL acc_DA_hist (hx_a,                    a_hx_a           )
-      CALL acc_DA_hist (wliq_soisno_ol,          a_wliq_soisno_ol )
-      CALL acc_DA_hist (wliq_soisno_f,           a_wliq_soisno_f  )
-      CALL acc_DA_hist (wliq_soisno_a,           a_wliq_soisno_a  )
-      CALL acc_DA_hist (wliq_soisno_ens(:,1:,:), a_wliq_soisno_ens)
-      CALL acc_DA_hist (t_soisno_ol,             a_t_soisno_ol    )
-      CALL acc_DA_hist (t_soisno_f,              a_t_soisno_f     )
-      CALL acc_DA_hist (t_soisno_a,              a_t_soisno_a     )
+      WHERE (hx_ol /= spval) nac_obs = nac_obs + 1.0
+      CALL acc_DA_hist(hx_ol,                   a_hx_ol          )
+      CALL acc_DA_hist(hx_f_ens,                a_hx_f_ens       )
+      CALL acc_DA_hist(hx_a_ens,                a_hx_a_ens       )
+      CALL acc_DA_hist(hx_f,                    a_hx_f           )
+      CALL acc_DA_hist(hx_a,                    a_hx_a           )
+      CALL acc_DA_hist(wliq_soisno_ol,          a_wliq_soisno_ol )
+      CALL acc_DA_hist(wliq_soisno_f,           a_wliq_soisno_f  )
+      CALL acc_DA_hist(wliq_soisno_a,           a_wliq_soisno_a  )
+      CALL acc_DA_hist(wliq_soisno_ens(:,1:,:), a_wliq_soisno_ens)
+      CALL acc_DA_hist(t_soisno_ol,             a_t_soisno_ol    )
+      CALL acc_DA_hist(t_soisno_f,              a_t_soisno_f     )
+      CALL acc_DA_hist(t_soisno_a,              a_t_soisno_a     )
 
    END SUBROUTINE accumulate_DA_AccVars
 
@@ -176,7 +176,7 @@ CONTAINS
 !   Module that DA can use directly.
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE acc_DA_hist_2d (var, s)
+   SUBROUTINE acc_DA_hist_2d(var, s)
 
 !-----------------------------------------------------------------------------
       real(r8), intent(in)    :: var (  :,:)
@@ -200,7 +200,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE acc_DA_hist_3d (var, s)
+   SUBROUTINE acc_DA_hist_3d(var, s)
 
 !-----------------------------------------------------------------------------
       real(r8), intent(in)    :: var (:,:,:)
