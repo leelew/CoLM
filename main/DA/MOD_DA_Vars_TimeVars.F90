@@ -5,16 +5,16 @@ MODULE MOD_DA_Vars_TimeVars
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
 !   Defines and manages the time-varying model variables required by the data
-!   Assimilation workflow.
+!   assimilation workflow.
 !
 !   This module stores the DA ensemble copies of prognostic state variables,
-!   Land-atmosphere coupling variables, history variables, and perturbed
-!   Forcing variables
+!   land-atmosphere coupling variables, history variables, and perturbed
+!   forcing variables
 !
-!   Ensemble copies include an unperturbed open-loop trajectory and a set
-!   Of perturbed members. The open-loop trajectory is retained in memory
-!   And restart files for restoration and diagnostics. Only the perturbed
-!   Members are used in ensemble assimilation.
+!   Ensemble copies include an unperturbed open-loop trajectory and a set of
+!   perturbed members. The open-loop trajectory is retained in memory and
+!   restart files for restoration and diagnostics. Only the perturbed members
+!   are used in ensemble assimilation.
 !
 ! HISTORY:
 !   Lu Li, 12/2024, 05/2025: Initial DA ensemble storage
@@ -43,99 +43,99 @@ MODULE MOD_DA_Vars_TimeVars
 !=============================================================================
 ! Ensemble restart state variables
 !=============================================================================
-   real(r8), allocatable :: z_sno_ens        (:,:,:  )  ! Layer depth                                              [m]
-   real(r8), allocatable :: dz_sno_ens       (:,:,:  )  ! Snow layer thickness                                     [m]
-   real(r8), allocatable :: t_soisno_ens     (:,:,:  )  ! Snow & soil temperature                                  [K]
-   real(r8), allocatable :: wliq_soisno_ens  (:,:,:  )  ! Liquid water in layers                                   [kg/m2]
-   real(r8), allocatable :: wice_soisno_ens  (:,:,:  )  ! Ice in layers                                            [kg/m2]
-   real(r8), allocatable :: smp_ens          (:,:,:  )  ! Soil matrix potential                                    [mm]
-   real(r8), allocatable :: hk_ens           (:,:,:  )  ! Hydraulic conductivity                                   [mm h2o/s]
-   real(r8), allocatable :: t_grnd_ens       (:,:    )  ! Ground surface temperature                               [K]
-   real(r8), allocatable :: tleaf_ens        (:,:    )  ! Leaf temperature                                         [K]
-   real(r8), allocatable :: ldew_ens         (:,:    )  ! Depth of water on foliage                                [mm]
-   real(r8), allocatable :: ldew_rain_ens    (:,:    )  ! Depth of rain on foliage                                 [mm]
-   real(r8), allocatable :: ldew_snow_ens    (:,:    )  ! Depth of snow on foliage                                 [mm]
-   real(r8), allocatable :: fwet_snow_ens    (:,:    )  ! Vegetation snow fractional cover                         [-]
-   real(r8), allocatable :: sag_ens          (:,:    )  ! Non dimensional snow age                                 [-]
-   real(r8), allocatable :: scv_ens          (:,:    )  ! Snow water equivalent                                    [kg/m2]
-   real(r8), allocatable :: snowdp_ens       (:,:    )  ! Snow depth                                               [m]
-   real(r8), allocatable :: fveg_ens         (:,:    )  ! Fraction vegetation cover                                [-]
-   real(r8), allocatable :: fsno_ens         (:,:    )  ! Fraction snow cover                                      [-]
-   real(r8), allocatable :: sigf_ens         (:,:    )  ! Fraction of veg cover, excluding snow-covered veg        [-]
-   real(r8), allocatable :: green_ens        (:,:    )  ! Leaf greenness                                           [-]
-   real(r8), allocatable :: tlai_ens         (:,:    )  ! Leaf area index                                          [m2/m2]
-   real(r8), allocatable :: lai_ens          (:,:    )  ! Leaf area index                                          [m2/m2]
-   real(r8), allocatable :: tsai_ens         (:,:    )  ! Stem area index                                          [m2/m2]
-   real(r8), allocatable :: sai_ens          (:,:    )  ! Stem area index                                          [m2/m2]
-   real(r8), allocatable :: alb_ens          (:,:,:,:)  ! Averaged albedo                                          [-]
-   real(r8), allocatable :: ssun_ens         (:,:,:,:)  ! Sunlit canopy absorption for solar radiation (0-1)       [-]
-   real(r8), allocatable :: ssha_ens         (:,:,:,:)  ! Shaded canopy absorption for solar radiation (0-1)       [-]
-   real(r8), allocatable :: ssoi_ens         (:,:,:,:)  ! Soil absorption for solar radiation (0-1)                [-]
-   real(r8), allocatable :: ssno_ens         (:,:,:,:)  ! Snow absorption for solar radiation (0-1)                [-]
-   real(r8), allocatable :: thermk_ens       (:,:    )  ! Canopy gap fraction for tir radiation                    [-]
-   real(r8), allocatable :: extkb_ens        (:,:    )  ! (k, g(mu)/mu) direct solar extinction coefficient        [-]
-   real(r8), allocatable :: extkd_ens        (:,:    )  ! Diffuse and scattered diffuse PAR extinction coefficient [-]
-   real(r8), allocatable :: zwt_ens          (:,:    )  ! The depth to water table                                 [m]
-   real(r8), allocatable :: wdsrf_ens        (:,:    )  ! Depth of surface water                                   [mm]
-   real(r8), allocatable :: wa_ens           (:,:    )  ! Water storage in aquifer                                 [mm]
-   real(r8), allocatable :: wetwat_ens       (:,:    )  ! Water storage in wetland                                 [mm]
-   real(r8), allocatable :: t_lake_ens       (:,:,:  )  ! Lake layer temperature                                   [K]
-   real(r8), allocatable :: lake_icefrac_ens (:,:,:  )  ! Lake mass fraction of lake layer that is frozen          [-]
-   real(r8), allocatable :: savedtke1_ens    (:,:    )  ! Top level eddy conductivity                              [W/(m K)]
+   real(r8), allocatable           :: z_sno_ens        (:,:,:  )  ! Layer depth                                              [m]
+   real(r8), allocatable           :: dz_sno_ens       (:,:,:  )  ! Snow layer thickness                                     [m]
+   real(r8), allocatable           :: t_soisno_ens     (:,:,:  )  ! Snow & soil temperature                                  [K]
+   real(r8), allocatable           :: wliq_soisno_ens  (:,:,:  )  ! Liquid water in layers                                   [kg/m2]
+   real(r8), allocatable           :: wice_soisno_ens  (:,:,:  )  ! Ice in layers                                            [kg/m2]
+   real(r8), allocatable           :: smp_ens          (:,:,:  )  ! Soil matrix potential                                    [mm]
+   real(r8), allocatable           :: hk_ens           (:,:,:  )  ! Hydraulic conductivity                                   [mm h2o/s]
+   real(r8), allocatable           :: t_grnd_ens       (:,:    )  ! Ground surface temperature                               [K]
+   real(r8), allocatable           :: tleaf_ens        (:,:    )  ! Leaf temperature                                         [K]
+   real(r8), allocatable           :: ldew_ens         (:,:    )  ! Depth of water on foliage                                [mm]
+   real(r8), allocatable           :: ldew_rain_ens    (:,:    )  ! Depth of rain on foliage                                 [mm]
+   real(r8), allocatable           :: ldew_snow_ens    (:,:    )  ! Depth of snow on foliage                                 [mm]
+   real(r8), allocatable           :: fwet_snow_ens    (:,:    )  ! Vegetation snow fractional cover                         [-]
+   real(r8), allocatable           :: sag_ens          (:,:    )  ! Non dimensional snow age                                 [-]
+   real(r8), allocatable           :: scv_ens          (:,:    )  ! Snow water equivalent                                    [kg/m2]
+   real(r8), allocatable           :: snowdp_ens       (:,:    )  ! Snow depth                                               [m]
+   real(r8), allocatable           :: fveg_ens         (:,:    )  ! Fraction vegetation cover                                [-]
+   real(r8), allocatable           :: fsno_ens         (:,:    )  ! Fraction snow cover                                      [-]
+   real(r8), allocatable           :: sigf_ens         (:,:    )  ! Fraction of veg cover, excluding snow-covered veg        [-]
+   real(r8), allocatable           :: green_ens        (:,:    )  ! Leaf greenness                                           [-]
+   real(r8), allocatable           :: tlai_ens         (:,:    )  ! Leaf area index                                          [m2/m2]
+   real(r8), allocatable           :: lai_ens          (:,:    )  ! Leaf area index                                          [m2/m2]
+   real(r8), allocatable           :: tsai_ens         (:,:    )  ! Stem area index                                          [m2/m2]
+   real(r8), allocatable           :: sai_ens          (:,:    )  ! Stem area index                                          [m2/m2]
+   real(r8), allocatable           :: alb_ens          (:,:,:,:)  ! Averaged albedo                                          [-]
+   real(r8), allocatable           :: ssun_ens         (:,:,:,:)  ! Sunlit canopy absorption for solar radiation (0-1)       [-]
+   real(r8), allocatable           :: ssha_ens         (:,:,:,:)  ! Shaded canopy absorption for solar radiation (0-1)       [-]
+   real(r8), allocatable           :: ssoi_ens         (:,:,:,:)  ! Soil absorption for solar radiation (0-1)                [-]
+   real(r8), allocatable           :: ssno_ens         (:,:,:,:)  ! Snow absorption for solar radiation (0-1)                [-]
+   real(r8), allocatable           :: thermk_ens       (:,:    )  ! Canopy gap fraction for tir radiation                    [-]
+   real(r8), allocatable           :: extkb_ens        (:,:    )  ! (k, g(mu)/mu) direct solar extinction coefficient        [-]
+   real(r8), allocatable           :: extkd_ens        (:,:    )  ! Diffuse and scattered diffuse PAR extinction coefficient [-]
+   real(r8), allocatable           :: zwt_ens          (:,:    )  ! The depth to water table                                 [m]
+   real(r8), allocatable           :: wdsrf_ens        (:,:    )  ! Depth of surface water                                   [mm]
+   real(r8), allocatable           :: wa_ens           (:,:    )  ! Water storage in aquifer                                 [mm]
+   real(r8), allocatable           :: wetwat_ens       (:,:    )  ! Water storage in wetland                                 [mm]
+   real(r8), allocatable           :: t_lake_ens       (:,:,:  )  ! Lake layer temperature                                   [K]
+   real(r8), allocatable           :: lake_icefrac_ens (:,:,:  )  ! Lake mass fraction of lake layer that is frozen          [-]
+   real(r8), allocatable           :: savedtke1_ens    (:,:    )  ! Top level eddy conductivity                              [W/(m K)]
 
 !=============================================================================
 ! Ensemble land-atmosphere coupling state variables (for online mode)
 !=============================================================================
-   real(r8), allocatable :: trad_ens         (:,:    )  ! Surface radiative temperature                            [K]
-   real(r8), allocatable :: tref_ens         (:,:    )  ! 2 m air temperature                                      [K]
-   real(r8), allocatable :: qref_ens         (:,:    )  ! 2 m specific humidity                                    [kg/kg]
-   real(r8), allocatable :: rhref_ens        (:,:    )  ! 2 m relative humidity                                    [-]
-   real(r8), allocatable :: rst_ens          (:,:    )  ! Canopy stomatal resistance                               [s/m]
-   real(r8), allocatable :: emis_ens         (:,:    )  ! Bulk surface emissivity                                  [-]
-   real(r8), allocatable :: z0m_ens          (:,:    )  ! Effective momentum roughness length                      [m]
-   real(r8), allocatable :: zol_ens          (:,:    )  ! Dimensionless height in Monin-Obukhov theory (z/L)       [-]
-   real(r8), allocatable :: rib_ens          (:,:    )  ! Bulk Richardson number in the surface layer              [-]
-   real(r8), allocatable :: ustar_ens        (:,:    )  ! Friction velocity in similarity theory                   [m/s]
-   real(r8), allocatable :: qstar_ens        (:,:    )  ! Humidity scale in similarity theory                      [kg/kg]
-   real(r8), allocatable :: tstar_ens        (:,:    )  ! Temperature scale in similarity theory                   [K]
-   real(r8), allocatable :: fm_ens           (:,:    )  ! Integrated momentum profile function                     [-]
-   real(r8), allocatable :: fh_ens           (:,:    )  ! Integrated heat profile function                         [-]
-   real(r8), allocatable :: fq_ens           (:,:    )  ! Integrated moisture profile function                     [-]
+   real(r8), allocatable           :: trad_ens         (:,:    )  ! Surface radiative temperature                            [K]
+   real(r8), allocatable           :: tref_ens         (:,:    )  ! 2 m air temperature                                      [K]
+   real(r8), allocatable           :: qref_ens         (:,:    )  ! 2 m specific humidity                                    [kg/kg]
+   real(r8), allocatable           :: rhref_ens        (:,:    )  ! 2 m relative humidity                                    [-]
+   real(r8), allocatable           :: rst_ens          (:,:    )  ! Canopy stomatal resistance                               [s/m]
+   real(r8), allocatable           :: emis_ens         (:,:    )  ! Bulk surface emissivity                                  [-]
+   real(r8), allocatable           :: z0m_ens          (:,:    )  ! Effective momentum roughness length                      [m]
+   real(r8), allocatable           :: zol_ens          (:,:    )  ! Dimensionless height in Monin-Obukhov theory (z/L)       [-]
+   real(r8), allocatable           :: rib_ens          (:,:    )  ! Bulk Richardson number in the surface layer              [-]
+   real(r8), allocatable           :: ustar_ens        (:,:    )  ! Friction velocity in similarity theory                   [m/s]
+   real(r8), allocatable           :: qstar_ens        (:,:    )  ! Humidity scale in similarity theory                      [kg/kg]
+   real(r8), allocatable           :: tstar_ens        (:,:    )  ! Temperature scale in similarity theory                   [K]
+   real(r8), allocatable           :: fm_ens           (:,:    )  ! Integrated momentum profile function                     [-]
+   real(r8), allocatable           :: fh_ens           (:,:    )  ! Integrated heat profile function                         [-]
+   real(r8), allocatable           :: fq_ens           (:,:    )  ! Integrated moisture profile function                     [-]
 
 !=============================================================================
 ! Ensemble forcing variables
 !=============================================================================
-   real(r8), allocatable :: forc_t_ens       (:,:    )  ! Temperature                                              [K]
-   real(r8), allocatable :: forc_frl_ens     (:,:    )  ! Atmospheric infrared (longwave) radiation                [W/m2]
-   real(r8), allocatable :: forc_prc_ens     (:,:    )  ! Convective precipitation                                 [mm/s]
-   real(r8), allocatable :: forc_prl_ens     (:,:    )  ! Large scale precipitation                                [mm/s]
-   real(r8), allocatable :: forc_sols_ens    (:,:    )  ! Atm vis direct beam solar rad onto srf                   [W/m2]
-   real(r8), allocatable :: forc_soll_ens    (:,:    )  ! Atm nir direct beam solar rad onto srf                   [W/m2]
-   real(r8), allocatable :: forc_solsd_ens   (:,:    )  ! Atm vis diffuse solar rad onto srf                       [W/m2]
-   real(r8), allocatable :: forc_solld_ens   (:,:    )  ! Atm nir diffuse solar rad onto srf                       [W/m2]
+   real(r8), allocatable           :: forc_t_ens       (:,:    )  ! Temperature                                              [K]
+   real(r8), allocatable           :: forc_frl_ens     (:,:    )  ! Atmospheric infrared (longwave) radiation                [W/m2]
+   real(r8), allocatable           :: forc_prc_ens     (:,:    )  ! Convective precipitation                                 [mm/s]
+   real(r8), allocatable           :: forc_prl_ens     (:,:    )  ! Large scale precipitation                                [mm/s]
+   real(r8), allocatable           :: forc_sols_ens    (:,:    )  ! Atm vis direct beam solar rad onto srf                   [W/m2]
+   real(r8), allocatable           :: forc_soll_ens    (:,:    )  ! Atm nir direct beam solar rad onto srf                   [W/m2]
+   real(r8), allocatable           :: forc_solsd_ens   (:,:    )  ! Atm vis diffuse solar rad onto srf                       [W/m2]
+   real(r8), allocatable           :: forc_solld_ens   (:,:    )  ! Atm nir diffuse solar rad onto srf                       [W/m2]
 
 !=============================================================================
 ! Diagnostic variables for output history
 !=============================================================================
-   integer               :: nstream = 0                 ! Number of configured observation streams
-   real(r8), allocatable :: hx_f_ens         (:,:,:  )  ! Prior H(x_f)
-   real(r8), allocatable :: hx_a_ens         (:,:,:  )  ! Posterior H(x_a)
-   real(r8), allocatable :: hx_ol            (:,:    )  ! Open-loop H(x)
-   real(r8), allocatable :: hx_f             (:,:    )  ! Ensemble-mean prior H(x_f)
-   real(r8), allocatable :: hx_a             (:,:    )  ! Ensemble-mean posterior H(x_a)
-   real(r8), allocatable :: wliq_soisno_ol   (:,:    )  ! Open-loop liquid water in layers                         [kg/m2]
-   real(r8), allocatable :: wliq_soisno_f    (:,:    )  ! Ensemble-mean prior liquid water in layers               [kg/m2]
-   real(r8), allocatable :: wliq_soisno_a    (:,:    )  ! Ensemble-mean posterior liquid water in layers           [kg/m2]
-   real(r8), allocatable :: t_soisno_ol      (:,:    )  ! Open-loop temperature in layers                          [K]
-   real(r8), allocatable :: t_soisno_f       (:,:    )  ! Ensemble-mean prior temperature in layers                [K]
-   real(r8), allocatable :: t_soisno_a       (:,:    )  ! Ensemble-mean posterior temperature in layers            [K]
+   integer                         :: nstream = 0                 ! Number of configured observation streams
+   real(r8), allocatable           :: hx_f_ens         (:,:,:  )  ! Prior H(x_f)
+   real(r8), allocatable           :: hx_a_ens         (:,:,:  )  ! Posterior H(x_a)
+   real(r8), allocatable           :: hx_ol            (:,:    )  ! Open-loop H(x)
+   real(r8), allocatable           :: hx_f             (:,:    )  ! Ensemble-mean prior H(x_f)
+   real(r8), allocatable           :: hx_a             (:,:    )  ! Ensemble-mean posterior H(x_a)
+   real(r8), allocatable           :: wliq_soisno_ol   (:,:    )  ! Open-loop liquid water in layers                         [kg/m2]
+   real(r8), allocatable           :: wliq_soisno_f    (:,:    )  ! Ensemble-mean prior liquid water in layers               [kg/m2]
+   real(r8), allocatable           :: wliq_soisno_a    (:,:    )  ! Ensemble-mean posterior liquid water in layers           [kg/m2]
+   real(r8), allocatable           :: t_soisno_ol      (:,:    )  ! Open-loop temperature in layers                          [K]
+   real(r8), allocatable           :: t_soisno_f       (:,:    )  ! Ensemble-mean prior temperature in layers                [K]
+   real(r8), allocatable           :: t_soisno_a       (:,:    )  ! Ensemble-mean posterior temperature in layers            [K]
 #ifdef GridRiverLakeFlow
-   real(r8), allocatable :: wdsrf_ucat_ol    (:      )  ! Open-loop river water depth                              [m]
-   real(r8), allocatable :: wdsrf_ucat_a     (:      )  ! Analysis river water depth                               [m]
-   real(r8), allocatable :: veloc_riv_ol     (:      )  ! Open-loop river velocity                                 [m/s]
-   real(r8), allocatable :: veloc_riv_a      (:      )  ! Analysis river velocity                                  [m/s]
-   real(r8), allocatable :: volresv_ol       (:      )  ! Open-loop reservoir water volume                         [m^3]
-   real(r8), allocatable :: volresv_a        (:      )  ! Analysis reservoir water volume                          [m^3]
+   real(r8), allocatable           :: wdsrf_ucat_ol    (:      )  ! Open-loop river water depth                              [m]
+   real(r8), allocatable           :: wdsrf_ucat_a     (:      )  ! Analysis river water depth                               [m]
+   real(r8), allocatable           :: veloc_riv_ol     (:      )  ! Open-loop river velocity                                 [m/s]
+   real(r8), allocatable           :: veloc_riv_a      (:      )  ! Analysis river velocity                                  [m/s]
+   real(r8), allocatable           :: volresv_ol       (:      )  ! Open-loop reservoir water volume                         [m^3]
+   real(r8), allocatable           :: volresv_a        (:      )  ! Analysis reservoir water volume                          [m^3]
 #endif
 
 !-----------------------------------------------------------------------------
@@ -341,15 +341,15 @@ CONTAINS
    SUBROUTINE WRITE_DA_TimeVars(idate, lc_year, site, dir_restart)
 
 !-----------------------------------------------------------------------------
-      integer,          intent(in) :: idate (3)       
-      integer,          intent(in) :: lc_year        
-      character(len=*), intent(in) :: site            
-      character(len=*), intent(in) :: dir_restart     
+      integer,          intent(in) :: idate (3)
+      integer,          intent(in) :: lc_year
+      character(len=*), intent(in) :: site
+      character(len=*), intent(in) :: dir_restart
 
-      character(len=256)           :: file_restart    
-      character(len=14)            :: cdate           
-      character(len=256)           :: cyear           
-      character(len=256)           :: file_gridriver 
+      character(len=256)           :: file_restart
+      character(len=14)            :: cdate
+      character(len=256)           :: cyear
+      character(len=256)           :: file_gridriver
 !-----------------------------------------------------------------------------
       write(cyear,'(i4.4)') lc_year
       write(cdate,'(i4.4,"-",i3.3,"-",i5.5)') idate(1), idate(2), idate(3)
@@ -452,8 +452,8 @@ CONTAINS
       character(len=256)           :: file_restart
       character(len=14)            :: cdate
       character(len=14)            :: cyear
-      character(len=256)           :: file_gridriver  
-      logical                      :: fexists         
+      character(len=256)           :: file_gridriver
+      logical                      :: fexists
 !-----------------------------------------------------------------------------
       write (cyear, '(i4.4)') lc_year
       write (cdate, '(i4.4,"-",i3.3,"-",i5.5)') idate(1), idate(2), idate(3)

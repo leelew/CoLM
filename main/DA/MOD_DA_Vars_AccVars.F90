@@ -6,9 +6,8 @@ MODULE MOD_DA_Vars_AccVars
 ! DESCRIPTION:
 !   Stores diagnostic sums for DA history output.
 !
-!   Diagnostic values are allocated by MOD_DA_Vars_TimeVars, and
-!   Valid samples are summed here, the history output procedure converts
-!   These sums to means.
+!   Diagnostic values are allocated by MOD_DA_Vars_TimeVars, and valid samples
+!   are summed here, the history output procedure converts these sums to means.
 !
 ! HISTORY:
 !   Zhilong Fan, 10/2026
@@ -34,24 +33,24 @@ MODULE MOD_DA_Vars_AccVars
 !=============================================================================
 ! Diagnostic sample sums for history output
 !=============================================================================
-   real(r8), allocatable :: nac_obs           (  :,:)  ! Valid H(x) sample counts per observation stream and patch [-]
-   real(r8), allocatable :: a_hx_ol           (  :,:)  ! Sum of open-loop H(x)
-   real(r8), allocatable :: a_hx_f_ens        (:,:,:)  ! Sum of forecast H(x) for each ensemble member
-   real(r8), allocatable :: a_hx_a_ens        (:,:,:)  ! Sum of analysis H(x) for each ensemble member
-   real(r8), allocatable :: a_hx_f            (  :,:)  ! Sum of ensemble-mean forecast H(x)
-   real(r8), allocatable :: a_hx_a            (  :,:)  ! Sum of ensemble-mean analysis H(x)
-   real(r8), allocatable :: a_wliq_soisno_ol  (  :,:)  ! Sum of open-loop layer liquid water                      [kg/m2]
-   real(r8), allocatable :: a_wliq_soisno_f   (  :,:)  ! Sum of ensemble-mean forecast layer liquid water         [kg/m2]
-   real(r8), allocatable :: a_wliq_soisno_a   (  :,:)  ! Sum of ensemble-mean analysis layer liquid water         [kg/m2]
-   real(r8), allocatable :: a_wliq_soisno_ens (:,:,:)  ! Sum of layer liquid water for each ensemble member       [kg/m2]
-   real(r8), allocatable :: a_t_soisno_ol     (  :,:)  ! Sum of open-loop layer temperature                       [K]
-   real(r8), allocatable :: a_t_soisno_f      (  :,:)  ! Sum of ensemble-mean forecast layer temperature          [K]
-   real(r8), allocatable :: a_t_soisno_a      (  :,:)  ! Sum of ensemble-mean analysis layer temperature          [K]
+   real(r8), allocatable      :: nac_obs           (  :,:)  ! Valid H(x) sample counts per observation stream and patch [-]
+   real(r8), allocatable      :: a_hx_ol           (  :,:)  ! Sum of open-loop H(x)
+   real(r8), allocatable      :: a_hx_f_ens        (:,:,:)  ! Sum of forecast H(x) for each ensemble member
+   real(r8), allocatable      :: a_hx_a_ens        (:,:,:)  ! Sum of analysis H(x) for each ensemble member
+   real(r8), allocatable      :: a_hx_f            (  :,:)  ! Sum of ensemble-mean forecast H(x)
+   real(r8), allocatable      :: a_hx_a            (  :,:)  ! Sum of ensemble-mean analysis H(x)
+   real(r8), allocatable      :: a_wliq_soisno_ol  (  :,:)  ! Sum of open-loop layer liquid water                      [kg/m2]
+   real(r8), allocatable      :: a_wliq_soisno_f   (  :,:)  ! Sum of ensemble-mean forecast layer liquid water         [kg/m2]
+   real(r8), allocatable      :: a_wliq_soisno_a   (  :,:)  ! Sum of ensemble-mean analysis layer liquid water         [kg/m2]
+   real(r8), allocatable      :: a_wliq_soisno_ens (:,:,:)  ! Sum of layer liquid water for each ensemble member       [kg/m2]
+   real(r8), allocatable      :: a_t_soisno_ol     (  :,:)  ! Sum of open-loop layer temperature                       [K]
+   real(r8), allocatable      :: a_t_soisno_f      (  :,:)  ! Sum of ensemble-mean forecast layer temperature          [K]
+   real(r8), allocatable      :: a_t_soisno_a      (  :,:)  ! Sum of ensemble-mean analysis layer temperature          [K]
 #ifdef GridRiverLakeFlow
-   real(r8), allocatable :: a_discharge_ol    (    :)  ! Open-loop of the  discharge integral                     [m3]
-   real(r8), allocatable :: acctime_ucat_ol   (    :)  ! Open-loop of the  routing duration                       [s]
-   real(r8), allocatable :: a_discharge_a     (    :)  ! Analysis discharge integral over the output interval     [m3]
-   real(r8), allocatable :: acctime_ucat_a    (    :)  ! Analysis routing duration over the output interval       [s]
+   real(r8), allocatable      :: a_discharge_ol    (    :)  ! Open-loop of the  discharge integral                     [m3]
+   real(r8), allocatable      :: acctime_ucat_ol   (    :)  ! Open-loop of the  routing duration                       [s]
+   real(r8), allocatable      :: a_discharge_a     (    :)  ! Analysis discharge integral over the output interval     [m3]
+   real(r8), allocatable      :: acctime_ucat_a    (    :)  ! Analysis routing duration over the output interval       [s]
 #endif
 
 !-----------------------------------------------------------------------------
@@ -169,11 +168,11 @@ CONTAINS
 !-----------------------------------------------------------------------------
 ! WARNING (duplicated codes):
 !   Keep DA history definitions, accumulation, and output within DA modules
-!   Without modifying the core model. Necessary utilities are included here
-!   To avoid circular module dependencies.
+!   without modifying the core model. Necessary utilities are included here
+!   to avoid circular module dependencies.
 !
 !   Remove these copies once the core utilities are moved to an independent
-!   Module that DA can use directly.
+!   module that DA can use directly.
 !-----------------------------------------------------------------------------
 
    SUBROUTINE acc_DA_hist_2d(var, s)
@@ -182,7 +181,7 @@ CONTAINS
       real(r8), intent(in)    :: var (  :,:)
       real(r8), intent(inout) :: s   (  :,:)
 
-      integer :: i1, i2
+      integer                 :: i1, i2
 !-----------------------------------------------------------------------------
       DO i2 = lbound(var,2), ubound(var,2)
          DO i1 = lbound(var,1), ubound(var,1)
@@ -206,7 +205,7 @@ CONTAINS
       real(r8), intent(in)    :: var (:,:,:)
       real(r8), intent(inout) :: s   (:,:,:)
 
-      integer :: i1, i2, i3
+      integer                 :: i1, i2, i3
 !-----------------------------------------------------------------------------
       DO i3 = lbound(var,3), ubound(var,3)
          DO i2 = lbound(var,2), ubound(var,2)

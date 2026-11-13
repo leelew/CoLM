@@ -7,9 +7,9 @@ MODULE MOD_DA_Vars_Hist
 !   History output of DA-related quantities.
 !
 !   Write history diagnostics of model states and observation equivalents
-!   computed through observation operators. Observation equivalents are
-!   output only where observations are available, ensuring consistent
-!   spatial coverage for comparison with observations.
+!   computed through observation operators. Observation equivalents are output
+!   only where observations are available, ensuring consistent spatial
+!   coverage for comparison with observations.
 !
 ! HISTORY:
 !   Zhilong Fan, 09/2026

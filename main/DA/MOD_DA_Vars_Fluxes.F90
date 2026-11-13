@@ -5,11 +5,11 @@ MODULE MOD_DA_Vars_Fluxes
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
 !   Variables required for land-atmosphere coupling include restart state
-!   Variables and land-atmosphere fluxes.
+!   variables and land-atmosphere fluxes.
 !
 !   Ensemble state variables written to DA restart files are defined and
-!   Managed in MOD_DA_Vars_TimeVars. This module defines and manages
-!   Ensemble land-atmosphere fluxes and associated diagnostic variables.
+!   managed in MOD_DA_Vars_TimeVars. This module defines and manages ensemble
+!   land-atmosphere fluxes and associated diagnostic variables.
 !
 ! HISTORY:
 !   Lu Li, 11/2026: DA v1.0
