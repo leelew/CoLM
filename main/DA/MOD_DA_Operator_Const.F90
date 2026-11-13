@@ -20,10 +20,8 @@ MODULE MOD_DA_Operator_Const
 !   Lu Li, 12/2024: Initial version
 !   Lu Li, Zhilong Fan, 11/2026: DA v1.0
 !-----------------------------------------------------------------------
-
    USE MOD_Precision
    USE MOD_Vars_Global, only: pi, N_land_classification
-
    IMPLICIT NONE
    SAVE
 
@@ -39,9 +37,6 @@ MODULE MOD_DA_Operator_Const
    complex(r8), parameter :: jj = (0., 1.)      ! imaginary unit for complex number
 
 #ifdef LULC_IGBP
-
-   ! MODIS IGBP Land Use/Land Cover System Legend
-!---------------------------
    ! 0  Ocean
    ! 1  Evergreen Needleleaf Forests
    ! 2  Evergreen Broadleaf Forests
@@ -138,5 +133,6 @@ MODULE MOD_DA_Operator_Const
 #endif
 
 END MODULE MOD_DA_Operator_Const
+
 !-----------------------------------------------------------------------------
 #endif
