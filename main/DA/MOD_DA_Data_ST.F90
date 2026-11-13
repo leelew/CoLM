@@ -8,20 +8,20 @@ MODULE MOD_DA_Data_ST
 !
 ! WORKFLOW:
 !   1. Init: Group stream configurations by source and initialize the source
-!      Modules. Store observation search and localization parameters.
-!   2. Forward: Call enabled sources to prepare observations and H(x).
-!      For assimilation, concatenate observations, error standard deviations,
-!      Locations, and matching ensemble H(x) in a consistent record order.
+!      modules. Store observation search and localization parameters.
+!   2. Forward: Call enabled sources to prepare observations and H(x). For
+!      assimilation, concatenate observations, error standard deviations,
+!      locations, and matching ensemble H(x) in a consistent record order.
 !   3. Prepare: Select nearby valid observations for each target patch and
-!      Convert error standard deviations to localized variances for LETKF.
+!      convert error standard deviations to localized variances for LETKF.
 !   4. Save: Copy PM model-space H(x) into the shared diagnostic arrays.
 !   5. Clear: Release current observations and H(x), retaining source
-!      Configurations and spatial mappings for subsequent forward calls.
+!      configurations and spatial mappings for subsequent forward calls.
 !
 ! SUPPORTED:
 !   PM:
 !      Passive microwave brightness temperatures (TB_H / TB_V) and retrieved
-!      Soil moisture products (SM).
+!      soil moisture products (SM).
 !
 ! HISTORY:
 !   Lu Li, 05/2026: First implementation
@@ -41,41 +41,41 @@ MODULE MOD_DA_Data_ST
 !-----------------------------------------------------------------------------
    type :: ST_type
 
-      type(ST_config_type), allocatable :: cfgs(:)                        ! Configuration for each observation stream
+      type(ST_config_type), allocatable   :: cfgs(:)                        ! Configuration for each observation stream
 
-      logical                           :: use_pm = .false.               ! Include passive microwave observations
+      logical                             :: use_pm = .false.               ! Include passive microwave observations
 
-      real(r8)                          :: dres                           ! Observation search radius in latitude and longitude [deg]
-      real(r8)                          :: locr                           ! Gaussian localization length scale [km]
-      real(r8)                          :: infl                           ! Background error covariance inflation factor
+      real(r8)                            :: dres                           ! Observation search radius in latitude and longitude [deg]
+      real(r8)                            :: locr                           ! Gaussian localization length scale [km]
+      real(r8)                            :: infl                           ! Background error covariance inflation factor
 
-      type(PM_set_type)                 :: pm                             ! Passive microwave observations and ensemble H(x)
+      type(PM_set_type)                   :: pm                             ! Passive microwave observations and ensemble H(x)
 
-      integer                           :: nobs = 0                       ! Total number of observations across enabled sources
-      real(r8), allocatable             :: lat(:)                         ! Observation latitudes [deg]
-      real(r8), allocatable             :: lon(:)                         ! Observation longitudes [deg]
-      real(r8), allocatable             :: y(:)                           ! Observed values
-      real(r8), allocatable             :: hx_obs(:,:)                    ! Observation-space ensemble H(x)
-      real(r8), allocatable             :: r(:)                           ! Observation error standard deviations
+      integer                             :: nobs = 0                       ! Total number of observations across enabled sources
+      real(r8), allocatable               :: lat(:)                         ! Observation latitudes [deg]
+      real(r8), allocatable               :: lon(:)                         ! Observation longitudes [deg]
+      real(r8), allocatable               :: y(:)                           ! Observed values
+      real(r8), allocatable               :: hx_obs(:,:)                    ! Observation-space ensemble H(x)
+      real(r8), allocatable               :: r(:)                           ! Observation error standard deviations
 
    CONTAINS
 
-      procedure                         :: init       => ST_type_init     ! Configure enabled sources and assimilation parameters
-      procedure                         :: forward    => ST_type_forward  ! Compute model- and observation-space H(x) from enabled sources
-      procedure                         :: save       => ST_type_save     ! Copy PM patch H(x) into forecast or analysis diagnostics
-      procedure                         :: clear      => ST_type_clear    ! Deallocate combined records and clear source observations
-      procedure                         :: concat     => ST_type_concat   ! Combine enabled sources in matching y, hx_obs and r order
-      procedure                         :: prepare    => ST_type_prepare  ! Prepare 'data package' used for data assimilation at each patch
+      procedure                           :: init       => ST_type_init     ! Configure enabled sources and assimilation parameters
+      procedure                           :: forward    => ST_type_forward  ! Compute model- and observation-space H(x) from enabled sources
+      procedure                           :: save       => ST_type_save     ! Copy PM patch H(x) into forecast or analysis diagnostics
+      procedure                           :: clear      => ST_type_clear    ! Deallocate combined records and clear source observations
+      procedure                           :: concat     => ST_type_concat   ! Combine enabled sources in matching y, hx_obs and r order
+      procedure                           :: prepare    => ST_type_prepare  ! Prepare 'data package' used for data assimilation at each patch
 
    END type ST_type
 
    type :: ST_config_type
 
-      character(len=16) :: source_name
-      character(len=32) :: sensor_name
-      character(len=16) :: var_name
-      real(r8)          :: fghz
-      integer           :: istream
+      character(len=16)                   :: source_name
+      character(len=32)                   :: sensor_name
+      character(len=16)                   :: var_name
+      real(r8)                            :: fghz
+      integer                             :: istream
 
    END type ST_config_type
 
@@ -133,7 +133,7 @@ CONTAINS
    SUBROUTINE ST_type_clear(this)
 
 !-----------------------------------------------------------------------------
-      class(ST_type), intent(inout) :: this
+      class(ST_type), intent(inout)       :: this
 !-----------------------------------------------------------------------------
       this%nobs = 0
       IF (allocated(this%lat   )) deallocate(this%lat   )
@@ -151,10 +151,10 @@ CONTAINS
    SUBROUTINE ST_type_concat(this)
 
 !-----------------------------------------------------------------------------
-      class(ST_type), intent(inout) :: this
+      class(ST_type), intent(inout)       :: this
 
-      integer                       :: n
-      integer                       :: offset
+      integer                             :: n
+      integer                             :: offset
 !-----------------------------------------------------------------------------
       this%nobs = 0
       IF (allocated(this%lat   )) deallocate(this%lat   )
@@ -193,9 +193,9 @@ CONTAINS
    SUBROUTINE ST_type_forward(this, idate, deltim)
 
 !-----------------------------------------------------------------------------
-      class(ST_type), intent(inout) :: this
-      integer,        intent(in)    :: idate(3)
-      real(r8),       intent(in)    :: deltim
+      class(ST_type), intent(inout)       :: this
+      integer,        intent(in)          :: idate(3)
+      real(r8),       intent(in)          :: deltim
 !-----------------------------------------------------------------------------
       IF (this%use_pm) CALL this%pm%forward(idate, deltim)
       CALL this%concat()
@@ -207,11 +207,11 @@ CONTAINS
    SUBROUTINE ST_type_save(this, is_analysis)
 
 !-----------------------------------------------------------------------------
-      class(ST_type), intent(in) :: this
-      logical,        intent(in) :: is_analysis
+      class(ST_type), intent(in)          :: this
+      logical,        intent(in)          :: is_analysis
 
-      integer :: istream, is, ipm, np, iens
-      logical :: valid_hx
+      integer                             :: istream, is, ipm, np, iens
+      logical                             :: valid_hx
 !-----------------------------------------------------------------------------
       DO istream = 1, size(this%cfgs)
          is = this%cfgs(istream)%istream

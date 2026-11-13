@@ -8,14 +8,14 @@ MODULE MOD_DA_Data_TQ
 !
 ! WORKFLOW:
 !   1. Init: Configure INSITU observation streams and initialize the source
-!      Module. Store observation search and localization parameters.
+!      module. Store observation search and localization parameters.
 !   2. Forward: Call INSITU to read observations and compute matching H(x).
 !      For assimilation, INSITU combines records from all configured streams.
 !   3. Prepare: Select nearby valid observations for each target patch and
-!      Convert error standard deviations to localized variances for LETKF.
+!      convert error standard deviations to localized variances for LETKF.
 !   4. Save: Copy INSITU model-space H(x) into the shared diagnostic arrays.
 !   5. Clear: Release current observations and H(x), retaining source
-!      Configurations and site-to-patch mappings for subsequent forward calls.
+!      configurations and site-to-patch mappings for subsequent forward calls.
 !
 ! SUPPORTED:
 !   INSITU:
@@ -24,7 +24,7 @@ MODULE MOD_DA_Data_TQ
 !
 ! NOTES:
 !   Separate TQ_type instances serve temperature and humidity analysis
-!   Targets. MOD_DA_Assim_TQ controls their analysis order and state updates.
+!   targets. MOD_DA_Assim_TQ controls their analysis order and state updates.
 !
 ! HISTORY:
 !   Lu Li, 11/2026: DA v1.0
@@ -45,33 +45,33 @@ MODULE MOD_DA_Data_TQ
 !-----------------------------------------------------------------------------
    type :: TQ_type
 
-      type(TQ_config_type), allocatable :: cfgs(:)                        ! Observation stream configurations
-      logical                           :: use_insitu = .false.           ! Include site observations
+      type(TQ_config_type), allocatable     :: cfgs(:)                        ! Observation stream configurations
+      logical                               :: use_insitu = .false.           ! Include site observations
 
       ! Observation selection and LETKF parameters.
-      real(r8)                          :: dres                           ! Observation search half-width [degrees]
-      real(r8)                          :: locr                           ! Gaussian localization length scale [km]
-      real(r8)                          :: infl                           ! Ensemble covariance inflation factor [-]
+      real(r8)                              :: dres                           ! Observation search half-width [degrees]
+      real(r8)                              :: locr                           ! Gaussian localization length scale [km]
+      real(r8)                              :: infl                           ! Ensemble covariance inflation factor [-]
 
       ! Source-specific observation containers.
-      type(INSITU_set_type)             :: insitu                         ! Station observations and ensemble H(x)
+      type(INSITU_set_type)                 :: insitu                         ! Station observations and ensemble H(x)
 
    CONTAINS
 
-      procedure                         :: init       => TQ_type_init     ! Configure sources and assimilation parameters
-      procedure                         :: forward    => TQ_type_forward  ! Compute model- and observation-space H(x) from enabled sources
-      procedure                         :: save       => TQ_type_save     ! Copy model-space H(x) into shared diagnostics
-      procedure                         :: clear      => TQ_type_clear    ! Clear time-step data while retaining configurations
-      procedure                         :: prepare    => TQ_type_prepare  ! Select nearby observations and localize error variances
+      procedure                             :: init       => TQ_type_init     ! Configure sources and assimilation parameters
+      procedure                             :: forward    => TQ_type_forward  ! Compute model- and observation-space H(x) from enabled sources
+      procedure                             :: save       => TQ_type_save     ! Copy model-space H(x) into shared diagnostics
+      procedure                             :: clear      => TQ_type_clear    ! Clear time-step data while retaining configurations
+      procedure                             :: prepare    => TQ_type_prepare  ! Select nearby observations and localize error variances
 
    END type TQ_type
 
    type :: TQ_config_type
 
-      character(len=16)                 :: source_name                   
-      character(len=32)                 :: sensor_name                    
-      character(len=16)                 :: var_name                  
-      integer                           :: istream                        
+      character(len=16)                     :: source_name
+      character(len=32)                     :: sensor_name
+      character(len=16)                     :: var_name
+      integer                               :: istream
 
    END type TQ_config_type
 
@@ -81,7 +81,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE TQ_type_init (this, pixelset, configs)
+   SUBROUTINE TQ_type_init(this, pixelset, configs)
 
 !-----------------------------------------------------------------------------
       class(TQ_type), intent(inout)         :: this
@@ -120,12 +120,12 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE TQ_type_forward (this, idate, deltim)
+   SUBROUTINE TQ_type_forward(this, idate, deltim)
 
 !-----------------------------------------------------------------------------
-      class(TQ_type), intent(inout) :: this
-      integer, intent(in)           :: idate(3)
-      real(r8), intent(in)          :: deltim
+      class(TQ_type), intent(inout)         :: this
+      integer, intent(in)                   :: idate(3)
+      real(r8), intent(in)                  :: deltim
 !-----------------------------------------------------------------------------
       IF (this%use_insitu) CALL this%insitu%forward(idate, deltim)
 
@@ -133,10 +133,10 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE TQ_type_clear (this)
+   SUBROUTINE TQ_type_clear(this)
 
 !-----------------------------------------------------------------------------
-      class(TQ_type), intent(inout) :: this
+      class(TQ_type), intent(inout)         :: this
 !-----------------------------------------------------------------------------
       CALL this%insitu%clear()
 
@@ -144,17 +144,17 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE TQ_type_save (this, is_analysis)
+   SUBROUTINE TQ_type_save(this, is_analysis)
 
 !-----------------------------------------------------------------------------
-      class(TQ_type), intent(in) :: this
-      logical, intent(in)        :: is_analysis
+      class(TQ_type), intent(in)            :: this
+      logical, intent(in)                   :: is_analysis
 
-      integer                    :: i
-      integer                    :: is
-      integer                    :: iinsitu
-      integer                    :: np
-      logical                    :: valid_hx
+      integer                               :: i
+      integer                               :: is
+      integer                               :: iinsitu
+      integer                               :: np
+      logical                               :: valid_hx
 !-----------------------------------------------------------------------------
       iinsitu = 0
       DO i = 1, size(this%cfgs)
@@ -193,20 +193,20 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE TQ_type_prepare (this, np, nobs_p, y_p, hx_p, r_p)
+   SUBROUTINE TQ_type_prepare(this, np, nobs_p, y_p, hx_p, r_p)
 
 !-----------------------------------------------------------------------------
-      class(TQ_type),         intent(in)  :: this
-      integer,                intent(in)  :: np
-      integer,                intent(out) :: nobs_p
-      real(r8), allocatable,  intent(out) :: y_p(:)
-      real(r8), allocatable,  intent(out) :: hx_p(:,:)
-      real(r8), allocatable,  intent(out) :: r_p(:)
+      class(TQ_type),         intent(in)    :: this
+      integer,                intent(in)    :: np
+      integer,                intent(out)   :: nobs_p
+      real(r8), allocatable,  intent(out)   :: y_p(:)
+      real(r8), allocatable,  intent(out)   :: hx_p(:,:)
+      real(r8), allocatable,  intent(out)   :: r_p(:)
 
-      integer                             :: iens, iobs
-      real(r8)                            :: lat_p, lon_p, dlat, dlon
-      logical,  allocatable               :: valid(:)
-      real(r8), allocatable               :: lat(:), lon(:), dist(:), hav(:)
+      integer                               :: iens, iobs
+      real(r8)                              :: lat_p, lon_p, dlat, dlon
+      logical,  allocatable                 :: valid(:)
+      real(r8), allocatable                 :: lat(:), lon(:), dist(:), hav(:)
 !-----------------------------------------------------------------------------
       nobs_p = 0
       lat_p = patchlatr(np)*180.0_r8/pi

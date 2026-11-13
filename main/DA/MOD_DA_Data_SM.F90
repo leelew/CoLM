@@ -8,27 +8,27 @@ MODULE MOD_DA_Data_SM
 !
 ! WORKFLOW:
 !   1. Init: Group stream configurations by source and initialize the source
-!      Modules. Store observation search and localization parameters.
-!   2. Forward: Call enabled sources to prepare observations and H(x).
-!      For assimilation, concatenate observations, error standard deviations,
-!      Locations, and matching ensemble H(x) in a consistent record order.
+!      modules. Store observation search and localization parameters.
+!   2. Forward: Call enabled sources to prepare observations and H(x). For
+!      assimilation, concatenate observations, error standard deviations,
+!      locations, and matching ensemble H(x) in a consistent record order.
 !   3. Prepare: Select nearby valid observations for each target patch and
-!      Convert error standard deviations to localized variances for LETKF.
+!      convert error standard deviations to localized variances for LETKF.
 !   4. Save: Copy PM model-space H(x) into the shared diagnostic arrays.
 !   5. Clear: Release current observations and H(x), retaining source
-!      Configurations and spatial mappings for subsequent forward calls.
-! 
+!      configurations and spatial mappings for subsequent forward calls.
+!
 ! SUPPORTED:
 !   PM:
 !      Passive microwave brightness temperatures (TB_H / TB_V) and retrieved
-!      Soil moisture products (SM).
+!      soil moisture products (SM).
 !   ANATQ:
 !      Patch-based pseudo-observations derived from 2 m temperature and
-!      Relative humidity analyses (2MT / 2MRH).
+!      relative humidity analyses (2MT / 2MRH).
 !
 ! HISTORY:
 !   Lu Li, 05/2026: First implementation
-!   Lu Li, Zhilong Fan, 10/2026: First operational version
+!   Lu Li, Zhilong Fan, 10/2026: DA v1.0
 !-----------------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_Namelist
@@ -45,43 +45,43 @@ MODULE MOD_DA_Data_SM
 !-----------------------------------------------------------------------------
    type :: SM_type
 
-      type(SM_config_type), allocatable :: cfgs(:)                        ! Configuration for each observation stream
+      type(SM_config_type), allocatable   :: cfgs(:)                        ! Configuration for each observation stream
 
-      logical                           :: use_pm = .false.               ! Include passive microwave observations
-      logical                           :: use_anatq = .false.            ! Include temperature and relative humidity pseudo-observations
+      logical                             :: use_pm = .false.               ! Include passive microwave observations
+      logical                             :: use_anatq = .false.            ! Include temperature and relative humidity pseudo-observations
 
-      real(r8)                          :: dres                           ! Observation search radius in latitude and longitude [deg]
-      real(r8)                          :: locr                           ! Gaussian localization length scale [km]
-      real(r8)                          :: infl                           ! Background error covariance inflation factor
+      real(r8)                            :: dres                           ! Observation search radius in latitude and longitude [deg]
+      real(r8)                            :: locr                           ! Gaussian localization length scale [km]
+      real(r8)                            :: infl                           ! Background error covariance inflation factor
 
-      type(PM_set_type)                 :: pm                             ! Passive microwave observations and ensemble H(x)
-      type(ANATQ_set_type)              :: anatq                          ! Temperature and relative humidity pseudo-observations and ensemble H(x)
+      type(PM_set_type)                   :: pm                             ! Passive microwave observations and ensemble H(x)
+      type(ANATQ_set_type)                :: anatq                          ! Temperature and relative humidity pseudo-observations and ensemble H(x)
 
-      integer                           :: nobs = 0                       ! Total number of observations across enabled sources
-      real(r8), allocatable             :: lat(:)                         ! Observation latitudes [deg]
-      real(r8), allocatable             :: lon(:)                         ! Observation longitudes [deg]
-      real(r8), allocatable             :: y(:)                           ! Observed values or analysis ensemble means
-      real(r8), allocatable             :: hx_obs(:,:)                    ! Observation-space ensemble H(x)
-      real(r8), allocatable             :: r(:)                           ! Observation error standard deviations
+      integer                             :: nobs = 0                       ! Total number of observations across enabled sources
+      real(r8), allocatable               :: lat(:)                         ! Observation latitudes [deg]
+      real(r8), allocatable               :: lon(:)                         ! Observation longitudes [deg]
+      real(r8), allocatable               :: y(:)                           ! Observed values or analysis ensemble means
+      real(r8), allocatable               :: hx_obs(:,:)                    ! Observation-space ensemble H(x)
+      real(r8), allocatable               :: r(:)                           ! Observation error standard deviations
 
    CONTAINS
 
-      procedure                         :: init       => SM_type_init     ! Configure enabled sources and assimilation parameters
-      procedure                         :: forward    => SM_type_forward  ! Compute model- and observation-space H(x) from enabled sources
-      procedure                         :: save       => SM_type_save     ! Copy PM patch H(x) into forecast or analysis diagnostics
-      procedure                         :: clear      => SM_type_clear    ! Deallocate combined records and clear source observations
-      procedure                         :: concat     => SM_type_concat   ! Combine enabled sources in matching y, hx_obs and r order
-      procedure                         :: prepare    => SM_type_prepare  ! Prepare 'data package' used for data assimilation at each patch
+      procedure                           :: init       => SM_type_init     ! Configure enabled sources and assimilation parameters
+      procedure                           :: forward    => SM_type_forward  ! Compute model- and observation-space H(x) from enabled sources
+      procedure                           :: save       => SM_type_save     ! Copy PM patch H(x) into forecast or analysis diagnostics
+      procedure                           :: clear      => SM_type_clear    ! Deallocate combined records and clear source observations
+      procedure                           :: concat     => SM_type_concat   ! Combine enabled sources in matching y, hx_obs and r order
+      procedure                           :: prepare    => SM_type_prepare  ! Prepare 'data package' used for data assimilation at each patch
 
    END type SM_type
 
    type :: SM_config_type
 
-      character(len=16)                 :: source_name                   
-      character(len=32)                 :: sensor_name                  
-      character(len=16)                 :: var_name     
-      real(r8)                          :: fghz         
-      integer                           :: istream      
+      character(len=16)                   :: source_name
+      character(len=32)                   :: sensor_name
+      character(len=16)                   :: var_name
+      real(r8)                            :: fghz
+      integer                             :: istream
 
    END type SM_config_type
 
@@ -98,8 +98,8 @@ CONTAINS
       type(pixelset_type),  intent(in)    :: pixelset
       type(SM_config_type), intent(in)    :: configs(:)
 
-      integer :: i, ipm, npm
-      type(PM_config_type), allocatable  :: pm_configs(:)
+      integer                             :: i, ipm, npm
+      type(PM_config_type), allocatable   :: pm_configs(:)
 !-----------------------------------------------------------------------------
       CALL this%clear()
       this%use_pm = .false.
@@ -146,7 +146,7 @@ CONTAINS
    SUBROUTINE SM_type_clear(this)
 
 !-----------------------------------------------------------------------------
-      class(SM_type), intent(inout) :: this
+      class(SM_type), intent(inout)       :: this
 !-----------------------------------------------------------------------------
       this%nobs = 0
       IF (allocated(this%lat   ))   deallocate(this%lat   )
@@ -165,10 +165,10 @@ CONTAINS
    SUBROUTINE SM_type_concat(this)
 
 !-----------------------------------------------------------------------------
-      class(SM_type), intent(inout) :: this
+      class(SM_type), intent(inout)       :: this
 
-      integer :: n
-      integer :: offset
+      integer                             :: n
+      integer                             :: offset
 !-----------------------------------------------------------------------------
       this%nobs = 0
       IF (allocated(this%lat   ))   deallocate(this%lat   )
@@ -220,9 +220,9 @@ CONTAINS
    SUBROUTINE SM_type_forward(this, idate, deltim)
 
 !-----------------------------------------------------------------------------
-      class(SM_type),     intent(inout) :: this
-      integer,            intent(in)    :: idate(3)
-      real(r8),           intent(in)    :: deltim
+      class(SM_type),     intent(inout)   :: this
+      integer,            intent(in)      :: idate(3)
+      real(r8),           intent(in)      :: deltim
 !-----------------------------------------------------------------------------
       IF (this%use_pm) CALL this%pm%forward(idate, deltim)
       IF (this%use_anatq) CALL this%anatq%forward()
@@ -232,14 +232,14 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE SM_type_save (this, is_analysis)
+   SUBROUTINE SM_type_save(this, is_analysis)
 
 !-----------------------------------------------------------------------------
-      class(SM_type), intent(in) :: this
-      logical,        intent(in) :: is_analysis
+      class(SM_type), intent(in)          :: this
+      logical,        intent(in)          :: is_analysis
 
-      integer                    :: istream, is, ipm, np, iens
-      logical                    :: valid_hx
+      integer                             :: istream, is, ipm, np, iens
+      logical                             :: valid_hx
 !-----------------------------------------------------------------------------
       DO istream = 1, size(this%cfgs)
          is = this%cfgs(istream)%istream
@@ -288,7 +288,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE SM_type_prepare (this, np, nobs_p, y_p, hx_p, r_p)
+   SUBROUTINE SM_type_prepare(this, np, nobs_p, y_p, hx_p, r_p)
 
 !-----------------------------------------------------------------------------
       class(SM_type),         intent(in)  :: this
