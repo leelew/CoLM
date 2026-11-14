@@ -286,7 +286,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE SM_type_prepare(this, np, nobs_p, y_p, hx_p, R_p)
+   SUBROUTINE SM_type_prepare(this, np, nobs_p, y_p, hx_p, r_p)
 
 !-----------------------------------------------------------------------------
       class(SM_type),         intent(in)  :: this
@@ -294,7 +294,7 @@ CONTAINS
       integer,                intent(out) :: nobs_p
       real(r8), allocatable,  intent(out) :: y_p(:)
       real(r8), allocatable,  intent(out) :: hx_p(:,:)
-      real(r8), allocatable,  intent(out) :: R_p(:)
+      real(r8), allocatable,  intent(out) :: r_p(:)
 
       integer                             :: iens, iobs
       real(r8)                            :: lat_p, lon_p, dlat, dlon
@@ -318,7 +318,7 @@ CONTAINS
       nobs_p = count(valid)
       IF (nobs_p == 0) RETURN
 
-      allocate(y_p(nobs_p), hx_p(nobs_p,DEF_DA_ENS_NUM), R_p(nobs_p))
+      allocate(y_p(nobs_p), hx_p(nobs_p,DEF_DA_ENS_NUM), r_p(nobs_p))
       allocate(lat(nobs_p), lon(nobs_p), dist(nobs_p), hav(nobs_p))
       y_p = pack(this%y, valid)
       DO iens = 1, DEF_DA_ENS_NUM

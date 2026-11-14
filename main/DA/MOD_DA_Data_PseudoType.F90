@@ -115,15 +115,15 @@ CONTAINS
       ! Broadcast complete observation vectors to all processes.
       allocate(this%lat(this%nobs), this%lon(this%nobs), this%y(this%nobs), this%sigma(this%nobs))
       IF (p_is_master) THEN
-         this%lat = obs_global(1,:)
-         this%lon = obs_global(2,:)
-         this%y   = obs_global(3,:)
-         this%sigma   = obs_global(4,:)
+         this%lat   = obs_global(1,:)
+         this%lon   = obs_global(2,:)
+         this%y     = obs_global(3,:)
+         this%sigma = obs_global(4,:)
       ENDIF
-      CALL mpi_bcast(this%lat, this%nobs, MPI_REAL8, p_address_master, p_comm_glb, p_err)
-      CALL mpi_bcast(this%lon, this%nobs, MPI_REAL8, p_address_master, p_comm_glb, p_err)
-      CALL mpi_bcast(this%y,   this%nobs, MPI_REAL8, p_address_master, p_comm_glb, p_err)
-      CALL mpi_bcast(this%sigma,   this%nobs, MPI_REAL8, p_address_master, p_comm_glb, p_err)
+      CALL mpi_bcast(this%lat,  this%nobs, MPI_REAL8, p_address_master, p_comm_glb, p_err)
+      CALL mpi_bcast(this%lon,  this%nobs, MPI_REAL8, p_address_master, p_comm_glb, p_err)
+      CALL mpi_bcast(this%y,    this%nobs, MPI_REAL8, p_address_master, p_comm_glb, p_err)
+      CALL mpi_bcast(this%sigma,this%nobs, MPI_REAL8, p_address_master, p_comm_glb, p_err)
 
    END SUBROUTINE pseudo_obs_read
 

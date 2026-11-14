@@ -195,7 +195,7 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE TQ_type_prepare(this, np, nobs_p, y_p, hx_p, R_p)
+   SUBROUTINE TQ_type_prepare(this, np, nobs_p, y_p, hx_p, r_p)
 
 !-----------------------------------------------------------------------------
       class(TQ_type),         intent(in)    :: this
@@ -203,7 +203,7 @@ CONTAINS
       integer,                intent(out)   :: nobs_p
       real(r8), allocatable,  intent(out)   :: y_p(:)
       real(r8), allocatable,  intent(out)   :: hx_p(:,:)
-      real(r8), allocatable,  intent(out)   :: R_p(:)
+      real(r8), allocatable,  intent(out)   :: r_p(:)
 
       integer                               :: iens, iobs
       real(r8)                              :: lat_p, lon_p, dlat, dlon
@@ -227,13 +227,13 @@ CONTAINS
       nobs_p = count(valid)
       IF (nobs_p == 0) RETURN
 
-      allocate(y_p(nobs_p), hx_p(nobs_p,DEF_DA_ENS_NUM), R_p(nobs_p))
+      allocate(y_p(nobs_p), hx_p(nobs_p,DEF_DA_ENS_NUM), r_p(nobs_p))
       allocate(lat(nobs_p), lon(nobs_p), dist(nobs_p), hav(nobs_p))
       y_p = pack(this%insitu%y, valid)
       DO iens = 1, DEF_DA_ENS_NUM
          hx_p(:,iens) = pack(this%insitu%hx_obs(:,iens), valid)
       ENDDO
-      R_p = pack(this%insitu%sigma, valid)
+      r_p = pack(this%insitu%sigma, valid)
       lat = pack(this%insitu%lat, valid)
       lon = pack(this%insitu%lon, valid)
 
@@ -242,7 +242,7 @@ CONTAINS
          cos(lat*pi/180.0_r8)*cos(patchlatr(np))* &
          sin((lon*pi/180.0_r8 - patchlonr(np))/2.0_r8)**2
       dist = 2.0_r8*6378.1_r8*asin(sqrt(max(0.0_r8,min(1.0_r8,hav))))
-      R_p = R_p**2 / max(exp(-(dist**2)/(2.0_r8*this%locr**2)), 1.0e-6_r8)
+      r_p = r_p**2 / max(exp(-(dist**2)/(2.0_r8*this%locr**2)), 1.0e-6_r8)
 
    END SUBROUTINE TQ_type_prepare
 

@@ -383,20 +383,20 @@ CONTAINS
 
       real(r8)                 :: t_sky = 2.7                       ! Cosmic background brightness temperature [K]
       real(r8)                 :: t_eq                              ! Equivalent layer temperature
-      real(r8)                 :: gossat
+      real(r8)                 :: gamma_atm                         ! Atmospheric transmissity
 !-----------------------------------------------------------------------------
-      ! Atmospheric optical depth ([11])
-      tau_atm = exp(-3.9262 - 0.2211*z/1000 - 0.00369*tref)/cos(theta)
-      gossat = exp(-tau_atm)
+      ! Atmospheric optical depth ([11] Eq.A1)
+      tau_atm = exp(-3.9262 - 0.2211*z/1000 - 0.00369*tref)
+      gamma_atm = exp(-tau_atm /cos(theta))
 
-      ! Calculate equivalent layer temperature ([11])
+      ! Calculate equivalent layer temperature ([11] Eq.A1)
       t_eq = exp(4.9274 + 0.002195*tref)
 
-      ! Upwelling radiation (brightness temperature) of atmosphere ([11])
-      tb_au(:) = t_eq*(1.-gossat)
+      ! Upwelling radiation (brightness temperature) of atmosphere ([11] Eq.A2)
+      tb_au(:) = t_eq*(1.-gamma_atm)
 
-      ! Downwelling atmospheric and attenuated cosmic emission ([11])
-      tb_ad(:) = t_eq*(1.-gossat) + t_sky*gossat
+      ! Downwelling atmospheric and attenuated cosmic emission ([11] Eq.A2)
+      tb_ad(:) = t_eq*(1.-gamma_atm) + t_sky*gamma_atm
 
    END SUBROUTINE atm
 
@@ -440,6 +440,11 @@ CONTAINS
       ENDIF
 
       ! Calculate ratio of freezed soil
+      ! Approximate frozen-soil permittivity by blending unfrozen and frozen
+      ! endmembers using the ice fraction of total soil water. This fraction
+      ! does not represent the frozen fraction of the soil volume, and its use
+      ! as a mixing weight requires validation. Replace this approximation with
+      ! a dielectric model that explicitly accounts for ice and unfrozen water.
       IF (liq_surf + ice_surf <= 0.0d0) THEN
          ffrz = 0.0d0
       ELSE

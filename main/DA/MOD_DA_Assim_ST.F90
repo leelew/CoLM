@@ -79,7 +79,7 @@ CONTAINS
       integer                           :: nobs_p        
       real(r8), allocatable             :: y_p(:)      
       real(r8), allocatable             :: hx_p(:,:)     
-      real(r8), allocatable             :: R_p(:)
+      real(r8), allocatable             :: r_p(:)
       real(r8)                          :: trans(DEF_DA_ENS_NUM, DEF_DA_ENS_NUM)  
       real(r8)                          :: state_f(nl_soil, DEF_DA_ENS_NUM)       
       real(r8)                          :: state_a(nl_soil, DEF_DA_ENS_NUM)   
@@ -100,11 +100,11 @@ CONTAINS
             IF (patchtype(np) >= 1) CYCLE
 
             ! Select observations and localize their error variances.
-            CALL st%prepare(np, nobs_p, y_p, hx_p, R_p)
+            CALL st%prepare(np, nobs_p, y_p, hx_p, r_p)
             IF (nobs_p == 0) CYCLE
 
             ! Compute the ensemble transform.
-            CALL letkf(DEF_DA_ENS_NUM, nobs_p, hx_p, y_p, R_p, st%infl, trans)
+            CALL letkf(DEF_DA_ENS_NUM, nobs_p, hx_p, y_p, r_p, st%infl, trans)
 
             DO iens = 1, DEF_DA_ENS_NUM
                state_f(:,iens) = t_soisno_ens(1:,iens,np)
@@ -119,7 +119,7 @@ CONTAINS
                   max(-20.0_r8, min(20.0_r8, state_a(1:2,iens) - t_soisno_ens(1:2,iens,np)))
             ENDDO
 
-            deallocate(y_p, R_p, hx_p)
+            deallocate(y_p, r_p, hx_p)
          ENDDO
       ENDIF
 
