@@ -250,7 +250,6 @@ MODULE MOD_Vars_TimeInvariants
    real(r8), allocatable :: wf_om        (:,:)  !gravimetric fraction of om
 #ifdef DataAssimilation
    real(r8), allocatable :: wf_silt      (:,:)  !gravimetric fraction of silt
-   real(r8), allocatable :: z_soil_ptb(:,:)     !standard normal draws for soil parameter perturbation (2, DEF_DA_ENS_NUM): porsl, hksati
 #endif
    real(r8), allocatable :: OM_density   (:,:)  !OM density (kg/m3)
    real(r8), allocatable :: BD_all       (:,:)  !bulk density of soil (GRAVELS + ORGANIC MATTER + Mineral Soils,kg/m3)
@@ -501,6 +500,9 @@ CONTAINS
    USE MOD_SPMD_Task
    USE MOD_NetCDFVector
    USE MOD_NetCDFSerial
+#ifdef DataAssimilation
+   USE MOD_DA_Vars_TimeInVars, only: READ_DA_TimeInVars
+#endif
 #ifdef RangeCheck
    USE MOD_RangeCheck
 #endif
@@ -630,12 +632,7 @@ CONTAINS
       CALL ncio_read_bcast_serial (file_restart, 'wetwatmax', wetwatmax) ! maximum wetland water (mm)
 
 #ifdef DataAssimilation
-      IF (DEF_DA .and. DEF_DA_ENS_SOIL_PTB) THEN
-         IF (allocated(z_soil_ptb)) deallocate(z_soil_ptb)
-         CALL ncio_read_bcast_serial_real8_2d (file_restart, 'z_soil_ptb', z_soil_ptb)
-         IF (any(shape(z_soil_ptb) /= [2, DEF_DA_ENS_NUM])) &
-            CALL CoLM_stop ('ERROR: z_soil_ptb shape mismatch in const; rerun mkinidata.')
-      ENDIF
+      CALL READ_DA_TimeInVars (file_restart)
 #endif
 
       IF (DEF_USE_Forcing_Downscaling) THEN
@@ -700,12 +697,15 @@ CONTAINS
    ! Original version: Yongjiu Dai, September 15, 1999, 03/2014
    !====================================================================
 
-   USE MOD_Namelist, only: DEF_REST_CompressLevel, DEF_USE_BEDROCK, DEF_Interception_scheme, DEF_DA_ENS_NUM, DEF_DA_ENS_SOIL_PTB
+   USE MOD_Namelist, only: DEF_REST_CompressLevel, DEF_USE_BEDROCK, DEF_Interception_scheme
    USE MOD_SPMD_Task
    USE MOD_NetCDFSerial
    USE MOD_NetCDFVector
    USE MOD_LandPatch
    USE MOD_Vars_Global
+#ifdef DataAssimilation
+   USE MOD_DA_Vars_TimeInVars, only: WRITE_DA_TimeInVars
+#endif
 
    IMPLICIT NONE
 
@@ -715,8 +715,7 @@ CONTAINS
 
    ! Local Variables
    character(len=256) :: file_restart, cyear
-   integer :: compress, k, i
-   real(r8), allocatable :: u1(:), u2(:)
+   integer :: compress
 
       compress = DEF_REST_CompressLevel
 
@@ -889,27 +888,7 @@ CONTAINS
          CALL ncio_write_serial (file_restart, 'wetwatmax', wetwatmax) ! maximum wetland water (mm)
 
 #ifdef DataAssimilation
-         IF (DEF_DA .and. DEF_DA_ENS_SOIL_PTB) THEN
-            ! standard normal draws for soil parameter perturbation
-            IF (allocated(z_soil_ptb)) deallocate(z_soil_ptb)
-            ! row 1: porsl, row 2: hksati
-            allocate (z_soil_ptb(2, DEF_DA_ENS_NUM))
-            allocate (u1(DEF_DA_ENS_NUM/2), u2(DEF_DA_ENS_NUM/2))
-            CALL random_seed ()
-            DO k = 1, 2
-               CALL random_number (u1)
-               CALL random_number (u2)
-               DO i = 1, DEF_DA_ENS_NUM/2
-                  u1(i) = max(u1(i), 1.0e-10_r8)
-                  z_soil_ptb(k,2*i-1) = sqrt(-2.0_r8*log(u1(i))) * cos(2.0_r8*pi*u2(i))
-                  z_soil_ptb(k,2*i)   = sqrt(-2.0_r8*log(u1(i))) * sin(2.0_r8*pi*u2(i))
-               ENDDO
-            ENDDO
-            CALL ncio_define_dimension (file_restart, 'nvar_ptb', 2)
-            CALL ncio_define_dimension (file_restart, 'ens', DEF_DA_ENS_NUM)
-            CALL ncio_write_serial_real8_2d (file_restart, 'z_soil_ptb', z_soil_ptb, 'nvar_ptb', 'ens')
-            deallocate (z_soil_ptb, u1, u2)
-         ENDIF
+         CALL WRITE_DA_TimeInVars (file_restart)
 #endif
 
       ENDIF
@@ -940,6 +919,9 @@ CONTAINS
    USE MOD_Namelist, only: DEF_USE_Forcing_Downscaling, DEF_USE_Forcing_Downscaling_Simple
    USE MOD_SPMD_Task
    USE MOD_LandPatch, only: numpatch
+#ifdef DataAssimilation
+   USE MOD_DA_Vars_TimeInVars, only: deallocate_DA_TimeInVars
+#endif
 
    IMPLICIT NONE
 
@@ -1060,7 +1042,7 @@ CONTAINS
       ENDIF
 
 #ifdef DataAssimilation
-      IF (allocated(z_soil_ptb)) deallocate(z_soil_ptb)
+      CALL deallocate_DA_TimeInVars ()
 #endif
 
 #if (defined LULC_IGBP_PFT || defined LULC_IGBP_PC)

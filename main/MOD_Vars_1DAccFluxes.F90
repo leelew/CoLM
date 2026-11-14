@@ -5,7 +5,6 @@ MODULE MOD_Vars_1DAccFluxes
    USE MOD_Precision
 #ifdef DataAssimilation
    USE MOD_DA_Vars_AccVars
-   USE MOD_Namelist
 #endif
 #ifdef EXTERNAL_LAKE
    USE MOD_Lake_1DAccVars
@@ -591,10 +590,6 @@ CONTAINS
    USE MOD_Vars_Global
    IMPLICIT NONE
 
-#ifdef DataAssimilation
-      CALL allocate_DA_AccVars ()
-#endif
-
       IF (p_is_worker) THEN
          IF (numpatch > 0) THEN
 
@@ -1164,6 +1159,10 @@ CONTAINS
          ENDIF
       ENDIF
 
+#ifdef DataAssimilation
+      CALL allocate_DA_AccVars
+#endif
+
 #ifdef EXTERNAL_LAKE
       CALL allocate_LakeAccVars
 #endif
@@ -1182,10 +1181,6 @@ CONTAINS
    IMPLICIT NONE
 
       IF (p_is_worker) THEN
-#ifdef DataAssimilation
-         CALL deallocate_DA_AccVars ()
-#endif
-
          IF (numpatch > 0) THEN
 
             deallocate (a_us     )
@@ -1756,6 +1751,10 @@ CONTAINS
          ENDIF
       ENDIF
 
+#ifdef DataAssimilation
+      CALL deallocate_DA_AccVars
+#endif
+
 #ifdef EXTERNAL_LAKE
       CALL deallocate_LakeAccVars
 #endif
@@ -1873,10 +1872,6 @@ CONTAINS
 
             a_o3uptakesun(:) = spval
             a_o3uptakesha(:) = spval
-
-#ifdef DataAssimilation
-            CALL flush_DA_AccVars ()
-#endif
 
 #ifdef URBAN_MODEL
             IF (numurban > 0) THEN
@@ -2346,6 +2341,10 @@ CONTAINS
          ENDIF
       ENDIF
 
+#ifdef DataAssimilation
+      CALL flush_DA_AccVars
+#endif
+
 #ifdef EXTERNAL_LAKE
       CALL Flush_LakeAccVars
 #endif
@@ -2582,10 +2581,6 @@ CONTAINS
                CALL acc1d(o3uptakesun,a_o3uptakesun)
                CALL acc1d(o3uptakesha,a_o3uptakesha)
             ENDIF
-
-#ifdef DataAssimilation
-            CALL accumulate_DA_AccVars ()
-#endif
 
 #ifdef URBAN_MODEL
             IF (numurban > 0) THEN
@@ -3352,6 +3347,10 @@ CONTAINS
 
 #ifdef CatchLateralFlow
       CALL accumulate_fluxes_basin ()
+#endif
+
+#ifdef DataAssimilation
+      CALL accumulate_DA_AccVars
 #endif
 
 #ifdef EXTERNAL_LAKE

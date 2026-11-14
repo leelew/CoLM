@@ -399,7 +399,7 @@ PROGRAM CoLM
       CALL ParaOpt_init (jdate, lc_year)
 
 #ifdef DataAssimilation
-      CALL init_DA ()
+      CALL init_DA
 #endif
 
       ! ======================================================================
@@ -514,7 +514,7 @@ PROGRAM CoLM
          CALL CheckEquilibrium (idate, deltim, i_spinupcycle, is_spinup, dir_hist, casename)
 
 #ifdef DataAssimilation
-         CALL run_DA (idate, deltim, dolai, doalb, dosst, oroflag, is_spinup)
+         CALL run_DA(idate, deltim, dolai, doalb, dosst, oroflag, is_spinup)
 #endif
 
          ! Write out the model histroy file
@@ -676,7 +676,7 @@ PROGRAM CoLM
 #endif
       CALL ParaOpt_final ()
 #ifdef DataAssimilation
-      CALL end_DA()
+      CALL end_DA
 #endif
 
 #if (defined GridRiverLakeFlow)
