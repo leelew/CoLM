@@ -76,13 +76,13 @@ CONTAINS
       real(r8), intent(in)              :: deltim
 
       integer                           :: np, iens, il
-      integer                           :: nobs_p                                 ! Number of observations selected for the target patch
-      real(r8), allocatable             :: y_p(:)                                 ! Selected observation values
-      real(r8), allocatable             :: hx_p(:,:)                              ! Forecast ensemble H(x) at selected observation locations
-      real(r8), allocatable             :: r_p(:)                                 ! Localized observation error variances
-      real(r8)                          :: trans(DEF_DA_ENS_NUM, DEF_DA_ENS_NUM)  ! LETKF ensemble transform matrix
-      real(r8)                          :: state_f(nl_soil, DEF_DA_ENS_NUM)       ! Forecast soil liquid water [kg/m2]
-      real(r8)                          :: state_a(nl_soil, DEF_DA_ENS_NUM)       ! Transformed soil liquid water [kg/m2]
+      integer                           :: nobs_p
+      real(r8), allocatable             :: y_p(:)
+      real(r8), allocatable             :: hx_p(:,:)
+      real(r8), allocatable             :: r_p(:)
+      real(r8)                          :: trans(DEF_DA_ENS_NUM, DEF_DA_ENS_NUM)
+      real(r8)                          :: state_f(nl_soil, DEF_DA_ENS_NUM)
+      real(r8)                          :: state_a(nl_soil, DEF_DA_ENS_NUM)
 !-----------------------------------------------------------------------------
       ! Prepare observations and forecast H(x).
       CALL st%forward(idate, deltim)
