@@ -24,7 +24,7 @@ MODULE MOD_DA_Data_PM
 !      configuration, reference grid, and spatial mapping.
 !
 ! SUPPORTED:
-!   TB_H / TB_V:
+!   TB_H / TB_V: 
 !     Horizontally / vertically polarized brightness temperatures.
 !     Forward modeling uses microwave emission models
 !   SM:
@@ -195,7 +195,7 @@ CONTAINS
 ! Level-1 brightness temperature observations from passive microwave
 ! radiometers.
 !-----------------------------------------------------------------------------
-            CASE ('TB_H', 'TB_V') 
+            CASE ('TB_H', 'TB_V')
                ipol = merge(2, 1, this%y%var_name == 'TB_V')
                sumarea(:) = 0.0_r8
 
