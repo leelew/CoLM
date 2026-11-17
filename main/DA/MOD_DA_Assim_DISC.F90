@@ -29,7 +29,6 @@ MODULE MOD_DA_Assim_DISC
    USE MOD_Grid_RiverLakeFlow
    USE MOD_Grid_RiverLakeTimeVars
    USE MOD_Grid_RiverLakeHistState
-   USE MOD_DA_Vars_Fluxes
    USE MOD_DA_Vars_TimeVars
    USE MOD_DA_Vars_Fluxes
    USE MOD_DA_Vars_AccVars
