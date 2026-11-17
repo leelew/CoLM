@@ -220,10 +220,11 @@ CONTAINS
       real(r8)                 :: BD_all_surf                       ! Surface soil bulk density [kg/m3]
       real(r8)                 :: t_soil_surf                       ! Soil temperature at surface [K]
       real(r8)                 :: t_soil_deep                       ! Soil temperature at deep layer [K]
-      real(r8)                 :: vliq_soil                         ! Liquid volumetric water content at surface (m3/m3)
-      real(r8)                 :: vice_soil                         ! Ice volumetric water content at surface (m3/m3)
+      real(r8)                 :: vliq_soil_surf                    ! Liquid volumetric water content at surface (m3/m3)
+      real(r8)                 :: vice_soil_surf                    ! Ice volumetric water content at surface (m3/m3)
       real(r8)                 :: wf_clay_surf                      ! Clay mass fraction at surface [0-1]
       real(r8)                 :: wf_sand_surf                      ! Sand mass fraction at surface [0-1]
+      real(r8)                 :: teff_soil(2)                      ! Effective temperature for H and V polarizations, [K]
       integer                  :: i
 !-----------------------------------------------------------------------------
 !#############################################################################
@@ -244,8 +245,8 @@ CONTAINS
       t_soil_deep = (t_soisno(7)*(zi_soi(7)-0.5)+t_soisno(8)*(1.0-zi_soi(7))) / 0.5
 
       ! Convert liquid and ice masses to volume fractions over the first two layers.
-      vliq_soil_surf = max((wliq_soisno(1)+wliq_soisno(2))/(sum(dz_soi(1:2))*denh2o),0)
-      vice_soil_surf = max((wice_soisno(1)+wice_soisno(2))/(sum(dz_soi(1:2))*denice),0)
+      vliq_soil_surf = max((wliq_soisno(1)+wliq_soisno(2))/(sum(dz_soi(1:2))*denh2o),0.0_r8)
+      vice_soil_surf = max((wice_soisno(1)+wice_soisno(2))/(sum(dz_soi(1:2))*denice),0.0_r8)
 
       ! Calculate lower bound of snow
       lb = 0
@@ -504,7 +505,7 @@ CONTAINS
       tau_water = tau_water * b
 
       ! Soil-water conductivity ([5] Eq.32; [6] Eq.8).
-      sigma_water = max(-1.645+1.939*rho_bulk_gcm3-0.0225622*sand_pct+0.01594*clay_pct,0)
+      sigma_water = max(-1.645+1.939*rho_bulk_gcm3-0.0225622*sand_pct+0.01594*clay_pct,0.0_r8)
 
       ! Calculate dielectric constant of soil-water by modified Debye expression ([5] Eq.29)
       eps_water = epsinf_water + (eps0_water-epsinf_water)/(1+jj*omega*tau_water)         &
@@ -1051,7 +1052,7 @@ CONTAINS
 
          ! Effective snow power absorption coefficient.
          b_wsnow = (eps_snow_i/eps_snow_r)**2
-         ka_snow = 2. * omega * sqrt(mu0*eps0*eps_snow_r) * sqrt(b_ws/(2.*(sqrt(1.+b_wsnow)+1)))
+         ka_snow = 2. * omega * sqrt(mu0*eps0*eps_snow_r) * sqrt(b_wsnow/(2.*(sqrt(1.+b_wsnow)+1)))
 
          ! Total extinction (assuming scattering is the same for dry and wet snow)
          ke_snow = (ke_dsnow-ka_dsnow) + ka_snow
@@ -1064,7 +1065,7 @@ CONTAINS
 
          ! Snow-layer emission transmitted through the upper interface ([20], Eq.4.161).
          tb_snow = (1.0_r8+r_below(ipol)*gamma_snow) * (1.0_r8-r_snow_air) * t_snow * &
-            (ka_snow/(ke_snow-q*ks_snow)) * (1.0_r8-gamma_snow) / (1.0_r8-r_below(ipol)*r_snow_air*gamma_snow**2)
+            (ka_snow/(ke_snow-0.96*ks_snow)) * (1.0_r8-gamma_snow) / (1.0_r8-r_below(ipol)*r_snow_air*gamma_snow**2)
 
          ! Underlying-layer emission transmitted through the snow ([20], Eq.4.162).
          tb_below = (1.0_r8-r_below(ipol)) * (1.0_r8-r_snow_air) * t_below * &
