@@ -38,15 +38,15 @@ MODULE MOD_DA_Operator_Const
    SAVE
 
    ! Constant variables
-   real(r8), parameter    :: C = 2.998e8           ! Speed of light (m/s)
-   real(r8), parameter    :: mu0 = 4.*pi*1e-7      ! Vacuum permeability (H/m)
-   real(r8), parameter    :: eps_0 = 8.854e-12     ! Dielectric constant of free space (Klein and Swift 1977) [Farads/meter]
-   real(r8), parameter    :: z0 = sqrt(mu0/eps_0)  ! Impedance of free space (Ohm)
-   real(r8), parameter    :: eps_w_inf = 4.9       ! Dielectric constant at infinite frequency (Stogryn 1971),
-   real(r8), parameter    :: rho_soil = 2.66       ! Soil specific density (g/cm3)
-   real(r8), parameter    :: f0w = 9.              ! Relaxation frequency of liquid water (GHz)
-   real(r8), parameter    :: rgh_surf = 2.2        ! Soil surface roughness (cm)
-   complex(r8), parameter :: jj = (0., 1.)         ! Imaginary unit for complex number
+   real(r8), parameter    :: C = 2.998e8                ! Speed of light (m/s)
+   real(r8), parameter    :: mu0 = 4.*pi*1e-7           ! Vacuum permeability (H/m)
+   real(r8), parameter    :: eps0 = 8.854e-12           ! Dielectric constant of free space (Klein and Swift 1977) [Farads/meter]
+   real(r8), parameter    :: z0 = sqrt(mu0/eps0)        ! Impedance of free space (Ohm)
+   real(r8), parameter    :: epsinf_water = 4.9         ! Dielectric constant at infinite frequency (Stogryn 1971)
+   real(r8), parameter    :: rho_soil_gcm3 = 2.66       ! Soil specific density (g/cm3)
+   real(r8), parameter    :: f0_water = 9.              ! Relaxation frequency of liquid water (GHz)
+   real(r8), parameter    :: rgh_surf = 2.2             ! Soil surface roughness (cm)
+   complex(r8), parameter :: jj = (0., 1.)              ! Imaginary unit for complex number
 
 #ifdef LULC_IGBP
    ! 0  Ocean
@@ -99,7 +99,7 @@ MODULE MOD_DA_Operator_Const
       0.020, 0.170, 0.190, 0.220, 0.000, &
       0.020, 0.000/)
 
-   ! b parameters for Wigneron vegetation model (ref?)
+   ! b parameters for Wigneron vegetation model 
    real(r8), parameter, dimension(N_land_classification) :: b1 &
       = (/0.2600, 0.2260, 0.2600, 0.2260, 0.2260, &
       0.0375, 0.0375, 0.0375, 0.0375, 0.0375, &
@@ -109,12 +109,6 @@ MODULE MOD_DA_Operator_Const
    real(r8), parameter, dimension(N_land_classification) :: b2 &
       = (/0.0060, 0.0010, 0.0060, 0.0010, 0.0010, &
       0.0500, 0.0500, 0.0500, 0.0500, 0.0500, &
-      0.0000, 0.0000, 0.0000, 0.0000, 0.0000, &
-      0.0000, 0.0000/)
-
-   real(r8), parameter, dimension(N_land_classification) :: b3 &
-      = (/0.6900, 0.7000, 0.6900, 0.7000, 0.7000, &
-      0.0000, 0.0000, 0.0000, 0.0000, 0.0000, &
       0.0000, 0.0000, 0.0000, 0.0000, 0.0000, &
       0.0000, 0.0000/)
 

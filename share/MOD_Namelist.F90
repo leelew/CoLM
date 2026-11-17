@@ -650,8 +650,8 @@ MODULE MOD_Namelist
    logical            :: DEF_DA_ENS_SM             = .false.
    logical            :: DEF_DA_ENS_SOILPARAM      = .false.
 
-   integer            :: DEF_DA_OPERATOR_EM_DIEL   = 0
-   integer            :: DEF_DA_OPERATOR_EM_ROUGH  = 0
+   integer            :: DEF_DA_OPERATOR_EM_DIEL   = 3
+   integer            :: DEF_DA_OPERATOR_EM_ROUGH  = 2
 
    real(r8)           :: DEF_DA_ASSIM_SM_DRES      = 0.4
    real(r8)           :: DEF_DA_ASSIM_SM_LOCR      = 40.0
