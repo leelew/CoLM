@@ -24,7 +24,7 @@ MODULE MOD_DA_Data_PM
 !      configuration, reference grid, and spatial mapping.
 !
 ! SUPPORTED:
-!   TB_H / TB_V: 
+!   TB_H / TB_V:
 !     Horizontally / vertically polarized brightness temperatures.
 !     Forward modeling uses microwave emission models
 !   SM:
@@ -56,7 +56,7 @@ MODULE MOD_DA_Data_PM
    USE MOD_DA_Data_GridType
    USE MOD_DA_Operator_EM
    USE MOD_DA_Vars_TimeVars
-   USE MOD_DA_Vars_TimeInVars, only: porsl_ens
+   USE MOD_DA_Vars_TimeInVars
    IMPLICIT NONE
 
 !-----------------------------------------------------------------------------
@@ -99,7 +99,7 @@ MODULE MOD_DA_Data_PM
       real(r8), allocatable               :: lat(:)                        ! Observation latitudes
       real(r8), allocatable               :: lon(:)                        ! Observation longitudes
       real(r8), allocatable               :: y(:)                          ! Observed values
-      real(r8), allocatable               :: r(:)                          ! Observation error standard deviations
+      real(r8), allocatable               :: sigma(:)                      ! Observation error standard deviations
       real(r8), allocatable               :: hx_obs(:,:)                   ! Observation-space ensemble H(x)
 
    CONTAINS
@@ -211,7 +211,7 @@ CONTAINS
                         snowdp_ens(iens,np),                                                          &
                         lai_ens(iens,np), sai_ens(iens,np),                                           &
                         wf_clay(:,np), wf_sand(:,np), wf_silt(:,np),                                  &
-                        BD_all(:,np), porsl_ens(:,iens,np),                                            &
+                        BD_all(:,np), porsl_ens(:,iens,np),                                                    &
                         theta_part(np)%val(ipart), this%fghz,                                         &
                         tb_part(1), tb_part(2))
 
@@ -347,13 +347,8 @@ CONTAINS
       integer                             :: i
 !-----------------------------------------------------------------------------
       CALL this%clear()
-      IF (allocated(this%sensors)) THEN
-         DO i = 1, size(this%sensors)
-            CALL this%sensors(i)%clear()
-         ENDDO
-         deallocate(this%sensors)
-      ENDIF
-      IF (allocated(this%cfgs)) deallocate(this%cfgs)
+      IF (allocated(this%sensors)) deallocate(this%sensors)
+      IF (allocated(this%cfgs   )) deallocate(this%cfgs   )
 
       this%nsensor = 0
       IF (size(configs) == 0) return
@@ -383,7 +378,7 @@ CONTAINS
       IF (allocated(this%lat   )) deallocate(this%lat   )
       IF (allocated(this%lon   )) deallocate(this%lon   )
       IF (allocated(this%y     )) deallocate(this%y     )
-      IF (allocated(this%r     )) deallocate(this%r     )
+      IF (allocated(this%sigma )) deallocate(this%sigma )
       IF (allocated(this%hx_obs)) deallocate(this%hx_obs)
 
       IF (.not. allocated(this%sensors)) return
@@ -407,7 +402,7 @@ CONTAINS
       IF (allocated(this%lat   )) deallocate(this%lat   )
       IF (allocated(this%lon   )) deallocate(this%lon   )
       IF (allocated(this%y     )) deallocate(this%y     )
-      IF (allocated(this%r     )) deallocate(this%r     )
+      IF (allocated(this%sigma )) deallocate(this%sigma )
       IF (allocated(this%hx_obs)) deallocate(this%hx_obs)
       IF (.not. allocated(this%sensors)) RETURN
 
@@ -422,7 +417,7 @@ CONTAINS
       allocate(this%lat(this%nobs))
       allocate(this%lon(this%nobs))
       allocate(this%y(this%nobs))
-      allocate(this%r(this%nobs))
+      allocate(this%sigma(this%nobs))
       allocate(this%hx_obs(this%nobs, DEF_DA_ENS_NUM))
 
       ! Combine observations and H(x) in stream order.
@@ -436,7 +431,7 @@ CONTAINS
          this%lat(offset+1:offset+n) = this%sensors(is)%y%lat
          this%lon(offset+1:offset+n) = this%sensors(is)%y%lon
          this%y(offset+1:offset+n) = this%sensors(is)%y%y
-         this%r(offset+1:offset+n) = this%sensors(is)%y%r
+         this%sigma(offset+1:offset+n) = this%sensors(is)%y%sigma
          this%hx_obs(offset+1:offset+n,:) = this%sensors(is)%hx_obs
 
          offset = offset + n

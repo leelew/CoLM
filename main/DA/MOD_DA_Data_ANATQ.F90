@@ -8,14 +8,13 @@ MODULE MOD_DA_Data_ANATQ
 !   handling for land data assimilation.
 !
 ! WORKFLOW:
-!   1. Init: Initialize empty temperature and relative humidity collections.
-!   2. Forward: Select patches with changed forecast and analysis ensemble
+!   1. Forward: Select patches with changed forecast and analysis ensemble
 !      means independently for each variable. Use analysis ensemble means as
 !      pseudo-observations and forecast members as matching H(x). Gather
 !      observations through PseudoType, then gather and broadcast H(x) in the
 !      same record order. Combine temperature records first, followed by
 !      relative humidity records.
-!   3. Clear: Release current pseudo-observations and H(x).
+!   2. Clear: Release current pseudo-observations and H(x).
 !
 ! SUPPORTED:
 !   2MT:
@@ -48,7 +47,6 @@ MODULE MOD_DA_Data_ANATQ
 
    CONTAINS
 
-      procedure                            :: init    => ANATQ_init         ! Initialize an empty pseudo-observation collection
       procedure                            :: forward => ANATQ_forward      ! Construct y and matching observation-space H(x)
       procedure                            :: clear   => ANATQ_clear        ! Clear current pseudo-observations and H(x)
 
@@ -66,12 +64,11 @@ MODULE MOD_DA_Data_ANATQ
       real(r8), allocatable                :: lat(:)                        ! Observation latitudes [deg]
       real(r8), allocatable                :: lon(:)                        ! Observation longitudes [deg]
       real(r8), allocatable                :: y(:)                          ! Analysis ensemble means of the selected variable
-      real(r8), allocatable                :: r(:)                          ! Observation error standard deviations
+      real(r8), allocatable                :: sigma(:)                      ! Observation error standard deviations
       real(r8), allocatable                :: hx_obs(:,:)                   ! Observation-space forecast ensemble H(x)
 
    CONTAINS
 
-      procedure                            :: init    => ANATQ_set_init     ! Initialize the temperature and humidity collections
       procedure                            :: forward => ANATQ_set_forward  ! Prepare both variables and combine their records
       procedure                            :: concat  => ANATQ_set_concat   ! Combine temperature records followed by humidity
       procedure                            :: clear   => ANATQ_set_clear    ! Clear both variables and their combined arrays
@@ -84,24 +81,13 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE ANATQ_init(this)
-
-!-----------------------------------------------------------------------------
-      class(ANATQ_type), intent(inout)     :: this
-!-----------------------------------------------------------------------------
-      CALL this%clear()
-
-   END SUBROUTINE ANATQ_init
-
-!-----------------------------------------------------------------------------
-
    SUBROUTINE ANATQ_forward(this, var_name)
 
 !-----------------------------------------------------------------------------
       class(ANATQ_type), intent(inout)     :: this
       character(len=*), intent(in)         :: var_name
 
-      real(r8)                             :: r                             ! Observation error standard deviation
+      real(r8)                             :: sigma                         ! Observation error standard deviation
       integer                              :: iens
       integer                              :: iworker
       integer                              :: nlocal                        ! Number of selected patches on one worker
@@ -121,18 +107,18 @@ CONTAINS
 
          SELECT CASE (trim(var_name))
          CASE ('2MT')
-            r = 1.0_r8
+            sigma = 1.0_r8
             y = sum(tref_ens_a(1:DEF_DA_ENS_NUM,:), dim=1) / DEF_DA_ENS_NUM
             mask = y /= sum(tref_ens_f(1:DEF_DA_ENS_NUM,:), dim=1) / DEF_DA_ENS_NUM
          CASE ('2MRH')
-            r = 0.04_r8
+            sigma = 0.04_r8
             y = sum(rhref_ens_a(1:DEF_DA_ENS_NUM,:), dim=1) / DEF_DA_ENS_NUM
             mask = y /= sum(rhref_ens_f(1:DEF_DA_ENS_NUM,:), dim=1) / DEF_DA_ENS_NUM
          END SELECT
       ENDIF
 
       ! Gather observations through PseudoType; all processes participate.
-      CALL this%y%read(mask, y, r)
+      CALL this%y%read(mask, y, sigma)
       nobs = this%y%nobs
       IF (nobs == 0) RETURN
 
@@ -194,19 +180,6 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE ANATQ_set_init(this)
-
-!-----------------------------------------------------------------------------
-      class(ANATQ_set_type), intent(inout) :: this
-!-----------------------------------------------------------------------------
-      CALL this%clear()
-      CALL this%tref%init()
-      CALL this%rhref%init()
-
-   END SUBROUTINE ANATQ_set_init
-
-!-----------------------------------------------------------------------------
-
    SUBROUTINE ANATQ_set_forward(this)
 
 !-----------------------------------------------------------------------------
@@ -232,20 +205,20 @@ CONTAINS
       this%nobs = nt + nq
       IF (this%nobs == 0) RETURN
 
-      allocate(this%lat(this%nobs), this%lon(this%nobs), this%y(this%nobs), this%r(this%nobs))
+      allocate(this%lat(this%nobs), this%lon(this%nobs), this%y(this%nobs), this%sigma(this%nobs))
       allocate(this%hx_obs(this%nobs,DEF_DA_ENS_NUM))
       IF (nt > 0) THEN
          this%lat(1:nt) = this%tref%y%lat
          this%lon(1:nt) = this%tref%y%lon
          this%y(1:nt) = this%tref%y%y
-         this%r(1:nt) = this%tref%y%r
+         this%sigma(1:nt) = this%tref%y%sigma
          this%hx_obs(1:nt,:) = this%tref%hx_obs
       ENDIF
       IF (nq > 0) THEN
          this%lat(nt+1:nt+nq) = this%rhref%y%lat
          this%lon(nt+1:nt+nq) = this%rhref%y%lon
          this%y(nt+1:nt+nq) = this%rhref%y%y
-         this%r(nt+1:nt+nq) = this%rhref%y%r
+         this%sigma(nt+1:nt+nq) = this%rhref%y%sigma
          this%hx_obs(nt+1:nt+nq,:) = this%rhref%hx_obs
       ENDIF
 
@@ -264,7 +237,7 @@ CONTAINS
       IF (allocated(this%lat   )) deallocate(this%lat   )
       IF (allocated(this%lon   )) deallocate(this%lon   )
       IF (allocated(this%y     )) deallocate(this%y     )
-      IF (allocated(this%r     )) deallocate(this%r     )
+      IF (allocated(this%sigma )) deallocate(this%sigma )
       IF (allocated(this%hx_obs)) deallocate(this%hx_obs)
 
    END SUBROUTINE ANATQ_set_clear

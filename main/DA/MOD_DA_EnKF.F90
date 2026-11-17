@@ -35,7 +35,7 @@ CONTAINS
       integer,  intent(in)  :: num_obs                        ! Number of observations
       real(r8), intent(in)  :: hx(num_obs,num_ens)            ! Ensemble H(x) matrix
       real(r8), intent(in)  :: y(num_obs)                     ! Observation vector
-      real(r8), intent(in)  :: R(num_obs)                     ! Observation error standard deviation
+      real(r8), intent(in)  :: R(num_obs)                     ! Observation error error variances
       real(r8), intent(in)  :: infl                           ! Inflation factor
       real(r8), intent(out) :: trans(num_ens,num_ens)         ! Transform matrix (k x k)
 
@@ -44,7 +44,7 @@ CONTAINS
       real(r8)              :: dhx_t(num_ens,num_obs)         ! Transpose of dhx (k x l)
       real(r8)              :: C(num_ens,num_obs)             ! C = (dhx)^T * (R)^-1 (k x l)
       real(r8)              :: M1(num_ens,num_ens)            ! C * dhx (k x k)
-      real(r8)              :: pa_inv(num_ens,num_ens)        ! Inverse of background error covariance matrix (k x k)
+      real(r8)              :: pa_inv(num_ens,num_ens)        ! Analysis weight covariance matrix (k x k)
       real(r8)              :: eigval(num_ens)                ! Eigenvalues of pa_inv (k)
       real(r8)              :: eigvec(num_ens,num_ens)        ! Eigenvectors of pa_inv (k x k)
       real(r8)              :: M2(num_ens,num_ens)            ! M2 = eigvec * eigval^-1 (k x k)

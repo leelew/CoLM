@@ -86,8 +86,6 @@ CONTAINS
       use_assim_sm   = any(DEF_DA_OBS_TARGET == 'SM' )
       use_assim_st   = any(DEF_DA_OBS_TARGET == 'ST' )
 
-      CALL init_soil_ptb ()
-
       IF (use_assim_2mt .or. use_assim_2mq) CALL init_DA_TQ()
       IF (use_assim_sm) CALL init_DA_SM()
       IF (use_assim_st) CALL init_DA_ST()

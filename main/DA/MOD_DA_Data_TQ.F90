@@ -233,7 +233,7 @@ CONTAINS
       DO iens = 1, DEF_DA_ENS_NUM
          hx_p(:,iens) = pack(this%insitu%hx_obs(:,iens), valid)
       ENDDO
-      r_p = pack(this%insitu%r, valid)
+      r_p = pack(this%insitu%sigma, valid)
       lat = pack(this%insitu%lat, valid)
       lon = pack(this%insitu%lon, valid)
 

@@ -132,6 +132,7 @@ CONTAINS
       ! Initialize persistent variables
       IF (.not. initialized) THEN
          CALL random_seed()
+         CALL init_soil_ptb()
          allocate(r_prev_forc (numpatch,nvar_forc,DEF_DA_ENS_NUM))
          allocate(r_curr_forc (numpatch,nvar_forc,DEF_DA_ENS_NUM))
          allocate(r_prev_sm   (numpatch,nvar_sm,  DEF_DA_ENS_NUM))
@@ -150,8 +151,7 @@ CONTAINS
       phi_sm = exp(-dt/tau_sm)
       sigma_eps_sm = sqrt(1.0 - phi_sm**2)
 
-      ! Generate ensemble samples
-      cov_matrix_forc = 0.0_r8
+      ! Calculate covariance matrix by cross-correlation matrix and standard deviation
       DO i = 1, nvar_forc
          DO j = 1, nvar_forc
             cov_matrix_forc(i,j) = C_forc(i,j) * sigma_forc(i) * sigma_forc(j)
@@ -302,7 +302,7 @@ CONTAINS
             r_prev_sm(np,:,:) = r_curr_sm(np,:,:)
 
             ! Apply layer perturbations and the existing groundwater adjustment.
-            wa_ens(1:DEF_DA_ENS_NUM,np) = wa_ens(1:DEF_DA_ENS_NUM,np) + &
+            wa_ens(1:DEF_DA_ENS_NUM,np) = wa_ens(1:DEF_DA_ENS_NUM,np) - &
                sum(max(1e-10, wliq_soisno_ens(1:nvar_sm,1:DEF_DA_ENS_NUM,np) + r_curr_sm(np,:,:)) - &
                wliq_soisno_ens(1:nvar_sm,1:DEF_DA_ENS_NUM,np), dim=1)
             wliq_soisno_ens(1:nvar_sm,1:DEF_DA_ENS_NUM,np) = &

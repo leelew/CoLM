@@ -19,7 +19,7 @@ MODULE MOD_Vars_1DFluxes
    USE MOD_Urban_Vars_1DFluxes
 #endif
 #ifdef DataAssimilation
-   USE MOD_DA_Vars_Fluxes, only: allocate_DA_Fluxes, deallocate_DA_Fluxes
+   USE MOD_DA_Vars_Fluxes
 #endif
    IMPLICIT NONE
    SAVE
