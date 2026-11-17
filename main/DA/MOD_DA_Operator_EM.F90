@@ -365,15 +365,12 @@ CONTAINS
 
       complex(r8)              :: eps_soil                          ! Dielectric constant of soil for H and V polarizations
       real(r8)                 :: r_soil_smooth(2)                  ! Smooth surface reflectivity for H and V polarizations
-      logical                  :: is_desert                         ! Flag for desert soil
+      logical                  :: is_desert = .false.               ! Flag for desert soil
       real(r8)                 :: sal_soil = 0.0                    ! Soil-water salt mass fraction [g/kg]
       complex(r8)              :: eps_ice = (3.2, -0.1)             ! Dielectric constant of ice
 !-----------------------------------------------------------------------------
       ! Whether this patch is desert
-      is_desert = .false.
-      IF (vliq_soil_surf < 0.02 .and. wf_sand_surf > 0.90) THEN
-         is_desert = .true.
-      ENDIF
+      IF (vliq_soil_surf < 0.02 .and. wf_sand_surf > 0.90) is_desert = .true.
 
       ! Calculate effective temperature
       CALL cal_teff_soil(vliq_soil_surf, t_soil_surf, t_soil_deep, teff_soil)
@@ -384,13 +381,13 @@ CONTAINS
          eps_soil = 2.53 + (2.79-2.53)/(1-jj*(fghz/0.27)) + jj*0.002
          eps_soil = conjg(eps_soil)
       ELSE
-         ! Caculate dielectric constant in mixed soil (only liquid water)
+         ! Caculate dielectric constant in mixed soil (only liquid water, bulk, air)
          IF (DEF_DA_OPERATOR_EM_DIEL == 1) THEN
-            CALL diel_soil_D85(fghz, t_soil_surf, vliq_soil_surf/(1-vice_soil_surf), wf_sand_surf, wf_clay_surf, BD_all_surf, sal_soil, eps_soil)
+            CALL cal_diel_soil_D85(fghz, t_soil_surf, vliq_soil_surf/(1-vice_soil_surf), wf_sand_surf, wf_clay_surf, BD_all_surf, sal_soil, eps_soil)
          ELSEIF (DEF_DA_OPERATOR_EM_DIEL == 2) THEN
-            CALL diel_soil_M04(fghz,  vliq_soil_surf/(1-vice_soil_surf), wf_clay_surf, eps_soil)
+            CALL cal_diel_soil_M04(fghz,  vliq_soil_surf/(1-vice_soil_surf), wf_clay_surf, eps_soil)
          ELSEIF (DEF_DA_OPERATOR_EM_DIEL == 3) THEN
-            CALL diel_soil_M09(fghz,  vliq_soil_surf/(1-vice_soil_surf), t_soil_surf, wf_clay_surf, eps_soil)
+            CALL cal_diel_soil_M09(fghz,  vliq_soil_surf/(1-vice_soil_surf), t_soil_surf, wf_clay_surf, eps_soil)
          ENDIF
       ENDIF
 
