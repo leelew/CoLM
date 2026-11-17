@@ -478,6 +478,10 @@ CONTAINS
          ENDIF
       ENDIF
 
+#ifdef DataAssimilation
+      CALL allocate_DA_TimeInVars ()
+#endif
+
 #if (defined LULC_IGBP_PFT || defined LULC_IGBP_PC)
       CALL allocate_PFTimeInvariants
 #endif

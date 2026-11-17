@@ -45,8 +45,7 @@ MODULE MOD_DA_Ens
    USE MOD_Vars_TimeVariables
    USE MOD_DA_Vars_Fluxes
    USE MOD_DA_Vars_TimeVars
-   USE MOD_DA_Vars_TimeInVars, only: porsl_ens, hksati_ens, z_soil_ptb, &
-      allocate_DA_TimeInVars, deallocate_DA_TimeInVars
+   USE MOD_DA_Vars_TimeInVars, only: porsl_ens, hksati_ens, z_soil_ptb
    IMPLICIT NONE
    SAVE
 
@@ -749,7 +748,6 @@ CONTAINS
       ! porsl_ens is used by the observation operator and the SM analysis even
       ! when the parameter perturbation is switched off, so initialize it here
       ! for every DA run; member 0 always keeps the original parameter.
-      CALL allocate_DA_TimeInVars ()
       porsl_ens  = spread(porsl,  2, DEF_DA_ENS_NUM + 1)
       hksati_ens = spread(hksati, 2, DEF_DA_ENS_NUM + 1)
 
@@ -805,7 +803,6 @@ CONTAINS
       IF (allocated(r_curr_forc))   deallocate(r_curr_forc)
       IF (allocated(r_prev_sm  ))   deallocate(r_prev_sm  )
       IF (allocated(r_curr_sm  ))   deallocate(r_curr_sm  )
-      CALL deallocate_DA_TimeInVars ()
       initialized = .false.
 
    END SUBROUTINE end_DA_Ens
