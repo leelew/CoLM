@@ -24,9 +24,9 @@ MODULE MOD_DA_Vars_TimeInVars
 !   Zhilong Fan, 11/2026: Initial version
 !-----------------------------------------------------------------------------
    USE MOD_Precision
-   USE MOD_Namelist
-   USE MOD_Vars_Global
-   USE MOD_SPMD_Task
+   USE MOD_Namelist, only: DEF_DA, DEF_DA_ENS_NUM, DEF_DA_ENS_SOILPARAM
+   USE MOD_Vars_Global, only: nl_soil, pi
+   USE MOD_SPMD_Task, only: p_is_worker, CoLM_stop
    USE MOD_LandPatch, only: numpatch
    USE MOD_NetCDFSerial, only: ncio_define_dimension, &
       ncio_write_serial_real8_2d, ncio_read_bcast_serial_real8_2d

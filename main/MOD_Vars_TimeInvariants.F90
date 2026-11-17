@@ -208,6 +208,9 @@ MODULE MOD_Vars_TimeInvariants
 ! -------------------------------
 
    USE MOD_Precision
+#ifdef DataAssimilation
+   USE MOD_DA_Vars_TimeInVars
+#endif
 #if (defined LULC_IGBP_PFT || defined LULC_IGBP_PC)
    USE MOD_Vars_PFTimeInvariants
 #endif
@@ -500,9 +503,6 @@ CONTAINS
    USE MOD_SPMD_Task
    USE MOD_NetCDFVector
    USE MOD_NetCDFSerial
-#ifdef DataAssimilation
-   USE MOD_DA_Vars_TimeInVars, only: READ_DA_TimeInVars
-#endif
 #ifdef RangeCheck
    USE MOD_RangeCheck
 #endif
@@ -703,9 +703,6 @@ CONTAINS
    USE MOD_NetCDFVector
    USE MOD_LandPatch
    USE MOD_Vars_Global
-#ifdef DataAssimilation
-   USE MOD_DA_Vars_TimeInVars, only: WRITE_DA_TimeInVars
-#endif
 
    IMPLICIT NONE
 
@@ -919,9 +916,6 @@ CONTAINS
    USE MOD_Namelist, only: DEF_USE_Forcing_Downscaling, DEF_USE_Forcing_Downscaling_Simple
    USE MOD_SPMD_Task
    USE MOD_LandPatch, only: numpatch
-#ifdef DataAssimilation
-   USE MOD_DA_Vars_TimeInVars, only: deallocate_DA_TimeInVars
-#endif
 
    IMPLICIT NONE
 

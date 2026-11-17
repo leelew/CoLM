@@ -143,7 +143,6 @@ CONTAINS
 #endif
    USE MOD_Forcing, only: forcmask_pch
 #ifdef DataAssimilation
-   USE MOD_Vars_Global
    USE MOD_DA_Vars_TimeVars
 #endif
 
