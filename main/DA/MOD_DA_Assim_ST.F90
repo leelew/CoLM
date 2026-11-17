@@ -75,14 +75,14 @@ CONTAINS
       integer,  intent(in)              :: idate(3)
       real(r8), intent(in)              :: deltim
 
-      integer                           :: np, iens, il
-      integer                           :: nobs_p
-      real(r8), allocatable             :: y_p(:)
-      real(r8), allocatable             :: hx_p(:,:)
-      real(r8), allocatable             :: r_p(:)
-      real(r8)                          :: trans(DEF_DA_ENS_NUM, DEF_DA_ENS_NUM)
-      real(r8)                          :: state_f(nl_soil, DEF_DA_ENS_NUM)
-      real(r8)                          :: state_a(nl_soil, DEF_DA_ENS_NUM)
+      integer                           :: np, iens
+      integer                           :: nobs_p 
+      real(r8), allocatable             :: y_p(:) 
+      real(r8), allocatable             :: hx_p(:,:) 
+      real(r8), allocatable             :: r_p(:) 
+      real(r8)                          :: trans(DEF_DA_ENS_NUM, DEF_DA_ENS_NUM) 
+      real(r8)                          :: state_f(nl_soil, DEF_DA_ENS_NUM) 
+      real(r8)                          :: state_a(nl_soil, DEF_DA_ENS_NUM) 
 !-----------------------------------------------------------------------------
       ! Prepare observations and forecast H(x).
       CALL st%forward(idate, deltim)
