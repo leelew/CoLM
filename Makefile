@@ -140,6 +140,7 @@ OBJS_BASIC =    \
 				 MOD_Urban_Vars_1DFluxes.o       \
 				 MOD_Urban_Vars_TimeVariables.o  \
 				 MOD_Urban_Vars_TimeInvariants.o \
+				 MOD_DA_Vars_TimeInVars.o        \
 				 MOD_Vars_TimeInvariants.o       \
 				 MOD_DA_Vars_Fluxes.o            \
 				 MOD_DA_Vars_TimeVars.o          \
@@ -320,7 +321,6 @@ OBJS_MAIN = \
 				MOD_DA_Assim_SM.o                         \
 				MOD_DA_Assim_ST.o                         \
 				MOD_DA_Assim_SNOW.o                       \
-				MOD_DA_Assim_DISC.o                       \
 				MOD_Opt_Baseflow.o                        \
 				MOD_ParameterOptimization.o               \
 				MOD_AssimStomataConductance.o             \
@@ -369,6 +369,7 @@ OBJS_MAIN = \
 				MOD_LightningData.o                       \
 				MOD_Catch_LateralFlow.o                   \
 				MOD_Grid_RiverLakeFlow.o                  \
+				MOD_DA_Assim_DISC.o                       \
 				MOD_DA_Main.o                             \
 				MOD_Urban_Longwave.o                      \
 				MOD_Urban_NetSolar.o                      \

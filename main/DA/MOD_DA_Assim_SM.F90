@@ -29,6 +29,7 @@ MODULE MOD_DA_Assim_SM
    USE MOD_DA_Data_SM
    USE MOD_DA_EnKF
    USE MOD_DA_Vars_TimeVars
+   USE MOD_DA_Vars_TimeInVars
    IMPLICIT NONE
 
    type(SM_type)                        :: sm
@@ -132,9 +133,9 @@ CONTAINS
                      ENDIF
                   ENDIF
 
-                  wliq_soisno_ens(il,iens,np) = min(porsl(il,np)*(dz_soi(il)*denh2o), wliq_soisno_ens(il,iens,np))
+                  wliq_soisno_ens(il,iens,np) = min(porsl_ens(il,iens,np)*(dz_soi(il)*denh2o), wliq_soisno_ens(il,iens,np))
                   wice_soisno_ens(il,iens,np) = min(                                             &
-                     max(0.0_r8, porsl(il,np) - wliq_soisno_ens(il,iens,np)/(dz_soi(il)*denh2o)) &
+                     max(0.0_r8, porsl_ens(il,iens,np) - wliq_soisno_ens(il,iens,np)/(dz_soi(il)*denh2o)) &
                      * (dz_soi(il)*denice), wice_soisno_ens(il,iens,np))
                ENDDO
             ENDDO

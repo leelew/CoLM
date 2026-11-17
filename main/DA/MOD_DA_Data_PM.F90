@@ -54,8 +54,9 @@ MODULE MOD_DA_Data_PM
    USE MOD_Pixelset
    USE MOD_TimeManager
    USE MOD_DA_Data_GridType
-   USE MOD_DA_Operator_RTM
+   USE MOD_DA_Operator_EM
    USE MOD_DA_Vars_TimeVars
+   USE MOD_DA_Vars_TimeInVars
    IMPLICIT NONE
 
 !-----------------------------------------------------------------------------
@@ -210,7 +211,7 @@ CONTAINS
                         snowdp_ens(iens,np),                                                          &
                         lai_ens(iens,np), sai_ens(iens,np),                                           &
                         wf_clay(:,np), wf_sand(:,np), wf_silt(:,np),                                  &
-                        BD_all(:,np), porsl(:,np),                                                    &
+                        BD_all(:,np), porsl_ens(:,iens,np),                                                    &
                         theta_part(np)%val(ipart), this%fghz,                                         &
                         tb_part(1), tb_part(2))
 

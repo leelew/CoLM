@@ -18,7 +18,7 @@ MODULE MOD_DA_Vars_Fluxes
    USE MOD_Namelist
    USE MOD_Vars_Global
    USE MOD_SPMD_Task
-   USE MOD_LandPatch
+   USE MOD_LandPatch, only: numpatch
    IMPLICIT NONE
    SAVE
 

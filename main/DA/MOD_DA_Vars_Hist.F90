@@ -20,7 +20,7 @@ MODULE MOD_DA_Vars_Hist
    USE MOD_Namelist
    USE MOD_Vars_Global
    USE MOD_NetCDFSerial
-   USE MOD_LandPatch
+   USE MOD_LandPatch, only: numpatch 
    USE MOD_DataType
    USE MOD_HistGridded
    USE MOD_HistInterface
