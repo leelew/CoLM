@@ -16,7 +16,7 @@ MODULE MOD_DA_Vars_Fluxes
 !-----------------------------------------------------------------------------
    USE MOD_Precision
    USE MOD_Namelist, only: DEF_DA_ENS_NUM
-   USE MOD_Vars_Global, only: spval
+   USE MOD_Vars_Global, only: spval, nl_soil
    USE MOD_SPMD_Task, only: p_is_worker
    USE MOD_LandPatch, only: numpatch
    IMPLICIT NONE
