@@ -383,12 +383,13 @@ CONTAINS
          eps_soil = conjg(eps_soil)
       ELSE
          ! Caculate dielectric constant in mixed soil (only liquid water, bulk, air)
+         !//TODO: vliq_soil_surf/(1-vice_soil_surf)
          IF (DEF_DA_OPERATOR_EM_DIEL == 1) THEN
-            CALL cal_diel_soil_D85(fghz, t_soil_surf, vliq_soil_surf/(1-vice_soil_surf), wf_sand_surf, wf_clay_surf, BD_all_surf, sal_soil, eps_soil)
+            CALL cal_diel_soil_D85(fghz, t_soil_surf, vliq_soil_surf, wf_sand_surf, wf_clay_surf, BD_all_surf, sal_soil, eps_soil)
          ELSEIF (DEF_DA_OPERATOR_EM_DIEL == 2) THEN
-            CALL cal_diel_soil_M04(fghz,  vliq_soil_surf/(1-vice_soil_surf), wf_clay_surf, eps_soil)
+            CALL cal_diel_soil_M04(fghz,  vliq_soil_surf, wf_clay_surf, eps_soil)
          ELSEIF (DEF_DA_OPERATOR_EM_DIEL == 3) THEN
-            CALL cal_diel_soil_M09(fghz,  vliq_soil_surf/(1-vice_soil_surf), t_soil_surf, wf_clay_surf, eps_soil)
+            CALL cal_diel_soil_M09(fghz,  vliq_soil_surf, t_soil_surf, wf_clay_surf, eps_soil)
          ENDIF
       ENDIF
 
