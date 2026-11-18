@@ -24,24 +24,20 @@ MODULE MOD_DA_Vars_TimeInVars
 !   Zhilong Fan, 11/2026: Initial version
 !-----------------------------------------------------------------------------
    USE MOD_Precision
-   USE MOD_Namelist, only: DEF_DA, DEF_DA_ENS_NUM, DEF_DA_ENS_SOILPARAM
-   USE MOD_Vars_Global, only: nl_soil, pi
-   USE MOD_SPMD_Task, only: p_is_worker, CoLM_stop
+   USE MOD_Namelist
+   USE MOD_Vars_Global
+   USE MOD_SPMD_Task
    USE MOD_LandPatch, only: numpatch
    USE MOD_NetCDFSerial, only: ncio_define_dimension, &
       ncio_write_serial_real8_2d, ncio_read_bcast_serial_real8_2d
    IMPLICIT NONE
    SAVE
 
-!=============================================================================
-! Ensemble soil hydraulic parameters
-!=============================================================================
+   ! Ensemble soil hydraulic parameters
    real(r8), allocatable           :: porsl_ens  (:,:,:)  ! Fraction of soil that is voids                     [-]
    real(r8), allocatable           :: hksati_ens (:,:,:)  ! Saturated hydraulic conductivity                   [mm/s]
 
-!=============================================================================
-! Standard normal draws for soil parameter perturbation
-!=============================================================================
+   ! Standard normal draws for soil parameter perturbation
    real(r8), allocatable           :: z_soil_ptb (:,:)    ! Standard normal draws (nvar_ptb, ens): row 1 porsl, row 2 hksati [-]
 
 !-----------------------------------------------------------------------------
@@ -75,24 +71,19 @@ CONTAINS
 
 !-----------------------------------------------------------------------------
 
-   SUBROUTINE init_z_soil_ptb()
+   SUBROUTINE WRITE_DA_TimeInVars(file_restart)
 
 !-----------------------------------------------------------------------------
 ! DESCRIPTION:
-!   Generate the standard normal draws used to perturb the soil hydraulic
-!   parameters. Each perturbed parameter (row 1: porsl, row 2: hksati) gets
-!   one draw per ensemble member; a single draw is shared by all patches and
-!   layers, representing a global adjustment of the soil parameter dataset.
-!
-!   This is called by mkinidata only. The draws are stored in the const file
-!   and reused by every model run.
+!   Write the standard normal draws for the soil parameter perturbation
+!   so that every run can reuse them from the const file.
 !-----------------------------------------------------------------------------
+      character(len=*), intent(in) :: file_restart
+
       INTEGER :: i, k
       real(r8), allocatable :: u1(:), u2(:)
 
-      IF (DEF_DA_ENS_NUM < 2 .or. mod(DEF_DA_ENS_NUM,2) /= 0) THEN
-         CALL CoLM_stop ('ERROR: DEF_DA_ENS_NUM must be > 1 and even to generate z_soil_ptb.')
-      ENDIF
+      IF (.not. (DEF_DA .and. DEF_DA_ENS_SOILPARAM)) RETURN
 
       IF (allocated(z_soil_ptb)) deallocate(z_soil_ptb)
       allocate (z_soil_ptb(2, DEF_DA_ENS_NUM))
@@ -111,18 +102,6 @@ CONTAINS
 
       deallocate (u1, u2)
 
-   END SUBROUTINE init_z_soil_ptb
-
-!-----------------------------------------------------------------------------
-
-   SUBROUTINE WRITE_DA_TimeInVars(file_restart)
-
-!-----------------------------------------------------------------------------
-      character(len=*), intent(in) :: file_restart
-
-      IF (.not. (DEF_DA .and. DEF_DA_ENS_SOILPARAM)) RETURN
-
-      CALL init_z_soil_ptb ()
       CALL ncio_define_dimension (file_restart, 'nvar_ptb', 2)
       CALL ncio_define_dimension (file_restart, 'ens', DEF_DA_ENS_NUM)
       CALL ncio_write_serial_real8_2d (file_restart, 'z_soil_ptb', z_soil_ptb, 'nvar_ptb', 'ens')

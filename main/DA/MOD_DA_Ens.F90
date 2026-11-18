@@ -790,23 +790,5 @@ CONTAINS
    END SUBROUTINE init_soil_ptb
 
 !-----------------------------------------------------------------------------
-
-   SUBROUTINE end_DA_Ens()
-
-!-----------------------------------------------------------------------------
-! DESCRIPTION:
-!   Release the ensemble perturbation buffers.
-!-----------------------------------------------------------------------------
-      IMPLICIT NONE
-
-      IF (allocated(r_prev_forc))   deallocate(r_prev_forc)
-      IF (allocated(r_curr_forc))   deallocate(r_curr_forc)
-      IF (allocated(r_prev_sm  ))   deallocate(r_prev_sm  )
-      IF (allocated(r_curr_sm  ))   deallocate(r_curr_sm  )
-      initialized = .false.
-
-   END SUBROUTINE end_DA_Ens
-
-!-----------------------------------------------------------------------------
 END MODULE MOD_DA_Ens
 #endif
