@@ -38,14 +38,13 @@ MODULE MOD_DA_Ens
    USE MOD_LandPatch
    USE MOD_SPMD_Task
    USE MOD_Vars_Global
-   USE MOD_Vars_TimeInvariants, only: porsl, hksati, &
-      wf_sand, wf_clay, wf_silt, patchtype
+   USE MOD_Vars_TimeInvariants
    USE MOD_Vars_1DForcing
    USE MOD_Vars_1DFluxes
    USE MOD_Vars_TimeVariables
    USE MOD_DA_Vars_Fluxes
    USE MOD_DA_Vars_TimeVars
-   USE MOD_DA_Vars_TimeInVars, only: porsl_ens, hksati_ens, z_porsl, z_hksati
+   USE MOD_DA_Vars_TimeInVars
    IMPLICIT NONE
    SAVE
 
@@ -58,7 +57,7 @@ MODULE MOD_DA_Ens
    real(r8)                                 :: phi_forc                                   ! Forcing AR(1) correlation [-]
    real(r8)                                 :: sigma_eps_forc                             ! Forcing AR(1) noise std. [-]
    real(r8), dimension(nvar_forc)           :: sigma_forc = (/0.5, 0.3, 20.0, 1.0/)       ! Forcing perturbation standard deviations
-   real(r8), dimension(nvar_forc, nvar_forc):: C_forc = reshape([                        &
+   real(r8), dimension(nvar_forc, nvar_forc):: C_forc = reshape([                         &
       1.0, -0.8,  0.5, 0.0,                                                               &
       -0.8,  1.0, -0.5, 0.4,                                                              &
       0.5, -0.5,  1.0, 0.4,                                                               &
@@ -72,10 +71,10 @@ MODULE MOD_DA_Ens
    real(r8), parameter                      :: tau_sm = 3.0                               ! Correlation time scale in hours
    real(r8)                                 :: phi_sm                                     ! Soil moisture AR(1) correlation [-]
    real(r8)                                 :: sigma_eps_sm                               ! Soil AR(1) noise standard deviation [-]
-   real(r8), dimension(nvar_sm)             :: sigma_sm = (/                             &
+   real(r8), dimension(nvar_sm)             :: sigma_sm = (/                              &
          0.105_r8, 0.166_r8, 0.102_r8, 6.61e-3_r8, 3.69e-3_r8,                            &
          1.22e-3_r8, 1.83e-3_r8, 2.61e-3_r8, 3.65e-3_r8, 4.55e-3_r8 /)                    ! Soil moisture std. deviations [kg/m2]
-   real(r8), dimension(nvar_sm,nvar_sm)     :: C_sm = reshape([                          &
+   real(r8), dimension(nvar_sm,nvar_sm)     :: C_sm = reshape([                           &
          1.0_r8, 0.9_r8, 0.8_r8, 0.7_r8, 0.6_r8, 0.5_r8, 0.4_r8, 0.3_r8, 0.2_r8, 0.1_r8,  &
          0.9_r8, 1.0_r8, 0.9_r8, 0.8_r8, 0.7_r8, 0.6_r8, 0.5_r8, 0.4_r8, 0.3_r8, 0.2_r8,  &
          0.8_r8, 0.9_r8, 1.0_r8, 0.9_r8, 0.8_r8, 0.7_r8, 0.6_r8, 0.5_r8, 0.4_r8, 0.3_r8,  &
