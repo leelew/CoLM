@@ -15,9 +15,9 @@ MODULE MOD_DA_Vars_Fluxes
 !   Lu Li, 11/2026: DA v1.0
 !-----------------------------------------------------------------------------
    USE MOD_Precision
-   USE MOD_Namelist
-   USE MOD_Vars_Global
-   USE MOD_SPMD_Task
+   USE MOD_Namelist, only: DEF_DA_ENS_NUM
+   USE MOD_Vars_Global, only: spval, nl_soil
+   USE MOD_SPMD_Task, only: p_is_worker
    USE MOD_LandPatch, only: numpatch
    IMPLICIT NONE
    SAVE

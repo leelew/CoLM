@@ -160,7 +160,7 @@ CONTAINS
 
    SUBROUTINE write_history_variable_3d ( is_hist, &
          acc_vec, file_hist, varname, itime_in_file, dim1name, lb1, ndim1, &
-         sumarea, filter, longname, units)
+         sumarea, filter, longname, units, acc_num)
 
    IMPLICIT NONE
 
@@ -177,6 +177,7 @@ CONTAINS
    logical, intent(in) :: filter(:)
    character (len=*), intent(in) :: longname
    character (len=*), intent(in) :: units
+   real(r8), intent(in), optional :: acc_num(:)
 
    ! Local variables
    integer :: iblkme, xblk, yblk, xloc, yloc, i1
@@ -184,8 +185,16 @@ CONTAINS
 
       IF (.not. is_hist) RETURN
 
-      IF (p_is_worker)  THEN
-         WHERE (acc_vec /= spval)  acc_vec = acc_vec / nac
+      IF ( .not. present(acc_num) ) THEN
+         IF (p_is_worker) &
+            WHERE (acc_vec /= spval) acc_vec = acc_vec / nac
+      ELSE
+         IF (p_is_worker) THEN
+            DO i1 = lbound(acc_vec,1), ubound(acc_vec,1)
+               WHERE (acc_vec(i1,:) /= spval .and. acc_num > 0) &
+                  acc_vec(i1,:) = acc_vec(i1,:) / acc_num
+            ENDDO
+         ENDIF
       ENDIF
 
       select CASE (HistForm)

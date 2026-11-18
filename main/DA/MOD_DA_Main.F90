@@ -154,6 +154,7 @@ CONTAINS
       use_assim_2mq  = .false.
       use_assim_sm   = .false.
       use_assim_st   = .false.
+      CALL end_DA_Ens ()
       use_assim_disc = .false.
 
    END SUBROUTINE end_DA

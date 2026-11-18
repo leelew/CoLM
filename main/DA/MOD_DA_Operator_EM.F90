@@ -12,7 +12,7 @@ MODULE MOD_DA_Operator_EM
 !   branch. This configuration targets thin snow and low vegetation.
 !
 ! CONVENTION:
-!   Complex permittivities use negative imaginary parts and literature 
+!   Complex permittivities use negative imaginary parts and literature
 !   formulas using positive imaginary parts are complex-conjugated.
 !
 ! REFERENCES:
@@ -282,7 +282,7 @@ CONTAINS
          IF (snowdp > 0.01) THEN
             rho_snow = (wliq_soisno(lb)+wice_soisno(lb)) / dz_soisno(lb)
             vliq_snow = wliq_soisno(lb) / (dz_soisno(lb)*denh2o)
-            CALL snow(sat_fghz, sat_theta, t_soisno(lb), teff_soil, snowdp, rho_snow, vliq_snow, r_soil_rough, r_snow, tb_tos)
+            CALL snow(sat_fghz, sat_theta, t_soisno(lb), teff_soil(1), snowdp, rho_snow, vliq_snow, r_soil_rough, r_snow, tb_tos)
          ELSE
             r_snow = r_soil_rough
             tb_tos = tb_soil
@@ -551,7 +551,7 @@ CONTAINS
       beta_r = (127.48_r8-0.519_r8*sand_pct-0.152_r8*clay_pct) / 100.0_r8
       eps_soil_r = (1.0_r8+(rho_bulk_gcm3/rho_soil_gcm3)*(eps_bulk**alphas-1.0_r8)         &
          +(max(vliq_soil,0.001)**beta_r)*(real(eps_water)**alphas)                     &
-         -max(vliq_soil,0.001))**(1.0_r8/alphas) 
+         -max(vliq_soil,0.001))**(1.0_r8/alphas)
 
       ! Calculate the moisture exponent and mixing relation for dielectric loss ([6], Eqs.5, 3)
       beta_i = (133.797_r8-0.603_r8*sand_pct-0.166_r8*clay_pct) / 100.0_r8
@@ -970,9 +970,9 @@ CONTAINS
       eps_ice_i = abs(aimag(eps_ice))
 
       ! Salinity correction using reference ice losses at -5 degC.
-      eps_ice_i_impure = 0.0026/fghz + 0.00023*(fghz**0.87)         
-      eps_ice_i_pure = 6.e-4/fghz + 6.5e-5*(fghz**1.07)                
-      eps_ice_i = eps_ice_i + (eps_ice_i_impure-eps_ice_i_pure)*sal_snow/13.0d0    
+      eps_ice_i_impure = 0.0026/fghz + 0.00023*(fghz**0.87)
+      eps_ice_i_pure = 6.e-4/fghz + 6.5e-5*(fghz**1.07)
+      eps_ice_i = eps_ice_i + (eps_ice_i_impure-eps_ice_i_pure)*sal_snow/13.0d0
 
       ! Dry-snow effective permittivity ([18], Eq.2.19; [23], Eq.21).
       rho_dsnow_gcm3 = denice/1000.0_r8
@@ -982,9 +982,9 @@ CONTAINS
       eps_dsnow_r = 1.0 + 1.58*rho_dsnow_gcm3/(1.0-0.365*rho_dsnow_gcm3)
       eps_dsnow_i = 3.0 * (rho_dsnow_gcm3/(denice/1000.0_r8)) * eps_ice_i * (eps_dsnow_r**2) * &
          (2*eps_dsnow_r+1) / ((eps_ice_r+2*eps_dsnow_r)*(eps_ice_r+2*eps_dsnow_r**2))
- 
+
       ! Wet-snow dielectric mixing ([18], Eqs.2.24-2.26)
-      IF (vliq_snow > 0.) THEN                                   
+      IF (vliq_snow > 0.) THEN
          ! Relaxation frequencies of the three water-inclusion contributions.
          ! Principal-axis depolarization factors: 0.005, 0.4975, 0.4975.
          f0_water_a = f0_water * (1+(0.005*(eps0_water-epsinf_water)/(eps_dsnow_r+(0.005*(epsinf_water-eps_dsnow_r)))))

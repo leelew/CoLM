@@ -16,7 +16,7 @@ MODULE MOD_DA_Vars_AccVars
    USE MOD_Precision
    USE MOD_Vars_Global
    USE MOD_SPMD_Task
-   USE MOD_LandPatch, only: numpatch 
+   USE MOD_LandPatch, only: numpatch
    USE MOD_Namelist
 #ifdef GridRiverLakeFlow
    USE MOD_Grid_RiverLakeNetwork

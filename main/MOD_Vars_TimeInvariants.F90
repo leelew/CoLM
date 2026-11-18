@@ -208,6 +208,9 @@ MODULE MOD_Vars_TimeInvariants
 ! -------------------------------
 
    USE MOD_Precision
+#ifdef DataAssimilation
+   USE MOD_DA_Vars_TimeInVars
+#endif
 #if (defined LULC_IGBP_PFT || defined LULC_IGBP_PC)
    USE MOD_Vars_PFTimeInvariants
 #endif
@@ -475,6 +478,10 @@ CONTAINS
          ENDIF
       ENDIF
 
+#ifdef DataAssimilation
+      CALL allocate_DA_TimeInVars ()
+#endif
+
 #if (defined LULC_IGBP_PFT || defined LULC_IGBP_PC)
       CALL allocate_PFTimeInvariants
 #endif
@@ -627,6 +634,10 @@ CONTAINS
       CALL ncio_read_bcast_serial (file_restart, 'trsmx0', trsmx0) ! max transpiration for moist soil+100% veg.  [mm/s]
       CALL ncio_read_bcast_serial (file_restart, 'tcrit ', tcrit ) ! critical temp. to determine rain or snow
       CALL ncio_read_bcast_serial (file_restart, 'wetwatmax', wetwatmax) ! maximum wetland water (mm)
+
+#ifdef DataAssimilation
+      CALL READ_DA_TimeInVars (file_restart)
+#endif
 
       IF (DEF_USE_Forcing_Downscaling) THEN
          CALL ncio_read_vector (file_restart, 'slp_type_patches' , num_slope_type, landpatch, slp_type_patches)
@@ -877,6 +888,10 @@ CONTAINS
          CALL ncio_write_serial (file_restart, 'tcrit ', tcrit )       ! critical temp. to determine rain or snow
          CALL ncio_write_serial (file_restart, 'wetwatmax', wetwatmax) ! maximum wetland water (mm)
 
+#ifdef DataAssimilation
+         CALL WRITE_DA_TimeInVars (file_restart)
+#endif
+
       ENDIF
 
 #ifdef USEMPI
@@ -1023,6 +1038,10 @@ CONTAINS
 
          ENDIF
       ENDIF
+
+#ifdef DataAssimilation
+      CALL deallocate_DA_TimeInVars ()
+#endif
 
 #if (defined LULC_IGBP_PFT || defined LULC_IGBP_PC)
       CALL deallocate_PFTimeInvariants
