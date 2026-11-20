@@ -149,7 +149,7 @@ CONTAINS
       ENDIF
 
       ! Recompute model- and observation-space H(x), then save analysis diagnostics.
-      IF (p_is_worker) THEN
+      IF (p_is_worker .and. numpatch > 0) THEN
          wliq_soisno_a(:,:) = sum(wliq_soisno_ens(:,1:DEF_DA_ENS_NUM,:), dim=2) / DEF_DA_ENS_NUM
       ENDIF
       CALL sm%forward(idate, deltim)
