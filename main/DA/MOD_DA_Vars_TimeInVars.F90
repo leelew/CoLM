@@ -26,15 +26,11 @@ MODULE MOD_DA_Vars_TimeInVars
    IMPLICIT NONE
    SAVE
 
-!=============================================================================
-! Ensemble soil hydraulic parameters
-!=============================================================================
+   ! Ensemble soil hydraulic parameters
    real(r8), allocatable            :: porsl_ens (:,:,:)    ! Soil porosity [-]
    real(r8), allocatable            :: hksati_ens(:,:,:)    ! Saturated hydraulic conductivity [mm/s]
 
-!=============================================================================
-! Standard normal samples shared by all patches and layers
-!=============================================================================
+   ! Ensemble soil hydraulic parameters
    real(r8), allocatable            :: z_porsl   (:)        ! Porosity adjustment per member [-]
    real(r8), allocatable            :: z_hksati  (:)        ! Log10 conductivity adjustment per member [-]
 

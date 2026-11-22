@@ -888,14 +888,14 @@ CONTAINS
          CALL ncio_write_serial (file_restart, 'tcrit ', tcrit )       ! critical temp. to determine rain or snow
          CALL ncio_write_serial (file_restart, 'wetwatmax', wetwatmax) ! maximum wetland water (mm)
 
+#ifdef DataAssimilation
+         CALL WRITE_DA_TimeInVars (file_restart)
+#endif
+
       ENDIF
 
 #ifdef USEMPI
       CALL mpi_barrier (p_comm_glb, p_err)
-#endif
-
-#ifdef DataAssimilation
-      CALL WRITE_DA_TimeInVars (file_restart)
 #endif
 
 #if (defined LULC_IGBP_PFT || defined LULC_IGBP_PC)

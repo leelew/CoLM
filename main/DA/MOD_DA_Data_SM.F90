@@ -33,6 +33,7 @@ MODULE MOD_DA_Data_SM
    USE MOD_Precision
    USE MOD_Namelist
    USE MOD_Pixelset
+   USE MOD_SPMD_Task
    USE MOD_Vars_Global
    USE MOD_Vars_TimeInvariants
    USE MOD_DA_Data_PM
@@ -116,7 +117,7 @@ CONTAINS
       IF (npm > 0) THEN
          this%use_pm = .true.
          allocate(pm_configs(npm))
-         
+
          ipm = 0
          DO i = 1, size(configs)
             IF (trim(configs(i)%source_name) == 'PM') THEN
@@ -238,6 +239,8 @@ CONTAINS
       integer                             :: istream, is, ipm, np, iens
       logical                             :: valid_hx
 !-----------------------------------------------------------------------------
+      IF (.not. p_is_worker .or. numpatch == 0) RETURN
+
       DO istream = 1, size(this%cfgs)
          is = this%cfgs(istream)%istream
          IF (is_analysis) THEN
