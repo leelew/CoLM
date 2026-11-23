@@ -478,10 +478,6 @@ CONTAINS
          ENDIF
       ENDIF
 
-#ifdef DataAssimilation
-      CALL allocate_DA_TimeInVars ()
-#endif
-
 #if (defined LULC_IGBP_PFT || defined LULC_IGBP_PC)
       CALL allocate_PFTimeInvariants
 #endif
@@ -492,6 +488,10 @@ CONTAINS
 
 #ifdef URBAN_MODEL
       CALL allocate_UrbanTimeInvariants
+#endif
+
+#ifdef DataAssimilation
+      CALL allocate_DA_TimeInVars ()
 #endif
 
    END SUBROUTINE allocate_TimeInvariants

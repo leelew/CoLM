@@ -161,7 +161,6 @@ CONTAINS
       use_assim_sm   = .false.
       use_assim_st   = .false.
       use_assim_snow = .false.
-      CALL end_DA_Ens ()
       use_assim_disc = .false.
 
    END SUBROUTINE end_DA
