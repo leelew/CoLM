@@ -55,6 +55,7 @@ CONTAINS
    real(r8), parameter :: m = 1.0 ! the value of m used in CLM4.5 is 1.0.
                                   ! WHILE the value of m given by Niu et al (2007) is 1.6
                                   ! WHILE Niu (2012) suggested 3.0
+   real(r8) :: den                ! Denominator in the snow cover fraction parameterization                               
 
 !-----------------------------------------------------------------------
       IF(lai+sai > 1e-6) THEN
@@ -75,10 +76,20 @@ CONTAINS
 
 ! Fraction of soil covered by snow
       fsno = 0.0
-      IF(snowdp > 0.) THEN
+      IF(snowdp > 1.0e-5) THEN 
          fmelt = (scv/snowdp/100.) ** m
-         fsno  = tanh(snowdp/(2.5 * zlnd * fmelt))
-      ENDIF
+         
+         den = 2.5 * zlnd * fmelt
+         
+         ! Prevent division by zero
+         IF (den > 1.0e-12) THEN
+            fsno = tanh(snowdp / den)
+         ELSE
+            fsno = 1.0 
+         END IF
+      ELSE
+         fsno = 0.0
+      END IF
 
    END SUBROUTINE snowfraction
 

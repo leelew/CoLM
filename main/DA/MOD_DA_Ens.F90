@@ -90,6 +90,14 @@ MODULE MOD_DA_Ens
    real(r8), allocatable                     :: r_prev_sm   (:,:,:)                         ! Previous step soil moisture perturbation
    real(r8), allocatable                     :: r_curr_sm   (:,:,:)                         ! Current step soil moisture perturbation
 
+   integer, parameter                        :: nvar_snow = 1                               ! Number of perturbed snow variables
+   real(r8), parameter                       :: tau_snow = 6.0                              ! Correlation time scale [hours]
+   real(r8), parameter                       :: sigma_snow = 0.01                           ! Standard deviation of relative snow depth perturbations
+   real(r8)                                  :: phi_snow                                    ! AR(1) autocorrelation coefficient
+   real(r8)                                  :: sigma_eps_snow                              ! AR(1) innovation scaling factor
+   real(r8), allocatable                     :: r_prev_snow(:,:,:)                          ! Previous snow depth perturbations
+   real(r8), allocatable                     :: r_curr_snow(:,:,:)                          ! Current snow depth perturbations
+
    ! Soil hydraulic parameter perturbations
    real(r8), parameter                       :: soil_ptb_scale = 0.1_r8                     ! Damping factor applied to the pedotransfer uncertainty
 
@@ -125,6 +133,11 @@ CONTAINS
       real(r8)                               :: L_sm(nvar_sm,nvar_sm)                       ! Cholesky factor of the soil moisture covariance
       real(r8)                               :: zxL_sm(nvar_sm,DEF_DA_ENS_NUM)              ! Correlated soil moisture innovations
       real(r8)                               :: mean_r_sm(nvar_sm)                          ! Ensemble means of soil moisture perturbations after AR(1)
+      real(r8)                               :: z_snow(DEF_DA_ENS_NUM)                      ! Standard normal random variables for snow depth
+      real(r8)                               :: mean_z_snow                                 ! Ensemble mean of raw snow depth normal samples
+      real(r8)                               :: std_z_snow                                  ! Sample standard deviation of raw snow depth normal samples
+      real(r8)                               :: mean_r_snow(nvar_snow)                      ! Ensemble means of snow depth perturbations after AR(1)
+      real(r8)                               :: a_snow(DEF_DA_ENS_NUM)                      ! Perturbed snow depths for ensemble members [m]
 !-----------------------------------------------------------------------
       IF (.not. p_is_worker) RETURN
 
@@ -136,10 +149,14 @@ CONTAINS
          allocate(r_curr_forc (numpatch,nvar_forc,DEF_DA_ENS_NUM))
          allocate(r_prev_sm   (numpatch,nvar_sm,  DEF_DA_ENS_NUM))
          allocate(r_curr_sm   (numpatch,nvar_sm,  DEF_DA_ENS_NUM))
+         allocate(r_prev_snow (numpatch, nvar_snow,DEF_DA_ENS_NUM))
+         allocate(r_curr_snow (numpatch, nvar_snow,DEF_DA_ENS_NUM))
          r_prev_forc = 0.0_r8
          r_curr_forc = 0.0_r8
          r_prev_sm   = 0.0_r8
          r_curr_sm   = 0.0_r8
+         r_prev_snow = 0.0_r8
+         r_curr_snow = 0.0_r8
          initialized = .true.
       ENDIF
 
@@ -149,6 +166,9 @@ CONTAINS
       sigma_eps_forc = sqrt(1.0 - phi_forc**2)
       phi_sm = exp(-dt/tau_sm)
       sigma_eps_sm = sqrt(1.0 - phi_sm**2)
+      phi_snow = exp(-dt/tau_snow)
+      sigma_eps_snow = sqrt(1.0_r8 - phi_snow**2)
+
 
       ! Calculate covariance matrix by cross-correlation matrix and standard deviation
       DO i = 1, nvar_forc
@@ -307,6 +327,49 @@ CONTAINS
             wliq_soisno_ens(1:nvar_sm,1:DEF_DA_ENS_NUM,np) = &
                max(1e-10, wliq_soisno_ens(1:nvar_sm,1:DEF_DA_ENS_NUM,np) + r_curr_sm(np,:,:))
          ENDIF
+
+         IF (DEF_DA_ENS_SNOW) THEN
+            ! Generate ensemble samples (0, I) for snow
+            CALL random_number(u1)
+            CALL random_number(u2)
+            DO i = 1, DEF_DA_ENS_NUM/2
+               u1(i) = max(u1(i), 1e-10_r8)
+               z_snow(i*2-1) = sqrt(-2.0_r8*log(u1(i))) * cos(2.0_r8*pi*u2(i))
+               z_snow(i*2)   = sqrt(-2.0_r8*log(u1(i))) * sin(2.0_r8*pi*u2(i))
+            ENDDO
+
+            ! Introduce correlation using AR(1) process
+            mean_z_snow = sum(z_snow)/DEF_DA_ENS_NUM
+            std_z_snow = sqrt(sum((z_snow - mean_z_snow)**2)/(DEF_DA_ENS_NUM - 1))
+            z_snow = (z_snow - mean_z_snow)/std_z_snow
+
+            DO i = 1, nvar_snow
+               DO j = 1, DEF_DA_ENS_NUM
+                  r_curr_snow(np,i,j) = phi_snow * r_prev_snow(np,i,j) &
+                                    + sigma_eps_snow * sigma_snow * z_snow(j)
+               ENDDO
+            ENDDO
+
+            ! Normalize the disturbance ensemble samples to mean 0
+            mean_r_snow = sum(r_curr_snow(np,:,:), dim=2)/DEF_DA_ENS_NUM
+            DO i = 1, nvar_snow
+               DO j = 1, DEF_DA_ENS_NUM
+                  r_curr_snow(np,i,j) = r_curr_snow(np,i,j) - mean_r_snow(i)
+               ENDDO
+            ENDDO
+
+            ! Save current perturbation as previous perturbation for next time step
+            r_prev_snow(np,:,:) = r_curr_snow(np,:,:)
+
+            DO j = 1, DEF_DA_ENS_NUM
+               a_snow(j) = snowdp_ens(j,np) * (1.0_r8 + r_curr_snow(np,1,j))
+               a_snow(j) = max(0.0_r8, a_snow(j))
+            ENDDO
+
+            DO j = 1, DEF_DA_ENS_NUM
+               snowdp_ens(j,np) = a_snow(j)
+            ENDDO
+         ENDIF  
       ENDDO
 
    END SUBROUTINE ensemble
@@ -803,6 +866,8 @@ CONTAINS
       IF (allocated(r_curr_forc))   deallocate(r_curr_forc)
       IF (allocated(r_prev_sm  ))   deallocate(r_prev_sm  )
       IF (allocated(r_curr_sm  ))   deallocate(r_curr_sm  )
+      IF (allocated(r_prev_snow))   deallocate(r_prev_snow)
+      IF (allocated(r_curr_snow))   deallocate(r_curr_snow)
       initialized = .false.
 
    END SUBROUTINE end_DA_Ens

@@ -26,6 +26,7 @@ MODULE MOD_DA_Vars_AccVars
    SAVE
 
    INTERFACE acc_DA_hist
+      MODULE PROCEDURE acc_DA_hist_1d
       MODULE PROCEDURE acc_DA_hist_2d
       MODULE PROCEDURE acc_DA_hist_3d
    END INTERFACE acc_DA_hist
@@ -46,6 +47,9 @@ MODULE MOD_DA_Vars_AccVars
    real(r8), allocatable      :: a_t_soisno_ol     (  :,:)  ! Sum of open-loop layer temperature                       [K]
    real(r8), allocatable      :: a_t_soisno_f      (  :,:)  ! Sum of ensemble-mean forecast layer temperature          [K]
    real(r8), allocatable      :: a_t_soisno_a      (  :,:)  ! Sum of ensemble-mean analysis layer temperature          [K]
+   real(r8), allocatable      :: a_snowdp_ol       (    :)  ! Sum of open-loop snow depth                              [m]
+   real(r8), allocatable      :: a_snowdp_f        (    :)  ! Sum of forecast ensemble-mean snow depth                 [m]
+   real(r8), allocatable      :: a_snowdp_a        (    :)  ! Sum of snow depth after analysis                         [m]
 #ifdef GridRiverLakeFlow
    real(r8), allocatable      :: a_discharge_ol    (    :)  ! Open-loop of the  discharge integral                     [m3]
    real(r8), allocatable      :: acctime_ucat_ol   (    :)  ! Open-loop of the  routing duration                       [s]
@@ -77,6 +81,9 @@ CONTAINS
             allocate(a_t_soisno_ol     (maxsnl+1:nl_soil,                 numpatch))
             allocate(a_t_soisno_f      (maxsnl+1:nl_soil,                 numpatch))
             allocate(a_t_soisno_a      (maxsnl+1:nl_soil,                 numpatch))
+            allocate(a_snowdp_ol       (                                  numpatch))
+            allocate(a_snowdp_f        (                                  numpatch))
+            allocate(a_snowdp_a        (                                  numpatch))
          ENDIF
 #ifdef GridRiverLakeFlow
          IF (numucat > 0) THEN
@@ -108,6 +115,9 @@ CONTAINS
       IF (allocated(a_t_soisno_ol    )) deallocate(a_t_soisno_ol    )
       IF (allocated(a_t_soisno_f     )) deallocate(a_t_soisno_f     )
       IF (allocated(a_t_soisno_a     )) deallocate(a_t_soisno_a     )
+      IF (allocated(a_snowdp_ol      )) deallocate(a_snowdp_ol      )
+      IF (allocated(a_snowdp_f       )) deallocate(a_snowdp_f       )
+      IF (allocated(a_snowdp_a       )) deallocate(a_snowdp_a       )
 #ifdef GridRiverLakeFlow
       IF (allocated(a_discharge_ol   )) deallocate(a_discharge_ol   )
       IF (allocated(acctime_ucat_ol  )) deallocate(acctime_ucat_ol  )
@@ -135,6 +145,9 @@ CONTAINS
       IF (allocated(a_t_soisno_ol    )) a_t_soisno_ol     = spval
       IF (allocated(a_t_soisno_f     )) a_t_soisno_f      = spval
       IF (allocated(a_t_soisno_a     )) a_t_soisno_a      = spval
+      IF (allocated(a_snowdp_ol      )) a_snowdp_ol       = spval
+      IF (allocated(a_snowdp_f       )) a_snowdp_f        = spval
+      IF (allocated(a_snowdp_a       )) a_snowdp_a        = spval
 #ifdef GridRiverLakeFlow
       IF (allocated(a_discharge_ol   )) a_discharge_ol    = spval
       IF (allocated(acctime_ucat_ol  )) acctime_ucat_ol   = spval
@@ -164,6 +177,9 @@ CONTAINS
             CALL acc_DA_hist(t_soisno_ol,             a_t_soisno_ol    )
             CALL acc_DA_hist(t_soisno_f,              a_t_soisno_f     )
             CALL acc_DA_hist(t_soisno_a,              a_t_soisno_a     )
+            CALL acc_DA_hist(snowdp_ol,               a_snowdp_ol      )
+            CALL acc_DA_hist(snowdp_f,                a_snowdp_f       )
+            CALL acc_DA_hist(snowdp_a,                a_snowdp_a       )
          ENDIF
       ENDIF
 
@@ -177,6 +193,26 @@ CONTAINS
 !
 !   Remove these copies once the core utilities are moved to an independent
 !   module that DA can use directly.
+!-----------------------------------------------------------------------------
+
+SUBROUTINE acc_DA_hist_1d(var, s)
+
+!-----------------------------------------------------------------------------
+      IMPLICIT NONE
+      real(r8), intent(in) :: var(:)
+      real(r8), intent(inout) :: s(:)
+      integer :: i
+      DO i = 1, SIZE(var)
+         IF (var(i) /= spval) THEN
+            IF (s(i) /= spval) THEN
+               s(i) = s(i) + var(i)
+            ELSE
+               s(i) = var(i)
+            ENDIF
+         ENDIF
+      ENDDO
+   END SUBROUTINE acc_DA_hist_1d
+
 !-----------------------------------------------------------------------------
 
    SUBROUTINE acc_DA_hist_2d(var, s)

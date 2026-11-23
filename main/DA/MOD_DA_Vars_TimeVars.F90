@@ -127,6 +127,9 @@ MODULE MOD_DA_Vars_TimeVars
    real(r8), allocatable           :: t_soisno_ol      (:,:    )  ! Open-loop temperature in layers                          [K]
    real(r8), allocatable           :: t_soisno_f       (:,:    )  ! Ensemble-mean prior temperature in layers                [K]
    real(r8), allocatable           :: t_soisno_a       (:,:    )  ! Ensemble-mean posterior temperature in layers            [K]
+   real(r8), allocatable           :: snowdp_ol        (:      )  ! Open-loop snow depth                                     [m]
+   real(r8), allocatable           :: snowdp_f         (:      )  ! Forecast ensemble-mean snow depth                        [m]
+   real(r8), allocatable           :: snowdp_a         (:      )  ! Ensemble-mean snow depth after analysis                  [m]
 #ifdef GridRiverLakeFlow
    real(r8), allocatable           :: wdsrf_ucat_ol    (:      )  ! Open-loop river water depth                              [m]
    real(r8), allocatable           :: wdsrf_ucat_a     (:      )  ! Analysis river water depth                               [m]
@@ -223,6 +226,9 @@ CONTAINS
             allocate(t_soisno_ol      (                   maxsnl+1:nl_soil,numpatch)); t_soisno_ol      (:,:    ) = spval
             allocate(t_soisno_f       (                   maxsnl+1:nl_soil,numpatch)); t_soisno_f       (:,:    ) = spval
             allocate(t_soisno_a       (                   maxsnl+1:nl_soil,numpatch)); t_soisno_a       (:,:    ) = spval
+            allocate(snowdp_ol        (                                    numpatch)); snowdp_ol        (:      ) = spval
+            allocate(snowdp_f         (                                    numpatch)); snowdp_f         (:      ) = spval
+            allocate(snowdp_a         (                                    numpatch)); snowdp_a         (:      ) = spval
          ENDIF
 #ifdef GridRiverLakeFlow
          IF (numucat > 0) THEN
@@ -321,6 +327,9 @@ CONTAINS
       IF (allocated(t_soisno_ol     )) deallocate(t_soisno_ol     )
       IF (allocated(t_soisno_f      )) deallocate(t_soisno_f      )
       IF (allocated(t_soisno_a      )) deallocate(t_soisno_a      )
+      IF (allocated(snowdp_ol       )) deallocate(snowdp_ol       )
+      IF (allocated(snowdp_f        )) deallocate(snowdp_f        )
+      IF (allocated(snowdp_a        )) deallocate(snowdp_a        )
 #ifdef GridRiverLakeFlow
       IF (allocated(wdsrf_ucat_ol   )) deallocate(wdsrf_ucat_ol   )
       IF (allocated(wdsrf_ucat_a    )) deallocate(wdsrf_ucat_a    )
@@ -457,7 +466,7 @@ CONTAINS
       file_restart = trim(dir_restart)//'/'//trim(cdate)//'/'//trim(site)//'_restart_DA_'//trim(cdate)//'_lc'//trim(cyear)//'.nc'
 
       CALL ncio_read_vector(file_restart, 'z_sno',       -maxsnl,          DEF_DA_ENS_NUM+1, landpatch, z_sno_ens       )
-      CALL ncio_read_vector(file_restart, 'dz_sno',      -maxsnl,          DEF_DA_ENS_NUM+1, landpatch, dz_sno_ens      )
+      CALL ncio_read_vector(file_restart, 'dz_sno',      -maxsnl,          DEF_DA_ENS_NUM+1, landpatch, dz_sno_ens      )   
       CALL ncio_read_vector(file_restart, 't_soisno',    nl_soil - maxsnl, DEF_DA_ENS_NUM+1, landpatch, t_soisno_ens    )
       CALL ncio_read_vector(file_restart, 'wliq_soisno', nl_soil - maxsnl, DEF_DA_ENS_NUM+1, landpatch, wliq_soisno_ens )
       CALL ncio_read_vector(file_restart, 'wice_soisno', nl_soil - maxsnl, DEF_DA_ENS_NUM+1, landpatch, wice_soisno_ens )
