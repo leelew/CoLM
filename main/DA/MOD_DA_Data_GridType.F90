@@ -171,13 +171,13 @@ CONTAINS
       character(len=256)                    :: obs_file_name            ! Full path of current timestep obs file
       logical                               :: exists_file              ! Whether the expected obs file exists
       real(r8), allocatable                 :: lat(:)                   ! Raw obs latitudes
-      real(r8), allocatable                 :: lon(:)                   ! Raw obs longitudes 
+      real(r8), allocatable                 :: lon(:)                   ! Raw obs longitudes
       real(r8), allocatable                 :: time(:)                  ! Raw obs times [s since current UTC day]
-      real(r8), allocatable                 :: y(:)                     ! Raw obs values 
+      real(r8), allocatable                 :: y(:)                     ! Raw obs values
       real(r8), allocatable                 :: sigma(:)                 ! Raw obs error standard deviation
       real(r8), allocatable                 :: theta(:)                 ! Raw incidence angles [rad]
-      integer,  allocatable                 :: ii(:)                    ! Raw obs ii index 
-      integer,  allocatable                 :: jj(:)                    ! Raw obs jj index 
+      integer,  allocatable                 :: ii(:)                    ! Raw obs ii index
+      integer,  allocatable                 :: jj(:)                    ! Raw obs jj index
       logical,  allocatable                 :: valid(:)                 ! Full-length mask for obs inside time window and domain
 !-----------------------------------------------------------------------------
       CALL this%clear()
@@ -250,7 +250,7 @@ CONTAINS
 
       IF (p_is_master) THEN
          IF (exists_file) THEN
-            WRITE (*,'(A,I0,2A)') '[DA] Selected ', this%nobs, 'observations from ', trim(obs_file_name)
+            WRITE (*,'(A,I0,2A)') '[DA] Selected ', this%nobs, ' observations from ', trim(obs_file_name)
          ELSE
             WRITE (*,'(2A)') '[DA] Observation file not found: ', trim(obs_file_name)
          ENDIF
