@@ -156,6 +156,8 @@ CONTAINS
       integer                               :: np
       logical                               :: valid_hx
 !-----------------------------------------------------------------------------
+      IF (.not. p_is_worker .or. numpatch == 0) RETURN
+
       iinsitu = 0
       DO i = 1, size(this%cfgs)
          IF (trim(this%cfgs(i)%source_name) /= 'site') CYCLE
