@@ -253,8 +253,17 @@ CONTAINS
       write (daystr,   '(I2.2)') mday
       write (hourstr,  '(I2.2)') hour
 
-      obs_file_name = trim(DEF_DA_OBS_DIR)//'/'//trim(this%sensor_name)//'/'//trim(this%var_name)//'_'// &
-         trim(yearstr)//'_'//trim(monthstr)//'_'//trim(daystr)//'_'//trim(hourstr)//'.nc'
+      IF (DEF_DA_ENS_SNOW) THEN
+         ! Use the daily snow observation file labeled 10:00
+         obs_file_name = trim(DEF_DA_OBS_DIR)//'/'//trim(this%sensor_name)//'/'// &
+            trim(this%var_name)//'_'//trim(yearstr)//'_'//trim(monthstr)//'_'// &
+            trim(daystr)//'_10.nc'
+      ELSE
+         ! Use the observation file for the current DA window
+         obs_file_name = trim(DEF_DA_OBS_DIR)//'/'//trim(this%sensor_name)//'/'// &
+            trim(this%var_name)//'_'//trim(yearstr)//'_'//trim(monthstr)//'_'// &
+            trim(daystr)//'_'//trim(hourstr)//'.nc'
+      ENDIF
       inquire (file=trim(obs_file_name), exist=exists_file)
 
       IF (exists_file) THEN

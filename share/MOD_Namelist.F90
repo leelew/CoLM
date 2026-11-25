@@ -649,6 +649,7 @@ MODULE MOD_Namelist
    integer            :: DEF_DA_ENS_NUM            = 20
    logical            :: DEF_DA_ENS_SM             = .false.
    logical            :: DEF_DA_ENS_SOILPARAM      = .false.
+   logical            :: DEF_DA_ENS_SNOW           = .false.
 
    integer            :: DEF_DA_OPERATOR_EM_DIEL   = 3
    integer            :: DEF_DA_OPERATOR_EM_ROUGH  = 2
@@ -662,6 +663,9 @@ MODULE MOD_Namelist
    real(r8)           :: DEF_DA_ASSIM_TQ_DRES      = 0.4
    real(r8)           :: DEF_DA_ASSIM_TQ_LOCR      = 40.0
    real(r8)           :: DEF_DA_ASSIM_TQ_INFL      = 1.0
+   real(r8)           :: DEF_DA_ASSIM_SNOW_DRES    = 0.4
+   real(r8)           :: DEF_DA_ASSIM_SNOW_LOCR    = 40.0
+   real(r8)           :: DEF_DA_ASSIM_SNOW_INFL    = 1.0
 
    integer            :: nstream = 0
 
@@ -1208,6 +1212,9 @@ MODULE MOD_Namelist
       logical :: DA_t_soisno_ol                   = .false.
       logical :: DA_t_soisno_f                    = .false.
       logical :: DA_t_soisno_a                    = .false.
+      logical :: DA_snowdp_ol                     = .false.
+      logical :: DA_snowdp_f                      = .false.
+      logical :: DA_snowdp_a                      = .false.
       logical :: DA_hx_ol                         = .false.
       logical :: DA_hx_f                          = .false.
       logical :: DA_hx_a                          = .false.
@@ -1524,6 +1531,7 @@ CONTAINS
       DEF_DA_OBS_FGHZ,                        &
       DEF_DA_ENS_NUM,                         &
       DEF_DA_ENS_SM,                          &
+      DEF_DA_ENS_SNOW,                        &
       DEF_DA_ENS_SOILPARAM,                   &
       DEF_DA_OPERATOR_EM_DIEL,                &
       DEF_DA_OPERATOR_EM_ROUGH,               &
@@ -1536,6 +1544,9 @@ CONTAINS
       DEF_DA_ASSIM_TQ_DRES,                   &
       DEF_DA_ASSIM_TQ_LOCR,                   &
       DEF_DA_ASSIM_TQ_INFL,                   &
+      DEF_DA_ASSIM_SNOW_DRES,                 &
+      DEF_DA_ASSIM_SNOW_LOCR,                 &
+      DEF_DA_ASSIM_SNOW_INFL,                 &
 
       DEF_Optimize_Baseflow,                  &
 
@@ -2347,6 +2358,9 @@ ENDIF
       CALL mpi_bcast (DEF_DA_ASSIM_TQ_DRES                   ,1   ,mpi_real8     ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_ASSIM_TQ_LOCR                   ,1   ,mpi_real8     ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (DEF_DA_ASSIM_TQ_INFL                   ,1   ,mpi_real8     ,p_address_master ,p_comm_glb ,p_err)
+      CALL mpi_bcast (DEF_DA_ASSIM_SNOW_DRES                 ,1   ,mpi_real8     ,p_address_master ,p_comm_glb ,p_err)
+      CALL mpi_bcast (DEF_DA_ASSIM_SNOW_LOCR                 ,1   ,mpi_real8     ,p_address_master ,p_comm_glb ,p_err)
+      CALL mpi_bcast (DEF_DA_ASSIM_SNOW_INFL                 ,1   ,mpi_real8     ,p_address_master ,p_comm_glb ,p_err)
       CALL mpi_bcast (nstream                                ,1   ,mpi_integer   ,p_address_master ,p_comm_glb ,p_err)
 #endif
 
@@ -3073,6 +3087,9 @@ ENDIF
       CALL sync_hist_vars_one (DEF_hist_vars%DA_t_soisno_ol                  , set_defaults)
       CALL sync_hist_vars_one (DEF_hist_vars%DA_t_soisno_f                   , set_defaults)
       CALL sync_hist_vars_one (DEF_hist_vars%DA_t_soisno_a                   , set_defaults)
+      CALL sync_hist_vars_one (DEF_hist_vars%DA_snowdp_ol                    , set_defaults)
+      CALL sync_hist_vars_one (DEF_hist_vars%DA_snowdp_f                     , set_defaults)
+      CALL sync_hist_vars_one (DEF_hist_vars%DA_snowdp_a                     , set_defaults)
       CALL sync_hist_vars_one (DEF_hist_vars%DA_hx_ol                        , set_defaults)
       CALL sync_hist_vars_one (DEF_hist_vars%DA_hx_f                         , set_defaults)
       CALL sync_hist_vars_one (DEF_hist_vars%DA_hx_a                         , set_defaults)

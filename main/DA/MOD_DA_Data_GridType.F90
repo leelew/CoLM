@@ -188,14 +188,21 @@ CONTAINS
       CALL adj2begin(sdate)
       CALL julian2monthday(sdate(1), sdate(2), month, mday)
       hour = int(sdate(3)/3600)
+
+      ! Process MODIS snow observations only in the 10:00 UTC window
+      IF (trim(this%sensor_name) == 'MOD10A1F') THEN
+         IF (hour /= 10) RETURN
+      ENDIF
       write (yearstr,  '(I4.4)') sdate(1)
       write (monthstr, '(I2.2)') month
       write (daystr,   '(I2.2)') mday
       write (hourstr,  '(I2.2)') hour
 
-      ! Whether exists obs for this timestep at domain
-      obs_file_name = trim(DEF_DA_OBS_DIR)//'/'//trim(this%sensor_name)//'/'//trim(this%var_name)//'_'// &
-         trim(yearstr)//'_'//trim(monthstr)//'_'//trim(daystr)//'_'//trim(hourstr)//'.nc'
+      ! Use the observation file for the current DA window
+      obs_file_name = trim(DEF_DA_OBS_DIR)//'/'//trim(this%sensor_name)//'/'// &
+         trim(this%var_name)//'_'//trim(yearstr)//'_'//trim(monthstr)//'_'// &
+         trim(daystr)//'_'//trim(hourstr)//'.nc'
+
       inquire (file=trim(obs_file_name), exist=exists_file)
 
       IF (exists_file) THEN

@@ -100,6 +100,15 @@ CONTAINS
          a_wliq_soisno_ens, file_hist, 'f_wliq_soisno_ens', itime_in_file,                                &
          'soilsnow', maxsnl + 1, nl_soil - maxsnl, 'ens', 1, DEF_DA_ENS_NUM, sumarea_model, filter_model, &
          'Ensemble liquid water in soil layers','kg/m2')
+      CALL write_history_variable_2d( DEF_hist_vars%DA_snowdp_ol,                                         &
+         a_snowdp_ol, file_hist, 'f_snowdp_ol', itime_in_file,                                            &
+         sumarea_model, filter_model, 'Open-loop snow depth', 'm')
+      CALL write_history_variable_2d( DEF_hist_vars%DA_snowdp_f,                                          &
+         a_snowdp_f, file_hist, 'f_snowdp_f', itime_in_file,                                              &
+         sumarea_model, filter_model, 'Forecast ensemble-mean snow depth', 'm')
+      CALL write_history_variable_2d( DEF_hist_vars%DA_snowdp_a,                                          &
+         a_snowdp_a, file_hist, 'f_snowdp_a', itime_in_file,                                              &
+         sumarea_model, filter_model, 'Analysis ensemble-mean snow depth', 'm')
 
       ! Write H(x) diagnostics for each observation stream, excluding ANATQ.
       DO i = 1, nstream

@@ -59,6 +59,7 @@ MODULE MOD_DA_Main
    USE MOD_DA_Assim_TQ
    USE MOD_DA_Assim_SM
    USE MOD_DA_Assim_ST
+   USE MOD_DA_Assim_SNOW
    USE MOD_DA_Vars_AccVars
    IMPLICIT NONE
    SAVE
@@ -68,6 +69,7 @@ MODULE MOD_DA_Main
    logical :: use_assim_disc = .false.
    logical :: use_assim_sm   = .false.
    logical :: use_assim_st   = .false.
+   logical :: use_assim_snow = .false.
 
 !-----------------------------------------------------------------------------
 
@@ -85,10 +87,12 @@ CONTAINS
 #endif
       use_assim_sm   = any(DEF_DA_OBS_TARGET == 'SM' )
       use_assim_st   = any(DEF_DA_OBS_TARGET == 'ST' )
+      use_assim_snow = any(DEF_DA_OBS_TARGET == 'SNOW')
 
       IF (use_assim_2mt .or. use_assim_2mq) CALL init_DA_TQ()
       IF (use_assim_sm) CALL init_DA_SM()
       IF (use_assim_st) CALL init_DA_ST()
+      IF (use_assim_snow) CALL init_DA_SNOW()
 
    END SUBROUTINE init_DA
 
@@ -127,6 +131,7 @@ CONTAINS
          IF (use_assim_2mt .or. use_assim_2mq) CALL run_DA_TQ(idate, deltim)
          IF (use_assim_sm) CALL run_DA_SM(idate, deltim)
          IF (use_assim_st) CALL run_DA_ST(idate, deltim)
+         IF (use_assim_snow) CALL run_DA_SNOW(idate, deltim)
 #ifdef GridRiverLakeFlow
          IF (use_assim_disc) CALL run_DA_DISC(idate, deltim)
 #endif
@@ -149,11 +154,13 @@ CONTAINS
       IF (use_assim_2mt .or. use_assim_2mq) CALL end_DA_TQ()
       IF (use_assim_sm) CALL end_DA_SM()
       IF (use_assim_st) CALL end_DA_ST()
+      IF (use_assim_snow) CALL end_DA_SNOW()
 
       use_assim_2mt  = .false.
       use_assim_2mq  = .false.
       use_assim_sm   = .false.
       use_assim_st   = .false.
+      use_assim_snow = .false.
       use_assim_disc = .false.
 
    END SUBROUTINE end_DA

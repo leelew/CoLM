@@ -405,6 +405,7 @@ MOD_Grid_RiverLakeHistRoute.o: MOD_Grid_RiverLakeHistShard.o MOD_Grid_Reservoir.
 MOD_Grid_RiverLakeTimeVars.o: MOD_Grid_RiverLakeBifurcation.o MOD_Grid_RiverLakeLevee.o
 MOD_Vars_TimeVariables.o: MOD_Grid_RiverLakeTimeVars.o
 MOD_Grid_RiverLakeFlow.o: MOD_Grid_RiverLakeHist.o
+MOD_DA_Assim_SNOW.o: MOD_SnowLayersCombineDivide.o
 
 OBJS_MAIN_T = $(addprefix .bld/,${OBJS_MAIN})
 
