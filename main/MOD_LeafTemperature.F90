@@ -262,11 +262,13 @@ CONTAINS
         cgrnds,     &! deriv of soil latent heat flux wrt soil temp [w/m**2/k]
         tref,       &! 2 m height air temperature (kelvin)
         qref,       &! 2 m height air specific humidity
-        rstfacsun,  &! factor of soil water stress to transpiration on sunlit leaf
-        rstfacsha,  &! factor of soil water stress to transpiration on shaded leaf
         gssun,      &! stomata conductance of sunlit leaf
         gssha,      &! stomata conductance of shaded leaf
-        rootflux(1:nl_soil)  ! root water uptake from different layers
+        rootflux(1:nl_soil)
+
+   real(r8), intent(inout) :: &
+        rstfacsun,  &! factor of soil water stress to transpiration on sunlit leaf
+        rstfacsha    ! factor of soil water stress to transpiration on shaded leaf
 
    real(r8), intent(inout) :: &
         assimsun,   &! sunlit leaf assimilation rate [umol co2 /m**2/ s] [+]
@@ -692,7 +694,13 @@ CONTAINS
             ! leaf to canopy level
             rbsun = rb / laisun
             rbsha = rb / laisha
-
+            
+            IF (rstfacsun < 0._r8 .or. rstfacsha < 0._r8) THEN
+               write(*,*) 'ERROR BEFORE STOMATA, ipatch:', ipatch
+               write(*,*) 'rstfacsun, rstfacsha:', rstfacsun, rstfacsha
+               write(*,*) 'pco2m, pco2a:', pco2m, pco2a
+               write(*,*) 'parsun, parsha:', parsun, parsha
+            ENDIF
             ! Sunlit leaves
             CALL stomata  (vmax25   ,effcon   ,slti     ,hlti     ,&
                  shti     ,hhti     ,trda     ,trdm     ,trop     ,&
