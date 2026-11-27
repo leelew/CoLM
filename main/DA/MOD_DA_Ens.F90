@@ -159,10 +159,10 @@ CONTAINS
          initialized = .true.
 
          ! Apply fixed soil parameter samples from the const file once.
+         porsl_ens  = spread(porsl,  2, DEF_DA_ENS_NUM+1)
+         hksati_ens = spread(hksati, 2, DEF_DA_ENS_NUM+1)
+         
          IF (DEF_DA_ENS_SOILPARAM) THEN
-            porsl_ens  = spread(porsl,  2, DEF_DA_ENS_NUM+1)
-            hksati_ens = spread(hksati, 2, DEF_DA_ENS_NUM+1)
-
             DO np = 1, numpatch
                IF (patchtype(np) /= 0) CYCLE
                DO il = 1, nl_soil
