@@ -694,7 +694,8 @@ CONTAINS
             ! leaf to canopy level
             rbsun = rb / laisun
             rbsha = rb / laisha
-            
+
+
             ! Sunlit leaves
             CALL stomata  (vmax25   ,effcon   ,slti     ,hlti     ,&
                  shti     ,hhti     ,trda     ,trdm     ,trop     ,&
