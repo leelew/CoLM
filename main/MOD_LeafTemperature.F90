@@ -695,12 +695,6 @@ CONTAINS
             rbsun = rb / laisun
             rbsha = rb / laisha
             
-            IF (rstfacsun < 0._r8 .or. rstfacsha < 0._r8) THEN
-               write(*,*) 'ERROR BEFORE STOMATA, ipatch:', ipatch
-               write(*,*) 'rstfacsun, rstfacsha:', rstfacsun, rstfacsha
-               write(*,*) 'pco2m, pco2a:', pco2m, pco2a
-               write(*,*) 'parsun, parsha:', parsun, parsha
-            ENDIF
             ! Sunlit leaves
             CALL stomata  (vmax25   ,effcon   ,slti     ,hlti     ,&
                  shti     ,hhti     ,trda     ,trdm     ,trop     ,&
